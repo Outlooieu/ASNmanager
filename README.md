@@ -3,6 +3,33 @@
 
 ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to easily route specific Autonomous Systems (ASNs) through your primary WAN, secondary WAN, OpenVPN clients, or WireGuard tunnels.
 
+```
+================================================================
+  _   ___ _  _   __  __   _   _  _   _   ___ ___  ___
+ /_\ / __| \| | |  \/  | /_\ | \| | /_\ / __| __|| _ \
+/ _ \__ \ .' | | |\/| |/ _ \| .' |/ _ \ (_ | _| |   /
+/_/ \_\___/_|\_| |_|  |_/_/ \_\_|\_/_/ \_\___|___||_|_\
+              === ASN MANAGER v1.0.0 ===
+================================================================
+ [1]  View current ASN list & routing targets
+ [2]  Add ASN(s) with Target Interface selection
+ [3]  Find ASN for Domain / IP (Find, Add & Delete)
+ [4]  Add ASN Service Presets (AWS, Netflix, Gaming, Streaming...)
+ [5]  Remove ASN or Service Preset
+ [6]  Build & Apply New Routing Rules (Split @ 3000 max)
+ [7]  Check ipset Status & Per-ASN Subnet Count
+ [8]  Test IP or Domain Routing
+ [9]  Show active interface IP addresses & countries
+ [10] Run Traceroute to IP or Domain
+ [11] Update ASN Manager on GitHub
+ [12] Set ASN IP Subnet Auto-Refresh Schedule (Every 1d @ 04:30)
+ [13] Backup & Restore Configuration (Internal / USB)
+ [14] Uninstall ASN Manager
+ [0]  Exit
+----------------------------------------------------------------
+Select an option [0-14]:
+
+```
 
 Key Features:
 
