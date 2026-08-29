@@ -48,17 +48,24 @@ Backup & Restore: Easily export and import your configuration locally to /jffs o
 Quick Installation:
 
 Run the following command in your router's terminal via SSH:
+```
 sh -c "$(curl -k -s https://raw.githubusercontent.com/Outlooieu/ASNmanager/main/ASNmanager.sh)"
+```
+
 
 Start the script with the code above or
 
+```
 /jffs/scripts/ASNmanager.sh
+```
 
-Screenshots:
-1000289750.jpg
-1000289764.jpg
-1000289754.jpg
-Description:
+Run this single command in your router's SSH terminal to install, configure persistence hooks, and open the manager menu:
+
+```
+bash
+curl -f -sS [https://raw.githubusercontent.com/Outlooieu/asuswrt-asn-bypass/main/asn-bypass.sh](https://raw.githubusercontent.com/Outlooieu/asuswrt-asn-bypass/main/asn-bypass.sh) -o /jffs/scripts/asn-bypass.sh && chmod +x /jffs/scripts/asn-bypass.sh && grep -qF "/jffs/scripts/asn-bypass-worker.sh &" /jffs/scripts/nat-start 2>/dev/null || echo "/jffs/scripts/asn-bypass-worker.sh &" >> /jffs/scripts/nat-start && chmod +x /jffs/scripts/nat-start && grep -qF "cru a asn_bypass_update" /jffs/scripts/services-start 2>/dev/null || echo 'cru a asn_bypass_update "30 4 * * * /jffs/scripts/asn-bypass-worker.sh"' >> /jffs/scripts/services-start && chmod +x /jffs/scripts/services-start && cru a asn_bypass_update "30 4 * * * /jffs/scripts/asn-bypass-worker.sh" && /jffs/scripts/asn-bypass.sh
+```
+bash
 
 Here is a short guide for each menu option of the ASN Manager:
 
