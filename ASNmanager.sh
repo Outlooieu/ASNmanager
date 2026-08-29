@@ -353,23 +353,71 @@ prompt_source_ip() {
 service_presets() {
     clear
     echo -e "${YELLOW}--- Add ASN Service Presets ---${NC}"
-    echo -e " [1]  Amazon / AWS | [2] Google | [3] YouTube | [4] Netflix"
-    echo -e " [5]  Cloudflare   | [6] Steam  | [7] Meta    | [8] Microsoft"
-    echo -e " [9]  Apple        | [10] Telegram"
+    echo -e " [1]  Amazon / AWS (AS16509, AS14618)"
+    echo -e " [2]  Google Services (AS15169, AS8075, AS22577)"
+    echo -e " [3]  YouTube (AS43515, AS36040)"
+    echo -e " [4]  Netflix (AS2906, AS40027)"
+    echo -e " [5]  Cloudflare (AS13335, AS209242)"
+    echo -e " [6]  Steam / Valve (AS32590)"
+    echo -e " [7]  Meta / Facebook / IG / WhatsApp (AS32934, AS63293)"
+    echo -e " [8]  Microsoft / Azure / Xbox (AS8075, AS8068, AS8074, AS36444)"
+    echo -e " [9]  Apple / iCloud (AS714)"
+    echo -e " [10] Telegram (AS62041, AS59930, AS44907, AS211157, AS20473)"
+    echo -e " [11] Akamai CDN (AS20940, AS16625)"
+    echo -e " [12] Fastly CDN (AS54113)"
+    echo -e " [13] PlayStation / Sony (AS33494, AS19684, AS29237)"
+    echo -e " [14] TikTok / ByteDance (AS138699, AS396986)"
+    echo -e " [15] Hetzner & OVH Hosting (AS24940, AS16276)"
+    echo -e " [16] Disney+ / Hulu (AS394464)"
+    echo -e " [17] Spotify (AS8403, AS45102, AS23507)"
+    echo -e " [18] Twitch (AS46489)"
+    echo -e " [19] Riot Games / LoL / Valorant (AS6507)"
+    echo -e " [20] Epic Games (AS32252, AS13488)"
+    echo -e " [21] Nintendo (AS9003)"
+    echo -e " [22] Zoom (AS20224, AS394622)"
+    echo -e " [23] DigitalOcean & Linode (AS14061, AS63949)"
+    echo -e " [24] Oracle Cloud (AS31898)"
+    echo -e " [25] OpenAI / ChatGPT (AS398324)"
+    echo -e " [26] GitHub (AS36459, AS19864)"
+    echo -e " [27] NVIDIA / GeForce NOW (AS40676)"
+    echo -e " [28] EA / Electronic Arts (AS29748)"
+    echo -e " [29] Blizzard / Battle.net (AS57976)"
+    echo -e " [30] Ubisoft (AS32499)"
     echo -e " [0]  Cancel"
-    echo -n "Select preset [0-10]: "
+    echo ""
+    echo -n "Select preset [0-30]: "
     read -r p_opt
     case "$p_opt" in
-        1) PRESET_ASNS="16509 14618" ;;
-        2) PRESET_ASNS="15169 8075 22577" ;;
-        3) PRESET_ASNS="43515 36040" ;;
-        4) PRESET_ASNS="2906 40027" ;;
-        5) PRESET_ASNS="13335 209242" ;;
-        6) PRESET_ASNS="32590" ;;
-        7) PRESET_ASNS="32934 63293" ;;
-        8) PRESET_ASNS="8075 8068 8074 36444" ;;
-        9) PRESET_ASNS="714" ;;
+        1)  PRESET_ASNS="16509 14618" ;;
+        2)  PRESET_ASNS="15169 8075 22577" ;;
+        3)  PRESET_ASNS="43515 36040" ;;
+        4)  PRESET_ASNS="2906 40027" ;;
+        5)  PRESET_ASNS="13335 209242" ;;
+        6)  PRESET_ASNS="32590" ;;
+        7)  PRESET_ASNS="32934 63293" ;;
+        8)  PRESET_ASNS="8075 8068 8074 36444" ;;
+        9)  PRESET_ASNS="714" ;;
         10) PRESET_ASNS="62041 59930 44907 211157 20473" ;;
+        11) PRESET_ASNS="20940 16625" ;;
+        12) PRESET_ASNS="54113" ;;
+        13) PRESET_ASNS="33494 19684 29237" ;;
+        14) PRESET_ASNS="138699 396986" ;;
+        15) PRESET_ASNS="24940 16276" ;;
+        16) PRESET_ASNS="394464" ;;
+        17) PRESET_ASNS="8403 45102 23507" ;;
+        18) PRESET_ASNS="46489" ;;
+        19) PRESET_ASNS="6507" ;;
+        20) PRESET_ASNS="32252 13488" ;;
+        21) PRESET_ASNS="9003" ;;
+        22) PRESET_ASNS="20224 394622" ;;
+        23) PRESET_ASNS="14061 63949" ;;
+        24) PRESET_ASNS="31898" ;;
+        25) PRESET_ASNS="398324" ;;
+        26) PRESET_ASNS="36459 19864" ;;
+        27) PRESET_ASNS="40676" ;;
+        28) PRESET_ASNS="29748" ;;
+        29) PRESET_ASNS="57976" ;;
+        30) PRESET_ASNS="32499" ;;
         *) return ;;
     esac
 
@@ -388,12 +436,126 @@ service_presets() {
 
 remove_menu() {
     clear
-    echo -e "${YELLOW}--- Remove ASN ---${NC}"
-    echo -n "Enter ASN number to remove (e.g. 15169): "
-    read -r rem_asn
-    clean_rem=$(echo "$rem_asn" | sed -E 's/[Aa][Ss]([0-9]+)/\1/g')
-    [ -n "$clean_rem" ] && sed -i "/^${clean_rem}:/d" "$ASN_FILE"
-    echo -e "${GREEN}ASN AS$clean_rem removed if present. Run Option [6] to apply rules.${NC}"
+    echo -e "${YELLOW}--- Remove ASN or Service Preset ---${NC}"
+    echo -e " [1] Remove Individual ASN"
+    echo -e " [2] Remove Service Preset"
+    echo -e " [3] Clear ALL ASNs & Reset List"
+    echo -e " [0] Cancel"
+    echo ""
+    echo -n "Select option [0-3]: "
+    read -r r_opt
+    case "$r_opt" in
+        1)
+            echo ""
+            echo -n "Enter ASN number to remove (e.g. 15169): "
+            read -r rem_asn
+            clean_rem=$(echo "$rem_asn" | sed -E 's/[Aa][Ss]([0-9]+)/\1/g')
+            [ -n "$clean_rem" ] && sed -i "/^${clean_rem}:/d" "$ASN_FILE"
+            echo -e "${GREEN}ASN AS$clean_rem removed if present. Run Option [6] to apply rules.${NC}"
+            ;;
+        2)
+            clear
+            echo -e "${YELLOW}Select Service Preset to Remove:${NC}"
+            echo -e " [1]  Amazon / AWS (AS16509, AS14618)"
+            echo -e " [2]  Google Services (AS15169, AS8075, AS22577)"
+            echo -e " [3]  YouTube (AS43515, AS36040)"
+            echo -e " [4]  Netflix (AS2906, AS40027)"
+            echo -e " [5]  Cloudflare (AS13335, AS209242)"
+            echo -e " [6]  Steam / Valve (AS32590)"
+            echo -e " [7]  Meta / Facebook / IG / WhatsApp (AS32934, AS63293)"
+            echo -e " [8]  Microsoft / Azure / Xbox (AS8075, AS8068, AS8074, AS36444)"
+            echo -e " [9]  Apple / iCloud (AS714)"
+            echo -e " [10] Telegram (AS62041, AS59930, AS44907, AS211157, AS20473)"
+            echo -e " [11] Akamai CDN (AS20940, AS16625)"
+            echo -e " [12] Fastly CDN (AS54113)"
+            echo -e " [13] PlayStation / Sony (AS33494, AS19684, AS29237)"
+            echo -e " [14] TikTok / ByteDance (AS138699, AS396986)"
+            echo -e " [15] Hetzner & OVH Hosting (AS24940, AS16276)"
+            echo -e " [16] Disney+ / Hulu (AS394464)"
+            echo -e " [17] Spotify (AS8403, AS45102, AS23507)"
+            echo -e " [18] Twitch (AS46489)"
+            echo -e " [19] Riot Games / LoL / Valorant (AS6507)"
+            echo -e " [20] Epic Games (AS32252, AS13488)"
+            echo -e " [21] Nintendo (AS9003)"
+            echo -e " [22] Zoom (AS20224, AS394622)"
+            echo -e " [23] DigitalOcean & Linode (AS14061, AS63949)"
+            echo -e " [24] Oracle Cloud (AS31898)"
+            echo -e " [25] OpenAI / ChatGPT (AS398324)"
+            echo -e " [26] GitHub (AS36459, AS19864)"
+            echo -e " [27] NVIDIA / GeForce NOW (AS40676)"
+            echo -e " [28] EA / Electronic Arts (AS29748)"
+            echo -e " [29] Blizzard / Battle.net (AS57976)"
+            echo -e " [30] Ubisoft (AS32499)"
+            echo -e " [0]  Cancel"
+            echo ""
+            echo -n "Select preset to remove [0-30]: "
+            read -r p_rem
+            case "$p_rem" in
+                1)  REM_ASNS="16509 14618" ;;
+                2)  REM_ASNS="15169 8075 22577" ;;
+                3)  REM_ASNS="43515 36040" ;;
+                4)  REM_ASNS="2906 40027" ;;
+                5)  REM_ASNS="13335 209242" ;;
+                6)  REM_ASNS="32590" ;;
+                7)  REM_ASNS="32934 63293" ;;
+                8)  REM_ASNS="8075 8068 8074 36444" ;;
+                9)  REM_ASNS="714" ;;
+                10) REM_ASNS="62041 59930 44907 211157 20473" ;;
+                11) REM_ASNS="20940 16625" ;;
+                12) REM_ASNS="54113" ;;
+                13) REM_ASNS="33494 19684 29237" ;;
+                14) REM_ASNS="138699 396986" ;;
+                15) REM_ASNS="24940 16276" ;;
+                16) REM_ASNS="394464" ;;
+                17) REM_ASNS="8403 45102 23507" ;;
+                18) REM_ASNS="46489" ;;
+                19) REM_ASNS="6507" ;;
+                20) REM_ASNS="32252 13488" ;;
+                21) REM_ASNS="9003" ;;
+                22) REM_ASNS="20224 394622" ;;
+                23) REM_ASNS="14061 63949" ;;
+                24) REM_ASNS="31898" ;;
+                25) REM_ASNS="398324" ;;
+                26) REM_ASNS="36459 19864" ;;
+                27) REM_ASNS="40676" ;;
+                28) REM_ASNS="29748" ;;
+                29) REM_ASNS="57976" ;;
+                30) REM_ASNS="32499" ;;
+                *) return ;;
+            esac
+            for asn in $REM_ASNS; do
+                sed -i "/^${asn}:/d" "$ASN_FILE"
+            done
+            echo -e "${GREEN}Preset ASNs removed! Run Option [6] to apply rules.${NC}"
+            ;;
+        3)
+            echo ""
+            echo -n "Are you sure you want to clear ALL configured ASNs? (y/n): "
+            read -r confirm_all
+            case "$confirm_all" in
+                [Yy]*)
+                    > "$ASN_FILE"
+                    > "$STATS_FILE"
+                    for active_set in $(ipset list -n | grep "^ASN_"); do
+                        dest_name=$(echo "$active_set" | sed -E 's/ASN_([^_]+).*/\1/')
+                        info=$(get_target_info "$dest_name")
+                        if [ -n "$info" ]; then
+                            FWMARK=$(echo "$info" | cut -d' ' -f2)/$(echo "$info" | cut -d' ' -f2)
+                            iptables -t mangle -D PREROUTING -m set --match-set "$active_set" dst -j MARK --set-mark "$FWMARK" 2>/dev/null
+                            iptables -t mangle -D OUTPUT -m set --match-set "$active_set" dst -j MARK --set-mark "$FWMARK" 2>/dev/null
+                        fi
+                        ipset flush "$active_set" 2>/dev/null
+                        ipset destroy "$active_set" 2>/dev/null
+                    done
+                    echo -e "${GREEN}All ASNs cleared and active tables destroyed successfully!${NC}"
+                    ;;
+                *)
+                    echo -e "${YELLOW}Operation cancelled.${NC}"
+                    ;;
+            esac
+            ;;
+        *) return ;;
+    esac
     sleep 2
 }
 
@@ -403,7 +565,8 @@ is_remote_newer() {
         split(cur, c, ".");
         split(rem, r, ".");
         for (i = 1; i <= 3; i++) {
-            c[i] = c[i] + 0; r[i] = r[i] + 0;
+            c[i] = c[i] + 0;
+            r[i] = r[i] + 0;
             if (r[i] > c[i]) exit 0;
             if (r[i] < c[i]) exit 1;
         }
@@ -413,49 +576,95 @@ is_remote_newer() {
 
 update_self() {
     clear
-    echo -e "${YELLOW}--- Updating ASN Manager ---${NC}"
+    echo -e "${YELLOW}--- Updating ASN Manager on GitHub ---${NC}"
+    echo -e "Installed Version: ${CYAN}v${SCRIPT_VERSION}${NC}"
+    echo -e "${CYAN}Checking GitHub for available script updates...${NC}\n"
+    
     TMP_SCRIPT="/tmp/ASNmanager-update.sh"
     rm -f "$TMP_SCRIPT" 2>/dev/null
+
     FETCH_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/ASNmanager.sh"
 
-    if curl -s -S -k --connect-timeout 10 "$FETCH_URL" -o "$TMP_SCRIPT" && [ -s "$TMP_SCRIPT" ]; then
+    if curl -s -S -k --connect-timeout 10 "$FETCH_URL" -o "$TMP_SCRIPT"; then
+        if [ ! -s "$TMP_SCRIPT" ] || grep -q "404: Not Found" "$TMP_SCRIPT"; then
+            FETCH_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/master/ASNmanager.sh"
+            curl -s -S -k --connect-timeout 10 "$FETCH_URL" -o "$TMP_SCRIPT"
+        fi
+
+        if [ ! -s "$TMP_SCRIPT" ]; then
+            rm -f "$TMP_SCRIPT" 2>/dev/null
+            echo -e "${RED}Update check failed! Downloaded file is empty or missing on GitHub.${NC}"
+            echo "" && echo -n "Press Enter to return..." && read -r _
+            return
+        fi
+
         sed -i 's/\r$//' "$TMP_SCRIPT" 2>/dev/null
         REMOTE_VERSION=$(grep -m 1 "^SCRIPT_VERSION=" "$TMP_SCRIPT" | cut -d'"' -f2 | tr -d '\r')
-        if [ "$SCRIPT_VERSION" = "$REMOTE_VERSION" ]; then
-            echo -e "${GREEN}Already running latest v${SCRIPT_VERSION}.${NC}"
+
+        echo -e "Remote Version on GitHub: ${CYAN}v${REMOTE_VERSION:-unknown}${NC}"
+
+        if [ -z "$REMOTE_VERSION" ]; then
+            echo -e "${RED}Error: Unable to parse version from downloaded file.${NC}"
+            rm -f "$TMP_SCRIPT" 2>/dev/null
+        elif [ "$SCRIPT_VERSION" = "$REMOTE_VERSION" ]; then
+            echo -e "${GREEN}You are already running the latest version (v${SCRIPT_VERSION}). No update needed.${NC}"
+            rm -f "$TMP_SCRIPT" 2>/dev/null
         elif is_remote_newer "$SCRIPT_VERSION" "$REMOTE_VERSION"; then
-            cp "$TMP_SCRIPT" /jffs/scripts/ASNmanager.sh && chmod +x /jffs/scripts/ASNmanager.sh
-            echo -e "${GREEN}Updated to v${REMOTE_VERSION}! Reloading...${NC}"
-            sleep 1; exec /bin/sh /jffs/scripts/ASNmanager.sh
+            echo -e "New version available: ${GREEN}v${REMOTE_VERSION}${NC} (Installed: v${SCRIPT_VERSION})"
+            echo -n "Do you want to update now? (y/n): "
+            read -r confirm
+            case "$confirm" in
+                [Yy]*)
+                    cp "$TMP_SCRIPT" /jffs/scripts/ASNmanager.sh
+                    chmod +x /jffs/scripts/ASNmanager.sh
+                    sed -i 's/\r$//' /jffs/scripts/ASNmanager.sh 2>/dev/null
+                    rm -f "$TMP_SCRIPT" 2>/dev/null
+                    logger -t "ASN-Manager" "Script updated to v${REMOTE_VERSION} via menu." 2>/dev/null
+                    echo -e "\n${GREEN}Update successful! Reloading ASN Manager...${NC}"
+                    sleep 1
+                    exec /bin/sh /jffs/scripts/ASNmanager.sh
+                    ;;
+                *)
+                    echo -e "${YELLOW}Update cancelled.${NC}"
+                    rm -f "$TMP_SCRIPT" 2>/dev/null
+                    ;;
+            esac
         else
-            echo -e "${GREEN}Installed version is newer.${NC}"
+            echo -e "${GREEN}Your installed version (v${SCRIPT_VERSION}) is newer than GitHub (v${REMOTE_VERSION}). No update needed.${NC}"
+            rm -f "$TMP_SCRIPT" 2>/dev/null
         fi
     else
-        echo -e "${RED}Update check failed!${NC}"
+        rm -f "$TMP_SCRIPT" 2>/dev/null
+        echo -e "${RED}Update check failed! Could not reach GitHub.${NC}"
     fi
-    rm -f "$TMP_SCRIPT" 2>/dev/null
-    echo -n "Press Enter to return..." && read -r _
+    echo "" && echo -n "Press Enter to return..." && read -r _
 }
 
 show_menu() {
     clear
     load_schedule
     echo -e "${CYAN}================================================================${NC}"
+    echo -e "${GREEN}"
+    echo -e "  _   ___ _  _   __  __   _   _  _   _   ___ ___  ___ "
+    echo -e " /_\\ / __| \\| | |  \\/  | /_\\ | \\| | /_\\ / __| __|| _ \\"
+    echo -e "/ _ \\\\__ \\ .' | | |\\/| |/ _ \\| .' |/ _ \\ (_ | _| |   /"
+    echo -e "/_/ \\_\\___/_|\\_| |_|  |_/_/ \\_\\_|\\_/_/ \\_\\___|___||_|_\\"
+    echo -e "${NC}"
     echo -e "${YELLOW}              === ASN MANAGER v${SCRIPT_VERSION} ===${NC}"
     echo -e "${CYAN}================================================================${NC}"
     echo -e " [1]  View current ASN list & routing targets"
     echo -e " [2]  Add ASN(s) with Target Interface & Source IP"
-    echo -e " [3]  Find ASN for Domain / IP"
-    echo -e " [4]  Add ASN Service Presets"
-    echo -e " [5]  Remove ASN"
-    echo -e " [6]  Build & Apply New Routing Rules"
-    echo -e " [7]  Check ipset Status & Subnet Count"
+    echo -e " [3]  Find ASN for Domain / IP (Find, Add & Delete)"
+    echo -e " [4]  Add ASN Service Presets (AWS, Netflix, Gaming, Streaming...)"
+    echo -e " [5]  Remove ASN or Service Preset"
+    echo -e " [6]  Build & Apply New Routing Rules (Split @ 3000 max)"
+    echo -e " [7]  Check ipset Status & Per-ASN Subnet Count"
     echo -e " [8]  Test IP or Domain Routing"
     echo -e " [9]  Show active interface IP addresses & countries"
     echo -e " [10] Run Traceroute to IP or Domain"
     echo -e " [11] Update ASN Manager on GitHub"
-    echo -e " [12] Set Auto-Refresh Schedule (Every ${INTERVAL}d @ ${TIME_VAL})"
-    echo -e " [13] Backup & Restore Configuration"
+    echo -e " [12] Set ASN IP Subnet Auto-Refresh Schedule (Every ${INTERVAL}d @ ${TIME_VAL})"
+    echo -e " [13] Backup & Restore Configuration (Internal / USB)"
     echo -e " [14] Uninstall ASN Manager"
     echo -e " [0]  Exit"
     echo -e "${CYAN}----------------------------------------------------------------${NC}"
@@ -463,11 +672,15 @@ show_menu() {
 }
 
 rebuild_worker() {
-    [ ! -s "$ASN_FILE" ] && echo -e "${RED}Error: ASN list is empty.${NC}" && return 1
+    if [ ! -s "$ASN_FILE" ]; then
+        logger -t "ASN-Manager" "Error: ASN list is empty. Aborting build." 2>/dev/null
+        echo -e "${RED}Error: ASN list is empty. Add ASNs first via Option [2], [3], or [4].${NC}"
+        return 1
+    fi
 
     cat << 'WORKER_EOF' > "$WORKER_SCRIPT"
 #!/bin/sh
-# Generated by ASN Manager
+# Generated by ASN Manager (Chunked High-Performance Engine)
 
 ASN_FILE="/jffs/scripts/asn_list.txt"
 STATS_FILE="/tmp/asn_counts.txt"
@@ -481,6 +694,7 @@ until ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; do
     sleep 2
 done
 
+logger -t "ASN-Manager" "Network ready. Fetching IP subnets and building rules..."
 > "$STATS_FILE"
 
 get_ifname() {
@@ -543,7 +757,6 @@ fetch_asn_prefixes() {
     echo "$prefixes" > "$tmp_file"
 }
 
-# Clean old rules/sets
 for active_set in $(ipset list -n | grep "^ASN_"); do
     dest_name=$(echo "$active_set" | sed -E 's/ASN_([^_]+).*/\1/')
     info=$(get_info "$dest_name")
@@ -556,7 +769,6 @@ for active_set in $(ipset list -n | grep "^ASN_"); do
     ipset destroy "$active_set" 2>/dev/null
 done
 
-# Read ASN list entries (Format: ASN:DEST:SRC_IP)
 while IFS=':' read -r asn dest src_ip; do
     [ -z "$asn" ] || [ -z "$dest" ] && continue
     info=$(get_info "$dest")
@@ -566,7 +778,7 @@ while IFS=':' read -r asn dest src_ip; do
     FWMARK="$(echo "$info" | cut -d' ' -f2)/$(echo "$info" | cut -d' ' -f2)"
     PRIO=$(echo "$info" | cut -d' ' -f3)
 
-    echo "Fetching AS${asn} for ${dest}..."
+    echo -e "  ${YELLOW}[*]${NC} Requesting subnets for AS${asn}..."
     fetch_asn_prefixes "$asn"
     
     tmp_file="/tmp/asn_${asn}.txt"
@@ -583,7 +795,6 @@ while IFS=':' read -r asn dest src_ip; do
             ip rule del fwmark "$FWMARK" 2>/dev/null
             ip rule add from 0/0 fwmark "$FWMARK" table "$TABLE" prio "$PRIO"
 
-            # Apply iptables with or without source IP restriction
             if [ -n "$src_ip" ]; then
                 iptables -t mangle -I PREROUTING 1 -s "$src_ip" -m set --match-set "$IPSET_NAME" dst -j MARK --set-mark "$FWMARK"
             else
@@ -614,113 +825,217 @@ while true; do
                     echo -e " AS${asn} -> ${GREEN}${dest}${NC} [Source: ${CYAN}${src_ip}${NC}]"
                 done < "$ASN_FILE"
             else
-                echo -e "${RED}List is empty.${NC}"
+                echo -e "${RED}ASN list is currently empty.${NC}"
             fi
             echo "" && echo -n "Press Enter to return..." && read -r _
             ;;
         2)
             clear
             echo -e "${YELLOW}--- Add ASN(s) ---${NC}"
-            echo -n "Enter ASN(s) (e.g. 15169 or AS15169, 13335): "
+            echo -e "Enter one or multiple ASNs (e.g. ${GREEN}AS15169, 13335 8075${NC}):"
             read -r new_asns
             if [ -n "$new_asns" ]; then
                 prompt_destination
                 if [ "$SELECTED_DEST" != "CANCEL" ]; then
                     prompt_source_ip
-                    clean_asns=$(echo "$new_asns" | tr ',' ' ' | sed -E 's/[Aa][Ss]([0-9]+)/\1/g')
+                    clean_asns=$(echo "$new_asns" | tr ',' ' ' | tr ';' ' ' | sed -E 's/[Aa][Ss]([0-9]+)/\1/g')
                     for asn in $clean_asns; do
                         case $asn in
                             ''|*[!0-9]*) ;;
-                            *)
+                            *) 
                                 sed -i "/^${asn}:/d" "$ASN_FILE"
                                 echo "${asn}:${SELECTED_DEST}:${SELECTED_SRC_IP}" >> "$ASN_FILE"
                                 ;;
                         esac
                     done
                     sort -u "$ASN_FILE" -o "$ASN_FILE" 2>/dev/null
-                    echo -e "${GREEN}ASN(s) added successfully! Run Option [6] to apply rules.${NC}"
+                    echo -e "${GREEN}ASN(s) assigned to ${SELECTED_DEST} successfully.${NC}"
+                else
+                    echo -e "${YELLOW}Operation cancelled.${NC}"
                 fi
+            else
+                echo -e "${RED}No input received.${NC}"
             fi
-            sleep 2
+            sleep 1.5
             ;;
         3)
             clear
             echo -e "${YELLOW}--- Find ASN for Domain / IP ---${NC}"
-            echo -n "Enter Domain or IP (e.g. github.com): "
+            echo -n "Enter Domain or IP (e.g. github.com or 8.8.8.8): "
             read -r target
+
             if [ -n "$target" ]; then
                 clean_target=$(echo "$target" | sed -E 's#https?://##' | cut -d'/' -f1)
                 lookup_ip="$clean_target"
-                echo "$clean_target" | grep -q '[^0-9.]' && lookup_ip=$(nslookup "$clean_target" 2>/dev/null | grep -A 20 "Name:" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
+                if echo "$clean_target" | grep -q '[^0-9.]'; then
+                    echo -e "${CYAN}Resolving IP for ${clean_target}...${NC}"
+                    lookup_ip=$(nslookup "$clean_target" 2>/dev/null | grep -A 20 "Name:" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
+                fi
+
                 if [ -n "$lookup_ip" ]; then
+                    echo -e "${CYAN}Looking up ASN details for IP: ${lookup_ip}...${NC}\n"
                     asn_info=$(curl -fsSk --connect-timeout 5 "http://ip-api.com/line/$lookup_ip?fields=as")
-                    echo -e "Result: ${GREEN}$asn_info${NC}"
-                    asn_num=$(echo "$asn_info" | grep -oE '[Aa][Ss][0-9]+|[0-9]+' | head -n 1 | sed -E 's/[Aa][Ss]//g')
-                    if [ -n "$asn_num" ]; then
-                        echo -n "Add AS$asn_num to your list? (y/n): "
-                        read -r add_conf
-                        case $add_conf in
-                            [Yy]*)
-                                prompt_destination
-                                [ "$SELECTED_DEST" != "CANCEL" ] && prompt_source_ip
-                                [ "$SELECTED_DEST" != "CANCEL" ] && echo "${asn_num}:${SELECTED_DEST}:${SELECTED_SRC_IP}" >> "$ASN_FILE"
-                                sort -u "$ASN_FILE" -o "$ASN_FILE" 2>/dev/null
-                                echo -e "${GREEN}Added! Run Option [6] to apply rules.${NC}"
-                                ;;
-                        esac
+
+                    if [ -n "$asn_info" ]; then
+                        echo -e "Result: ${GREEN}$asn_info${NC}"
+                        asn_num=$(echo "$asn_info" | grep -oE '[Aa][Ss][0-9]+|[0-9]+' | head -n 1 | sed -E 's/[Aa][Ss]//g')
+
+                        if [ -n "$asn_num" ]; then
+                            echo ""
+                            if grep -q "^${asn_num}:" "$ASN_FILE"; then
+                                curr_dest=$(grep "^${asn_num}:" "$ASN_FILE" | cut -d':' -f2)
+                                echo -e "${YELLOW}AS$asn_num is currently configured for interface: ${GREEN}${curr_dest}${NC}"
+                                echo -e " [1] Change Target Interface & Source IP"
+                                echo -e " [2] Remove AS$asn_num from List"
+                                echo -e " [0] Cancel / Keep"
+                                echo ""
+                                echo -n "Select action [0-2]: "
+                                read -r manage_opt
+                                case "$manage_opt" in
+                                    1)
+                                        prompt_destination
+                                        if [ "$SELECTED_DEST" != "CANCEL" ]; then
+                                            prompt_source_ip
+                                            sed -i "/^${asn_num}:/d" "$ASN_FILE"
+                                            echo "${asn_num}:${SELECTED_DEST}:${SELECTED_SRC_IP}" >> "$ASN_FILE"
+                                            sort -u "$ASN_FILE" -o "$ASN_FILE" 2>/dev/null
+                                            echo -e "${GREEN}AS$asn_num updated! Run Option [6] to apply rules.${NC}"
+                                        else
+                                            echo -e "${YELLOW}Operation cancelled.${NC}"
+                                        fi
+                                        ;;
+                                    2)
+                                        sed -i "/^${asn_num}:/d" "$ASN_FILE"
+                                        echo -e "${GREEN}AS$asn_num removed from list! Run Option [6] to apply rules.${NC}"
+                                        ;;
+                                    *)
+                                        echo -e "No changes made."
+                                        ;;
+                                esac
+                            else
+                                echo -n "Would you like to add AS$asn_num to your ASN list? (y/n): "
+                                read -r add_confirm
+                                case $add_confirm in
+                                    [Yy]*)
+                                        prompt_destination
+                                        if [ "$SELECTED_DEST" != "CANCEL" ]; then
+                                            prompt_source_ip
+                                            sed -i "/^${asn_num}:/d" "$ASN_FILE"
+                                            echo "${asn_num}:${SELECTED_DEST}:${SELECTED_SRC_IP}" >> "$ASN_FILE"
+                                            sort -u "$ASN_FILE" -o "$ASN_FILE" 2>/dev/null
+                                            echo -e "${GREEN}AS$asn_num assigned! Run Option [6] to apply rules.${NC}"
+                                        else
+                                            echo -e "${YELLOW}Operation cancelled.${NC}"
+                                        fi
+                                        ;;
+                                    *)
+                                        echo -e "Skipped adding to list."
+                                        ;;
+                                esac
+                            fi
+                        fi
                     fi
                 fi
             fi
             echo "" && echo -n "Press Enter to return..." && read -r _
             ;;
-        4) service_presets ;;
-        5) remove_menu ;;
+        4)
+            service_presets
+            ;;
+        5)
+            remove_menu
+            ;;
         6)
             clear
-            echo -e "${YELLOW}--- Rebuilding Worker Script & Applying Rules ---${NC}"
+            echo -e "${YELLOW}--- Rebuilding Worker Script & Fetching Subnets ---${NC}"
             if rebuild_worker; then
                 "$WORKER_SCRIPT"
-                echo -e "\n${GREEN}Finished! Rules successfully applied.${NC}"
+                echo -e "\n${GREEN}Finished! ASN routes updated successfully.${NC}"
             fi
             echo "" && echo -n "Press Enter to return..." && read -r _
             ;;
         7)
             clear
-            echo -e "${YELLOW}--- ipset Status ---${NC}"
-            ipset list -n | grep "^ASN_" | while read -r s; do
-                cnt=$(ipset list "$s" 2>/dev/null | grep -E "Number of entries:" | awk '{print $4}')
-                echo -e " ${CYAN}$s${NC} -> Subnets: ${GREEN}${cnt:-0}${NC}"
-            done
+            echo -e "${YELLOW}--- ipset Status & Per-ASN Subnet Count ---${NC}"
+            sets=$(ipset list -n | grep "^ASN_")
+            if [ -n "$sets" ]; then
+                for s in $sets; do
+                    dest_name=$(echo "$s" | sed -E 's/ASN_([^_]+).*/\1/')
+                    if check_iface_up "$dest_name"; then
+                        IF_STATUS="${GREEN}[ONLINE / READY]${NC}"
+                    else
+                        IF_STATUS="${RED}[OFFLINE / DISCONNECTED]${NC}"
+                    fi
+
+                    echo -e "${CYAN}Set: $s${NC} -> Interface ${dest_name}: ${IF_STATUS}"
+                    ENTRY_COUNT=$(ipset list "$s" 2>/dev/null | grep -E "Number of entries:" | awk '{print $4}')
+                    echo -e " Subnets Loaded in Table: ${GREEN}${ENTRY_COUNT:-0}${NC}"
+                    echo "------------------------------------------------------"
+                done
+            else
+                echo -e "${RED}No ASN ipset tables active. Run Option [6] to build rules.${NC}"
+            fi
             echo "" && echo -n "Press Enter to return..." && read -r _
             ;;
         8)
             clear
-            echo -e "${YELLOW}--- Test IP Routing ---${NC}"
-            echo -n "Enter IP to test: " && read -r test_ip
-            if [ -n "$test_ip" ]; then
-                matched=0
-                for s in $(ipset list -n | grep "^ASN_"); do
-                    if ipset test "$s" "$test_ip" 2>/dev/null; then
-                        echo -e "Matched set: ${GREEN}${s}${NC}"
-                        matched=1
+            echo -e "${YELLOW}--- Test IP or Domain Routing ---${NC}"
+            echo -n "Enter IP or Domain (e.g. 1.1.1.1 or google.com): "
+            read -r target
+
+            if [ -n "$target" ]; then
+                clean_target=$(echo "$target" | sed -E 's#https?://##' | cut -d'/' -f1)
+                resolved_ips="$clean_target"
+                if echo "$clean_target" | grep -q '[^0-9.]'; then
+                    echo -e "${CYAN}Resolving IP addresses for ${clean_target}...${NC}\n"
+                    resolved_ips=$(nslookup "$clean_target" 2>/dev/null | grep -A 20 "Name:" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | sort -u)
+                fi
+
+                for test_ip in $resolved_ips; do
+                    MATCHED=0
+                    sets=$(ipset list -n | grep "^ASN_")
+                    for s in $sets; do
+                        if ipset test "$s" "$test_ip" 2>/dev/null; then
+                            dest_name=$(echo "$s" | sed -E 's/ASN_([^_]+).*/\1/')
+                            echo -e "  [${GREEN}MATCHED: ${dest_name} (${s})${NC}]  $test_ip ($clean_target) -> Routes to $dest_name"
+                            MATCHED=1
+                            break
+                        fi
+                    done
+                    if [ $MATCHED -eq 0 ]; then
+                        echo -e "  [${RED}DEFAULT ROUTE${NC}] $test_ip ($clean_target) -> Follows default router behavior"
                     fi
                 done
-                [ $matched -eq 0 ] && echo -e "${RED}No ASN match (Follows default routing).${NC}"
             fi
             echo "" && echo -n "Press Enter to return..." && read -r _
             ;;
-        9) show_interface_ips ;;
+        9)
+            show_interface_ips
+            ;;
         10)
             clear
-            echo -n "Enter Domain/IP for traceroute: " && read -r t_target
-            [ -n "$t_target" ] && traceroute -n -m 12 "$t_target"
+            echo -e "${YELLOW}--- Traceroute & Route Inspector ---${NC}"
+            echo -n "Enter IP or Domain to traceroute: "
+            read -r target
+            [ -n "$target" ] && traceroute -n -m 12 "$target"
             echo "" && echo -n "Press Enter to return..." && read -r _
             ;;
-        11) update_self ;;
-        12) configure_schedule ;;
-        13) backup_restore_menu ;;
-        14) uninstall_menu ;;
-        0) clear; exit 0 ;;
+        11)
+            update_self
+            ;;
+        12)
+            configure_schedule
+            ;;
+        13)
+            backup_restore_menu
+            ;;
+        14)
+            uninstall_menu
+            ;;
+        0)
+            clear
+            exit 0
+            ;;
     esac
 done
 SCRIPT_EOF
