@@ -4,7 +4,7 @@ cat << 'SCRIPT_EOF' > /jffs/scripts/ASNmanager.sh && chmod +x /jffs/scripts/ASNm
 
 [ -t 0 ] || exec < /dev/tty 2>/dev/null
 
-SCRIPT_VERSION="1.1.1"
+SCRIPT_VERSION="1.1.2"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
 STATS_FILE="/tmp/asn_counts.txt"
