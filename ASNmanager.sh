@@ -4,7 +4,7 @@ cat << 'SCRIPT_EOF' > /jffs/scripts/ASNmanager.sh && chmod +x /jffs/scripts/ASNm
 
 [ -t 0 ] || exec < /dev/tty 2>/dev/null
 
-SCRIPT_VERSION="1.1.2"
+SCRIPT_VERSION="1.1.3"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
 STATS_FILE="/tmp/asn_counts.txt"
@@ -230,16 +230,38 @@ uninstall_menu() {
     read -r final_conf
     case "$final_conf" in
         [Yy]*)
+            # Clean up kernel iptables rules, ipsets, and ip rules completely
             for active_set in $(ipset list -n | grep "^ASN_"); do
                 dest_name=$(echo "$active_set" | sed -E 's/ASN_([^_]+).*/\1/')
                 info=$(get_target_info "$dest_name")
-                [ -n "$info" ] && FWMARK=$(echo "$info" | cut -d' ' -f2)/$(echo "$info" | cut -d' ' -f2) && iptables -t mangle -D PREROUTING -m set --match-set "$active_set" dst -j MARK --set-mark "$FWMARK" 2>/dev/null
+                
+                if [ -n "$info" ]; then
+                    FWMARK_VAL=$(echo "$info" | cut -d' ' -f2)
+                    FWMARK="${FWMARK_VAL}/${FWMARK_VAL}"
+                    
+                    # Ensure ALL referring iptables rules are destroyed (PREROUTING & OUTPUT)
+                    iptables -t mangle -S PREROUTING 2>/dev/null | grep "match-set $active_set " | sed 's/^-A /-D /' | while read -r rule; do
+                        iptables -t mangle $rule 2>/dev/null
+                    done
+                    iptables -t mangle -S OUTPUT 2>/dev/null | grep "match-set $active_set " | sed 's/^-A /-D /' | while read -r rule; do
+                        iptables -t mangle $rule 2>/dev/null
+                    done
+                    
+                    # Delete the actual ip routing rule
+                    while ip rule del fwmark "$FWMARK" 2>/dev/null; do :; done
+                fi
+                
+                # Finally flush and destroy the set safely
                 ipset flush "$active_set" 2>/dev/null
                 ipset destroy "$active_set" 2>/dev/null
             done
+            
+            # Remove cronjob and associated files
             cru d ASN_Worker 2>/dev/null
+            sed -i '/cru [ad] ASN_Worker/d' "/jffs/scripts/services-start" 2>/dev/null
             rm -f "$ASN_FILE" "$SCHEDULE_FILE" "$STATS_FILE" "$WORKER_SCRIPT" "/jffs/scripts/ASNmanager.sh" 2>/dev/null
-            echo -e "\n${GREEN}ASN Manager successfully uninstalled.${NC}"
+            
+            echo -e "\n${GREEN}ASN Manager successfully uninstalled. All routing rules & ipsets cleared.${NC}"
             exit 0
             ;;
     esac
@@ -659,10 +681,25 @@ fetch_asn_prefixes() {
     echo "$prefixes" > "$tmp_file"
 }
 
+# 1) Robustly remove all previous iptables references to ASN_* ipsets
 for active_set in $(ipset list -n | grep "^ASN_"); do
     dest_name=$(echo "$active_set" | sed -E 's/ASN_([^_]+).*/\1/')
     info=$(get_info "$dest_name")
-    [ -n "$info" ] && FWMARK=$(echo "$info" | cut -d' ' -f2)/$(echo "$info" | cut -d' ' -f2) && iptables -t mangle -D PREROUTING -m set --match-set "$active_set" dst -j MARK --set-mark "$FWMARK" 2>/dev/null && iptables -t mangle -D OUTPUT -m set --match-set "$active_set" dst -j MARK --set-mark "$FWMARK" 2>/dev/null
+    
+    if [ -n "$info" ]; then
+        FWMARK_VAL=$(echo "$info" | cut -d' ' -f2)
+        FWMARK="${FWMARK_VAL}/${FWMARK_VAL}"
+        
+        iptables -t mangle -S PREROUTING 2>/dev/null | grep "match-set $active_set " | sed 's/^-A /-D /' | while read -r rule; do
+            iptables -t mangle $rule 2>/dev/null
+        done
+        iptables -t mangle -S OUTPUT 2>/dev/null | grep "match-set $active_set " | sed 's/^-A /-D /' | while read -r rule; do
+            iptables -t mangle $rule 2>/dev/null
+        done
+        
+        while ip rule del fwmark "$FWMARK" 2>/dev/null; do :; done
+    fi
+    
     ipset flush "$active_set" 2>/dev/null
     ipset destroy "$active_set" 2>/dev/null
 done
@@ -673,7 +710,8 @@ while IFS=':' read -r asn dest src_ip; do
     info=$(get_info "$dest")
     [ -z "$info" ] && continue
     TABLE=$(echo "$info" | cut -d' ' -f1)
-    FWMARK="$(echo "$info" | cut -d' ' -f2)/$(echo "$info" | cut -d' ' -f2)"
+    FWMARK_VAL=$(echo "$info" | cut -d' ' -f2)
+    FWMARK="${FWMARK_VAL}/${FWMARK_VAL}"
     PRIO=$(echo "$info" | cut -d' ' -f3)
 
     fetch_asn_prefixes "$asn"
@@ -691,8 +729,22 @@ while IFS=':' read -r asn dest src_ip; do
         awk -v set="$IPSET_NAME" '{print "add " set " " $1}' "$tmp_file" | ipset restore 2>/dev/null
 
         if check_iface_up "$dest"; then
-            ip rule del fwmark "$FWMARK" 2>/dev/null
+            iface_dev=$(get_ifname "$dest")
+            
+            # Recreate IP Rule
+            while ip rule del fwmark "$FWMARK" 2>/dev/null; do :; done
             ip rule add from 0/0 fwmark "$FWMARK" table "$TABLE" prio "$PRIO"
+            
+            # Fix for Bug: Ensure VPN tables have a default route (WAN is managed by Asuswrt)
+            if [ -n "$iface_dev" ]; then
+                case "$dest" in
+                    OVPN*|WGC*)
+                        ip route show table "$TABLE" 2>/dev/null | grep -q "^default" || ip route add default dev "$iface_dev" table "$TABLE" 2>/dev/null
+                        ;;
+                esac
+            fi
+            
+            # Insert iptables logic
             if [ -n "$src_ip" ]; then
                 iptables -t mangle -I PREROUTING 1 -s "$src_ip" -m set --match-set "$IPSET_NAME" dst -j MARK --set-mark "$FWMARK"
             else
