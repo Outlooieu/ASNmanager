@@ -4,7 +4,7 @@ cat << 'SCRIPT_EOF' > /jffs/scripts/ASNmanager.sh && chmod +x /jffs/scripts/ASNm
 
 [ -t 0 ] || exec < /dev/tty 2>/dev/null
 
-SCRIPT_VERSION="1.1.3"
+SCRIPT_VERSION="1.1.6"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
 STATS_FILE="/tmp/asn_counts.txt"
@@ -87,11 +87,19 @@ load_schedule() {
 apply_schedule() {
     load_schedule
     cru d ASN_Worker 2>/dev/null
-    cru a ASN_Worker "$MIN $HOUR */$INTERVAL * * $WORKER_SCRIPT"
+    
+    # Add cron job to fetch updates via internet
+    cru a ASN_Worker "$MIN $HOUR */$INTERVAL * * $WORKER_SCRIPT force"
     
     [ ! -f "$SERVICES_START" ] && touch "$SERVICES_START" && chmod +x "$SERVICES_START"
     sed -i '/cru [ad] ASN_Worker/d' "$SERVICES_START"
-    echo "cru a ASN_Worker \"$MIN $HOUR */$INTERVAL * * $WORKER_SCRIPT\"" >> "$SERVICES_START"
+    sed -i '/asn-bypass-worker.sh/d' "$SERVICES_START" 2>/dev/null
+    
+    # Register the cron job again on boot
+    echo "cru a ASN_Worker \"$MIN $HOUR */$INTERVAL * * $WORKER_SCRIPT force\"" >> "$SERVICES_START"
+    
+    # Let the worker load from cache on every router boot in the background
+    echo "$WORKER_SCRIPT boot >/dev/null 2>&1 &" >> "$SERVICES_START"
 }
 
 configure_schedule() {
@@ -236,10 +244,10 @@ uninstall_menu() {
                 info=$(get_target_info "$dest_name")
                 
                 if [ -n "$info" ]; then
+                    TABLE=$(echo "$info" | cut -d' ' -f1)
                     FWMARK_VAL=$(echo "$info" | cut -d' ' -f2)
                     FWMARK="${FWMARK_VAL}/${FWMARK_VAL}"
                     
-                    # Ensure ALL referring iptables rules are destroyed (PREROUTING & OUTPUT)
                     iptables -t mangle -S PREROUTING 2>/dev/null | grep "match-set $active_set " | sed 's/^-A /-D /' | while read -r rule; do
                         iptables -t mangle $rule 2>/dev/null
                     done
@@ -247,21 +255,27 @@ uninstall_menu() {
                         iptables -t mangle $rule 2>/dev/null
                     done
                     
-                    # Delete the actual ip routing rule
                     while ip rule del fwmark "$FWMARK" 2>/dev/null; do :; done
+                    
+                    case "$dest_name" in
+                        OVPN*|WGC*)
+                            ip route flush table "$TABLE" 2>/dev/null
+                            ;;
+                    esac
                 fi
                 
-                # Finally flush and destroy the set safely
                 ipset flush "$active_set" 2>/dev/null
                 ipset destroy "$active_set" 2>/dev/null
             done
             
-            # Remove cronjob and associated files
+            # Remove cronjob, cache and associated files
             cru d ASN_Worker 2>/dev/null
             sed -i '/cru [ad] ASN_Worker/d' "/jffs/scripts/services-start" 2>/dev/null
+            sed -i '/asn-bypass-worker.sh/d' "/jffs/scripts/services-start" 2>/dev/null
+            rm -rf "/jffs/scripts/asn_cache" 2>/dev/null
             rm -f "$ASN_FILE" "$SCHEDULE_FILE" "$STATS_FILE" "$WORKER_SCRIPT" "/jffs/scripts/ASNmanager.sh" 2>/dev/null
             
-            echo -e "\n${GREEN}ASN Manager successfully uninstalled. All routing rules & ipsets cleared.${NC}"
+            echo -e "\n${GREEN}ASN Manager successfully uninstalled. All rules & caches cleared.${NC}"
             exit 0
             ;;
     esac
@@ -611,6 +625,10 @@ rebuild_worker() {
 #!/bin/sh
 ASN_FILE="/jffs/scripts/asn_list.txt"
 STATS_FILE="/tmp/asn_counts.txt"
+CACHE_DIR="/jffs/scripts/asn_cache"
+EXEC_MODE="$1"
+
+mkdir -p "$CACHE_DIR"
 
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
@@ -620,9 +638,10 @@ NC='\033[0m'
 
 [ ! -s "$ASN_FILE" ] && exit 0
 
+# Better DNS & Internet check for boot
 n=0
-until ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; do
-    n=$((n+1)); [ $n -ge 30 ] && break; sleep 2
+until ping -c 1 -W 2 github.com >/dev/null 2>&1 || ping -c 1 -W 2 google.com >/dev/null 2>&1; do
+    n=$((n+1)); [ $n -ge 45 ] && break; sleep 2
 done
 
 > "$STATS_FILE"
@@ -670,7 +689,15 @@ get_info() {
 fetch_asn_prefixes() {
     asn="$1"
     tmp_file="/tmp/asn_${asn}.txt"
+    cache_file="$CACHE_DIR/${asn}.txt"
     prefixes=""
+    
+    # Use cache instantly if not forced and cache exists
+    if [ "$EXEC_MODE" != "force" ] && [ -s "$cache_file" ]; then
+        cp "$cache_file" "$tmp_file"
+        return
+    fi
+
     if [ "$asn" = "16509" ] || [ "$asn" = "14618" ]; then
         prefixes=$(curl -fsSk --connect-timeout 6 -m 10 "https://ip-ranges.amazonaws.com/ip-ranges.json" 2>/dev/null | grep -oE '"ip_prefix": "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}"' | cut -d'"' -f4 | sort -u)
     fi
@@ -678,15 +705,25 @@ fetch_asn_prefixes() {
     [ -z "$prefixes" ] && prefixes=$(curl -fsSk --connect-timeout 8 -m 25 -A "Mozilla/5.0" "https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS${asn}" 2>/dev/null | tr ',' '\n' | grep -oE '"prefix":"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}"' | cut -d'"' -f4 | sort -u)
     [ -z "$prefixes" ] && prefixes=$(curl -fsSk --connect-timeout 6 -m 10 -A "Mozilla/5.0" "https://api.hackertarget.com/aslookup/?q=AS${asn}" 2>/dev/null | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$' | sort -u)
     [ -z "$prefixes" ] && prefixes=$(curl -fsSk --connect-timeout 6 -m 10 -A "Mozilla/5.0" "https://api.bgpview.io/asn/${asn}/prefixes" 2>/dev/null | tr ',' '\n' | grep -oE '"prefix":"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}"' | cut -d'"' -f4 | sort -u)
-    echo "$prefixes" > "$tmp_file"
+    
+    if [ -n "$prefixes" ]; then
+        echo "$prefixes" > "$tmp_file"
+        cp "$tmp_file" "$cache_file" 2>/dev/null
+    elif [ -s "$cache_file" ]; then
+        # Fallback to cache if download failed to prevent 0 subnets
+        cp "$cache_file" "$tmp_file"
+    else
+        > "$tmp_file"
+    fi
 }
 
-# 1) Robustly remove all previous iptables references to ASN_* ipsets
+# Clean up before building
 for active_set in $(ipset list -n | grep "^ASN_"); do
     dest_name=$(echo "$active_set" | sed -E 's/ASN_([^_]+).*/\1/')
     info=$(get_info "$dest_name")
     
     if [ -n "$info" ]; then
+        TABLE=$(echo "$info" | cut -d' ' -f1)
         FWMARK_VAL=$(echo "$info" | cut -d' ' -f2)
         FWMARK="${FWMARK_VAL}/${FWMARK_VAL}"
         
@@ -698,13 +735,20 @@ for active_set in $(ipset list -n | grep "^ASN_"); do
         done
         
         while ip rule del fwmark "$FWMARK" 2>/dev/null; do :; done
+        
+        case "$dest_name" in
+            OVPN*|WGC*)
+                ip route flush table "$TABLE" 2>/dev/null
+                ;;
+        esac
     fi
     
     ipset flush "$active_set" 2>/dev/null
     ipset destroy "$active_set" 2>/dev/null
 done
 
-echo -e "${YELLOW}Processing ASNs and generating rules...${NC}"
+[ "$EXEC_MODE" = "force" ] && echo -e "${YELLOW}Downloading fresh ASN data from internet...${NC}" || echo -e "${YELLOW}Restoring ASN data from local cache...${NC}"
+
 while IFS=':' read -r asn dest src_ip; do
     [ -z "$asn" ] || [ -z "$dest" ] && continue
     info=$(get_info "$dest")
@@ -731,11 +775,9 @@ while IFS=':' read -r asn dest src_ip; do
         if check_iface_up "$dest"; then
             iface_dev=$(get_ifname "$dest")
             
-            # Recreate IP Rule
             while ip rule del fwmark "$FWMARK" 2>/dev/null; do :; done
             ip rule add from 0/0 fwmark "$FWMARK" table "$TABLE" prio "$PRIO"
             
-            # Fix for Bug: Ensure VPN tables have a default route (WAN is managed by Asuswrt)
             if [ -n "$iface_dev" ]; then
                 case "$dest" in
                     OVPN*|WGC*)
@@ -744,7 +786,6 @@ while IFS=':' read -r asn dest src_ip; do
                 esac
             fi
             
-            # Insert iptables logic
             if [ -n "$src_ip" ]; then
                 iptables -t mangle -I PREROUTING 1 -s "$src_ip" -m set --match-set "$IPSET_NAME" dst -j MARK --set-mark "$FWMARK"
             else
@@ -752,10 +793,14 @@ while IFS=':' read -r asn dest src_ip; do
                 iptables -t mangle -I OUTPUT 1 -m set --match-set "$IPSET_NAME" dst -j MARK --set-mark "$FWMARK"
             fi
         fi
-        echo -e " ${GREEN}[OK]${NC} AS${asn} -> ${dest}${src_text} ${CYAN}(${asn_cnt} subnets)${NC}"
+        
+        [ -t 1 ] && echo -e " ${GREEN}[OK]${NC} AS${asn} -> ${dest}${src_text} ${CYAN}(${asn_cnt} subnets)${NC}"
         rm -f "$tmp_file"
+        
+        # Prevent API Ban: Sleep 1 sec between downloads (only in force mode)
+        [ "$EXEC_MODE" = "force" ] && sleep 1
     else
-        echo -e " ${RED}[FAIL]${NC} AS${asn} -> ${dest}${src_text} ${RED}(0 subnets found)${NC}"
+        [ -t 1 ] && echo -e " ${RED}[FAIL]${NC} AS${asn} -> ${dest}${src_text} ${RED}(0 subnets found)${NC}"
     fi
 done < "$ASN_FILE"
 WORKER_EOF
@@ -882,7 +927,7 @@ while true; do
             clear
             echo -e "${YELLOW}--- Rebuilding Worker & Fetching Subnets ---${NC}"
             if rebuild_worker; then
-                "$WORKER_SCRIPT"
+                "$WORKER_SCRIPT" force
                 echo -e "\n${GREEN}Finished! Rules updated.${NC}"
             fi
             echo "" && echo -n "Press Enter to return..." && read -r _
