@@ -3,7 +3,7 @@
 - New modern WebUI design: cards, status tiles, modern input fields, badges and a live progress bar
 - Theme switch: Dark, Light, Blue (remembered in the browser)
 - Language switch: router default / English
-- The tab can be shown in the VPN menu (after "Instant Guard") instead of Addons: menu option [15] or `webui location vpn`
+- The tab now appears in the VPN menu (after "Instant Guard") by default; move it to Addons via menu option [15] or `webui location addons`
 - Source device picker now also lists WireGuard server peers and connected OpenVPN server clients
 - Round country flags (circle-flags, MIT) for the external IPs, fallback to rectangular flags or the country code
 - ASN lookup result shown in a full-width table with "Add to form"

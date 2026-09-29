@@ -562,7 +562,7 @@ show_menu() {
     echo -e " [13] Backup & Restore Configuration (Internal / USB)"
     echo -e " [14] Uninstall ASN Manager"
     webui_enabled && WEBUI_STATE="${GREEN}Enabled${NC}" || WEBUI_STATE="${RED}Disabled${NC}"
-    echo -e " [15] WebUI Addons Tab (${WEBUI_STATE})"
+    echo -e " [15] WebUI Tab (${WEBUI_STATE})"
     echo -e " [0]  Exit"
     echo -e "${CYAN}----------------------------------------------------------------${NC}"
     echo -n "Select an option [0-15]: "
@@ -1344,10 +1344,10 @@ menu_remount() {
     mount -o bind /tmp/menuTree.js /www/require/modules/menuTree.js
 }
 
-# Where the tab appears: "addons" (default) or "vpn"
+# Where the tab appears: "vpn" (default, after Instant Guard) or "addons"
 webui_location() {
     l=$(cat "$ADDON_DIR/webui.location" 2>/dev/null)
-    [ "$l" = "vpn" ] && echo "vpn" || echo "addons"
+    [ "$l" = "addons" ] && echo "addons" || echo "vpn"
 }
 
 webui_set_location() {
@@ -1473,6 +1473,9 @@ webui_auto() {
         sleep 1
     elif [ "$(webui_page_version)" != "$SCRIPT_VERSION" ]; then
         webui_install >/dev/null 2>&1
+    else
+        # re-mount so menu placement changes (e.g. new default location) take effect
+        webui_mount >/dev/null 2>&1
     fi
 }
 
@@ -1492,7 +1495,7 @@ webui_enable() {
 
 webui_menu() {
     clear
-    echo -e "${YELLOW}--- WebUI (Router Addons Tab) ---${NC}"
+    echo -e "${YELLOW}--- WebUI (Router Tab) ---${NC}"
     if ! webui_enabled; then
         echo -e "Status: ${RED}Disabled${NC}"
         echo -n "Enable the WebUI tab? (y/n): "; read -r c
@@ -1549,7 +1552,7 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   ifaces                             public IP / country per interface
   schedule <days> <HH:MM>            auto-refresh schedule
   webui install [local] | enable | disable | update | uninstall | mount | unmount | export
-  webui location <addons|vpn>        show the tab in the Addons or the VPN menu
+  webui location <vpn|addons>        show the tab in the VPN (default) or the Addons menu
 USAGE_EOF
 }
 

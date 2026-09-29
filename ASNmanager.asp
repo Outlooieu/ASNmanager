@@ -1055,7 +1055,7 @@ function asnmImportCancel() {
 var ASNM_ROUTER_LANG = 'en';
 
 function asnmLangMode() {
-    try { return localStorage.getItem('asnm_lang_mode') === 'en' ? 'en' : 'default'; } catch (e) { return 'default'; }
+    try { return localStorage.getItem('asnm_lang_mode_' + ASNM_NS) === 'en' ? 'en' : 'default'; } catch (e) { return 'default'; }
 }
 
 function asnmRenderLangSwitch() {
@@ -1068,7 +1068,7 @@ function asnmRenderLangSwitch() {
 
 function asnmSetLangMode(mode) {
     if (mode === asnmLangMode()) return;
-    try { if (mode === 'en') localStorage.setItem('asnm_lang_mode', 'en'); else localStorage.removeItem('asnm_lang_mode'); } catch (e) {}
+    try { if (mode === 'en') localStorage.setItem('asnm_lang_mode_' + ASNM_NS, 'en'); else localStorage.removeItem('asnm_lang_mode_' + ASNM_NS); } catch (e) {}
     window.location.reload();
 }
 

@@ -25,7 +25,7 @@ ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to eas
  [12] Set ASN IP Subnet Auto-Refresh Schedule (Every 1d @ 04:30)
  [13] Backup & Restore Configuration (Internal / USB)
  [14] Uninstall ASN Manager
- [15] WebUI Addons Tab (Enabled)
+ [15] WebUI Tab (Enabled)
  [0]  Exit
 ----------------------------------------------------------------
 Select an option [0-15]:
@@ -46,7 +46,7 @@ Interactive Diagnostics: Includes built-in tools to test IP/domain routing, view
 
 Backup & Restore: Easily export and import your configuration locally to /jffs or to an external USB storage drive.
 
-WebUI: Manage everything from a modern page in the router web interface ("ASN Manager" tab in the Addons or VPN menu) - see below.
+WebUI: Manage everything from a modern page in the router web interface ("ASN Manager" tab in the VPN menu) - see below.
 
 Quick Installation:
 
@@ -92,12 +92,12 @@ Here is a short guide for each menu option of the ASN Manager:
 
 [14] Uninstall ASN Manager: Completely removes all created rules, ipsets, cron jobs, script files, the WebUI page, its data folders and the service-event / services-start hooks from the router. Backups in /jffs are kept.
 
-[15] WebUI Addons Tab: Enables or disables the WebUI tab in the router web interface (enabled by default), reinstalls the page or moves the tab between the Addons and the VPN menu.
+[15] WebUI Tab: Enables or disables the WebUI tab in the router web interface (enabled by default), reinstalls the page or moves the tab between the Addons and the VPN menu.
 
 ## WebUI
 
 ASN Manager adds its own page to the router web interface (Asuswrt-Merlin 384.15+ / 3004.x with Addon API).
-It is installed automatically the first time the menu starts. By default the tab appears under **Addons** (next to other addons such as vnStat-on-Merlin, or under **Tools** if no Addons menu exists). It can also be shown in the **VPN** menu after "Instant Guard".
+It is installed automatically the first time the menu starts. By default the tab appears in the **VPN** menu after "Instant Guard". It can also be moved to the **Addons** menu (next to other addons such as vnStat-on-Merlin, or under **Tools** if no Addons menu exists).
 
 Features:
 
@@ -114,7 +114,7 @@ Enable / disable / move the tab: menu option **[15]** or
 ```
 /jffs/scripts/ASNmanager.sh webui disable
 /jffs/scripts/ASNmanager.sh webui enable
-/jffs/scripts/ASNmanager.sh webui location vpn      # or: addons
+/jffs/scripts/ASNmanager.sh webui location addons   # back to default: vpn
 ```
 
 Files used by the WebUI: `/jffs/addons/asnmanager/` (page, settings, cached flags), `/www/ext/asnmanager/` (runtime data in RAM), one `userN.asp` slot and one line each in `/jffs/scripts/service-event` and `/jffs/scripts/services-start` (marked `# ASNmanager-WebUI`).
