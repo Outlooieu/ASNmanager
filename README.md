@@ -9,7 +9,7 @@ ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to eas
  /_\ / __| \| | |  \/  | /_\ | \| | /_\ / __| __|| _ \
 / _ \__ \ .' | | |\/| |/ _ \| .' |/ _ \ (_ | _| |   /
 /_/ \_\___/_|\_| |_|  |_/_/ \_\_|\_/_/ \_\___|___||_|_\
-              === ASN MANAGER v1.0.0 ===
+              === ASN MANAGER v2.0.0 ===
 ================================================================
  [1]  View current ASN list & routing targets
  [2]  Add ASN(s) with Target Interface selection
@@ -25,9 +25,10 @@ ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to eas
  [12] Set ASN IP Subnet Auto-Refresh Schedule (Every 1d @ 04:30)
  [13] Backup & Restore Configuration (Internal / USB)
  [14] Uninstall ASN Manager
+ [15] WebUI Addons Tab (Enabled)
  [0]  Exit
 ----------------------------------------------------------------
-Select an option [0-14]:
+Select an option [0-15]:
 
 ```
 
@@ -44,6 +45,8 @@ Auto-Refresh Scheduling: Built-in configuration to automatically re-fetch and up
 Interactive Diagnostics: Includes built-in tools to test IP/domain routing, view active ipset counts, check interface public IPs/countries, and run traceroutes through specific target interfaces.
 
 Backup & Restore: Easily export and import your configuration locally to /jffs or to an external USB storage drive.
+
+WebUI: Manage everything from a modern page in the router web interface ("ASN Manager" tab in the Addons or VPN menu) - see below.
 
 Quick Installation:
 
@@ -87,4 +90,57 @@ Here is a short guide for each menu option of the ASN Manager:
 
 [13] Backup & Restore Configuration (Internal / USB): Creates backups of your configuration in the internal /jffs directory or on external USB storage, or restores them.
 
-[14] Uninstall ASN Manager: Completely removes all created rules, ipsets, cron jobs, and script files fr om the router.
+[14] Uninstall ASN Manager: Completely removes all created rules, ipsets, cron jobs, script files, the WebUI page, its data folders and the service-event / services-start hooks from the router. Backups in /jffs are kept.
+
+[15] WebUI Addons Tab: Enables or disables the WebUI tab in the router web interface (enabled by default), reinstalls the page or moves the tab between the Addons and the VPN menu.
+
+## WebUI
+
+ASN Manager adds its own page to the router web interface (Asuswrt-Merlin 384.15+ / 3004.x with Addon API).
+It is installed automatically the first time the menu starts. By default the tab appears under **Addons** (next to other addons such as vnStat-on-Merlin, or under **Tools** if no Addons menu exists). It can also be shown in the **VPN** menu after "Instant Guard".
+
+Features:
+
+- Modern interface with **Dark**, **Light** and **Blue** theme, language switch (router default / English)
+- Status tiles, "Apply rules" with live progress bar (e.g. `AS13335 -> WGC1 (3 of 12)`), retry for failed ASNs only (0 subnets are highlighted red)
+- ASN list grouped per interface (collapsible, collapsed by default), edit target / source IP inline, remove single, selected or all entries
+- Add ASNs or service presets, source device picker with names: LAN / Wi-Fi clients, WireGuard server peers and connected OpenVPN server clients
+- Find the ASN of a domain or IP and add it with one click (ignores 0.0.0.0 answers from ad blockers)
+- Target interfaces with state, external IP, country and flag
+- Auto-refresh schedule, backup download and restore (compatible with menu backups), diagnostics (route test, traceroute, ipset status, public IPs)
+
+Enable / disable / move the tab: menu option **[15]** or
+
+```
+/jffs/scripts/ASNmanager.sh webui disable
+/jffs/scripts/ASNmanager.sh webui enable
+/jffs/scripts/ASNmanager.sh webui location vpn      # or: addons
+```
+
+Files used by the WebUI: `/jffs/addons/asnmanager/` (page, settings, cached flags), `/www/ext/asnmanager/` (runtime data in RAM), one `userN.asp` slot and one line each in `/jffs/scripts/service-event` and `/jffs/scripts/services-start` (marked `# ASNmanager-WebUI`).
+
+## Command line
+
+All functions can also be used without the menu, e.g. for your own scripts:
+
+```
+ASNmanager.sh list
+ASNmanager.sh add WGC1 AS13335 15169 --src 192.168.1.50
+ASNmanager.sh preset 4 OVPN1
+ASNmanager.sh edit 13335 WAN2
+ASNmanager.sh remove 13335
+ASNmanager.sh apply
+ASNmanager.sh retry
+ASNmanager.sh lookup netflix.com
+ASNmanager.sh test netflix.com
+ASNmanager.sh schedule 1 04:30
+ASNmanager.sh webui location vpn
+ASNmanager.sh help
+```
+
+Without arguments the interactive menu starts.
+
+## Credits
+
+- Round country flags: [circle-flags](https://github.com/HatScripts/circle-flags) by HatScripts, MIT License (downloaded once per country by the router)
+- IP geolocation / ASN lookup: ip-api.com, with ipinfo.io and RIPEstat as fallback

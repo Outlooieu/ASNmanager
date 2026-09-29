@@ -2,9 +2,11 @@ cat << 'SCRIPT_EOF' > /jffs/scripts/ASNmanager.sh && chmod +x /jffs/scripts/ASNm
 #!/bin/sh
 # ASN Manager for Asuswrt-Merlin
 
-[ -t 0 ] || exec < /dev/tty 2>/dev/null
+# Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
+[ $# -eq 0 ] && { [ -t 0 ] || exec < /dev/tty 2>/dev/null; }
 
-SCRIPT_VERSION="1.2.0"
+SCRIPT_VERSION="2.0.0"
+SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
 STATS_FILE="/tmp/asn_counts.txt"
@@ -21,6 +23,55 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 MAGENTA='\033[0;35m'
 NC='\033[0m'
+[ -t 1 ] || { CYAN=''; GREEN=''; YELLOW=''; RED=''; MAGENTA=''; NC=''; }
+
+# Service presets: one line per preset -> "Name|ASN ASN ..." (single source for menu + WebUI)
+PRESET_DATA='Amazon / AWS|16509 14618
+Google Services|15169 8075 22577
+YouTube|43515 36040
+Netflix|2906 40027
+Cloudflare|13335 209242
+Steam / Valve|32590
+Meta / Facebook / IG / WhatsApp|32934 63293
+Microsoft / Azure / Xbox|8075 8068 8074 36444
+Apple / iCloud|714
+Telegram|62041 59930 44907 211157 20473
+Akamai CDN|20940 16625
+Fastly CDN|54113
+PlayStation / Sony|33494 19684 29237
+TikTok / ByteDance|138699 396986
+Hetzner & OVH Hosting|24940 16276
+Disney+ / Hulu|394464
+Spotify|8403 45102 23507
+Twitch|46489
+Riot Games / LoL / Valorant|6507
+Epic Games|32252 13488
+Nintendo|9003
+Zoom|20224 394622
+DigitalOcean & Linode|14061 63949
+Oracle Cloud|31898
+OpenAI / ChatGPT|398324
+GitHub|36459 19864
+NVIDIA / GeForce NOW|40676
+EA / Electronic Arts|29748
+Blizzard / Battle.net|57976
+Ubisoft|32499'
+PRESET_COUNT=$(echo "$PRESET_DATA" | grep -c .)
+
+print_presets() {
+    echo "$PRESET_DATA" | awk -F'|' '{ n=split($2,a," "); l=""; for(i=1;i<=n;i++) l=l (i>1?", ":"") "AS" a[i]; printf " [%d]%s %s (%s)\n", NR, (NR<10?" ":""), $1, l }'
+}
+
+preset_asns() {
+    case "$1" in ''|*[!0-9]*) return 1 ;; esac
+    echo "$PRESET_DATA" | sed -n "${1}p" | cut -d'|' -f2
+}
+
+ensure_script() {
+    # Merlin hook scripts need a shebang and the exec bit
+    [ -s "$1" ] || echo '#!/bin/sh' > "$1"
+    chmod +x "$1"
+}
 
 get_ifname() {
     case "$1" in
@@ -91,7 +142,7 @@ apply_schedule() {
     # Add cron job to fetch updates via internet
     cru a ASN_Worker "$MIN $HOUR */$INTERVAL * * $WORKER_SCRIPT force"
     
-    [ ! -f "$SERVICES_START" ] && touch "$SERVICES_START" && chmod +x "$SERVICES_START"
+    ensure_script "$SERVICES_START"
     sed -i '/cru [ad] ASN_Worker/d' "$SERVICES_START"
     sed -i '/asn-bypass-worker.sh/d' "$SERVICES_START" 2>/dev/null
     
@@ -138,8 +189,7 @@ configure_schedule() {
     sleep 2
 }
 
-show_interface_ips() {
-    clear
+iface_ips_report() {
     echo -e "${YELLOW}--- Active Interface Public IP & Country Info ---${NC}\n"
 
     print_ip_info() {
@@ -181,7 +231,11 @@ show_interface_ips() {
         ip addr show dev "$dev" 2>/dev/null | grep -q "inet " && print_ip_info "WireGuard Client $i (${dev})" "$dev" "$MAGENTA"
         i=$((i + 1))
     done
+}
 
+show_interface_ips() {
+    clear
+    iface_ips_report
     echo -n "Press Enter to return..."
     read -r _
 }
@@ -231,6 +285,37 @@ backup_restore_menu() {
     sleep 2
 }
 
+cleanup_rules() {
+    for active_set in $(ipset list -n | grep "^ASN_"); do
+        dest_name=$(echo "$active_set" | sed -E 's/ASN_([^_]+).*/\1/')
+        info=$(get_target_info "$dest_name")
+        
+        if [ -n "$info" ]; then
+            TABLE=$(echo "$info" | cut -d' ' -f1)
+            FWMARK_VAL=$(echo "$info" | cut -d' ' -f2)
+            FWMARK="${FWMARK_VAL}/${FWMARK_VAL}"
+            
+            iptables -t mangle -S PREROUTING 2>/dev/null | grep "match-set $active_set " | sed 's/^-A /-D /' | while read -r rule; do
+                iptables -t mangle $rule 2>/dev/null
+            done
+            iptables -t mangle -S OUTPUT 2>/dev/null | grep "match-set $active_set " | sed 's/^-A /-D /' | while read -r rule; do
+                iptables -t mangle $rule 2>/dev/null
+            done
+            
+            while ip rule del fwmark "$FWMARK" 2>/dev/null; do :; done
+            
+            case "$dest_name" in
+                OVPN*|WGC*)
+                    ip route flush table "$TABLE" 2>/dev/null
+                    ;;
+            esac
+        fi
+        
+        ipset flush "$active_set" 2>/dev/null
+        ipset destroy "$active_set" 2>/dev/null
+    done
+}
+
 uninstall_menu() {
     clear
     echo -e "${RED}--- Uninstall ASN Manager ---${NC}"
@@ -239,43 +324,24 @@ uninstall_menu() {
     case "$final_conf" in
         [Yy]*)
             # Clean up kernel iptables rules, ipsets, and ip rules completely
-            for active_set in $(ipset list -n | grep "^ASN_"); do
-                dest_name=$(echo "$active_set" | sed -E 's/ASN_([^_]+).*/\1/')
-                info=$(get_target_info "$dest_name")
-                
-                if [ -n "$info" ]; then
-                    TABLE=$(echo "$info" | cut -d' ' -f1)
-                    FWMARK_VAL=$(echo "$info" | cut -d' ' -f2)
-                    FWMARK="${FWMARK_VAL}/${FWMARK_VAL}"
-                    
-                    iptables -t mangle -S PREROUTING 2>/dev/null | grep "match-set $active_set " | sed 's/^-A /-D /' | while read -r rule; do
-                        iptables -t mangle $rule 2>/dev/null
-                    done
-                    iptables -t mangle -S OUTPUT 2>/dev/null | grep "match-set $active_set " | sed 's/^-A /-D /' | while read -r rule; do
-                        iptables -t mangle $rule 2>/dev/null
-                    done
-                    
-                    while ip rule del fwmark "$FWMARK" 2>/dev/null; do :; done
-                    
-                    case "$dest_name" in
-                        OVPN*|WGC*)
-                            ip route flush table "$TABLE" 2>/dev/null
-                            ;;
-                    esac
-                fi
-                
-                ipset flush "$active_set" 2>/dev/null
-                ipset destroy "$active_set" 2>/dev/null
-            done
+            cleanup_rules
             
+            # Remove WebUI page, menu entry and hooks
+            webui_uninstall >/dev/null 2>&1
+
             # Remove cronjob, cache and associated files
             cru d ASN_Worker 2>/dev/null
             sed -i '/cru [ad] ASN_Worker/d' "/jffs/scripts/services-start" 2>/dev/null
             sed -i '/asn-bypass-worker.sh/d' "/jffs/scripts/services-start" 2>/dev/null
+            for f in /jffs/scripts/services-start /jffs/scripts/service-event; do
+                [ -f "$f" ] && [ -z "$(grep -v '^#!/bin/sh$' "$f" | grep -v '^[[:space:]]*$')" ] && rm -f "$f"
+            done
+            rm -f /tmp/asn_[0-9]*.txt /tmp/asn_counts.txt /tmp/asn_progress.txt /tmp/asn_failed.txt /tmp/ASNmanager-*.tmp /tmp/ASNmanager-update.sh 2>/dev/null
             rm -rf "/jffs/scripts/asn_cache" 2>/dev/null
-            rm -f "$ASN_FILE" "$SCHEDULE_FILE" "$STATS_FILE" "$WORKER_SCRIPT" "/jffs/scripts/ASNmanager.sh" 2>/dev/null
+            rm -f "$ASN_FILE" "$SCHEDULE_FILE" "$STATS_FILE" "$WORKER_SCRIPT" "$SCRIPT_PATH" 2>/dev/null
             
-            echo -e "\n${GREEN}ASN Manager successfully uninstalled. All rules & caches cleared.${NC}"
+            echo -e "\n${GREEN}ASN Manager successfully uninstalled. All rules, caches, WebUI files and hooks removed.${NC}"
+            ls /jffs/asn_manager_backup_*.conf >/dev/null 2>&1 && echo -e "${YELLOW}Backups kept: /jffs/asn_manager_backup_*.conf${NC}"
             exit 0
             ;;
     esac
@@ -330,73 +396,13 @@ prompt_source_ip() {
 service_presets() {
     clear
     echo -e "${YELLOW}--- Add ASN Service Presets ---${NC}"
-    echo -e " [1]  Amazon / AWS (AS16509, AS14618)"
-    echo -e " [2]  Google Services (AS15169, AS8075, AS22577)"
-    echo -e " [3]  YouTube (AS43515, AS36040)"
-    echo -e " [4]  Netflix (AS2906, AS40027)"
-    echo -e " [5]  Cloudflare (AS13335, AS209242)"
-    echo -e " [6]  Steam / Valve (AS32590)"
-    echo -e " [7]  Meta / Facebook / IG / WhatsApp (AS32934, AS63293)"
-    echo -e " [8]  Microsoft / Azure / Xbox (AS8075, AS8068, AS8074, AS36444)"
-    echo -e " [9]  Apple / iCloud (AS714)"
-    echo -e " [10] Telegram (AS62041, AS59930, AS44907, AS211157, AS20473)"
-    echo -e " [11] Akamai CDN (AS20940, AS16625)"
-    echo -e " [12] Fastly CDN (AS54113)"
-    echo -e " [13] PlayStation / Sony (AS33494, AS19684, AS29237)"
-    echo -e " [14] TikTok / ByteDance (AS138699, AS396986)"
-    echo -e " [15] Hetzner & OVH Hosting (AS24940, AS16276)"
-    echo -e " [16] Disney+ / Hulu (AS394464)"
-    echo -e " [17] Spotify (AS8403, AS45102, AS23507)"
-    echo -e " [18] Twitch (AS46489)"
-    echo -e " [19] Riot Games / LoL / Valorant (AS6507)"
-    echo -e " [20] Epic Games (AS32252, AS13488)"
-    echo -e " [21] Nintendo (AS9003)"
-    echo -e " [22] Zoom (AS20224, AS394622)"
-    echo -e " [23] DigitalOcean & Linode (AS14061, AS63949)"
-    echo -e " [24] Oracle Cloud (AS31898)"
-    echo -e " [25] OpenAI / ChatGPT (AS398324)"
-    echo -e " [26] GitHub (AS36459, AS19864)"
-    echo -e " [27] NVIDIA / GeForce NOW (AS40676)"
-    echo -e " [28] EA / Electronic Arts (AS29748)"
-    echo -e " [29] Blizzard / Battle.net (AS57976)"
-    echo -e " [30] Ubisoft (AS32499)"
+    print_presets
     echo -e " [0]  Cancel"
     echo ""
-    echo -n "Select preset [0-30]: "
+    echo -n "Select preset [0-${PRESET_COUNT}]: "
     read -r p_opt
-    case "$p_opt" in
-        1)  PRESET_ASNS="16509 14618" ;;
-        2)  PRESET_ASNS="15169 8075 22577" ;;
-        3)  PRESET_ASNS="43515 36040" ;;
-        4)  PRESET_ASNS="2906 40027" ;;
-        5)  PRESET_ASNS="13335 209242" ;;
-        6)  PRESET_ASNS="32590" ;;
-        7)  PRESET_ASNS="32934 63293" ;;
-        8)  PRESET_ASNS="8075 8068 8074 36444" ;;
-        9)  PRESET_ASNS="714" ;;
-        10) PRESET_ASNS="62041 59930 44907 211157 20473" ;;
-        11) PRESET_ASNS="20940 16625" ;;
-        12) PRESET_ASNS="54113" ;;
-        13) PRESET_ASNS="33494 19684 29237" ;;
-        14) PRESET_ASNS="138699 396986" ;;
-        15) PRESET_ASNS="24940 16276" ;;
-        16) PRESET_ASNS="394464" ;;
-        17) PRESET_ASNS="8403 45102 23507" ;;
-        18) PRESET_ASNS="46489" ;;
-        19) PRESET_ASNS="6507" ;;
-        20) PRESET_ASNS="32252 13488" ;;
-        21) PRESET_ASNS="9003" ;;
-        22) PRESET_ASNS="20224 394622" ;;
-        23) PRESET_ASNS="14061 63949" ;;
-        24) PRESET_ASNS="31898" ;;
-        25) PRESET_ASNS="398324" ;;
-        26) PRESET_ASNS="36459 19864" ;;
-        27) PRESET_ASNS="40676" ;;
-        28) PRESET_ASNS="29748" ;;
-        29) PRESET_ASNS="57976" ;;
-        30) PRESET_ASNS="32499" ;;
-        *) return ;;
-    esac
+    PRESET_ASNS=$(preset_asns "$p_opt")
+    [ -z "$PRESET_ASNS" ] && return
 
     prompt_destination
     [ "$SELECTED_DEST" = "CANCEL" ] && return
@@ -432,73 +438,13 @@ remove_menu() {
         2)
             clear
             echo -e "${YELLOW}--- Remove Service Preset ---${NC}"
-            echo -e " [1]  Amazon / AWS (AS16509, AS14618)"
-            echo -e " [2]  Google Services (AS15169, AS8075, AS22577)"
-            echo -e " [3]  YouTube (AS43515, AS36040)"
-            echo -e " [4]  Netflix (AS2906, AS40027)"
-            echo -e " [5]  Cloudflare (AS13335, AS209242)"
-            echo -e " [6]  Steam / Valve (AS32590)"
-            echo -e " [7]  Meta / Facebook / IG / WhatsApp (AS32934, AS63293)"
-            echo -e " [8]  Microsoft / Azure / Xbox (AS8075, AS8068, AS8074, AS36444)"
-            echo -e " [9]  Apple / iCloud (AS714)"
-            echo -e " [10] Telegram (AS62041, AS59930, AS44907, AS211157, AS20473)"
-            echo -e " [11] Akamai CDN (AS20940, AS16625)"
-            echo -e " [12] Fastly CDN (AS54113)"
-            echo -e " [13] PlayStation / Sony (AS33494, AS19684, AS29237)"
-            echo -e " [14] TikTok / ByteDance (AS138699, AS396986)"
-            echo -e " [15] Hetzner & OVH Hosting (AS24940, AS16276)"
-            echo -e " [16] Disney+ / Hulu (AS394464)"
-            echo -e " [17] Spotify (AS8403, AS45102, AS23507)"
-            echo -e " [18] Twitch (AS46489)"
-            echo -e " [19] Riot Games / LoL / Valorant (AS6507)"
-            echo -e " [20] Epic Games (AS32252, AS13488)"
-            echo -e " [21] Nintendo (AS9003)"
-            echo -e " [22] Zoom (AS20224, AS394622)"
-            echo -e " [23] DigitalOcean & Linode (AS14061, AS63949)"
-            echo -e " [24] Oracle Cloud (AS31898)"
-            echo -e " [25] OpenAI / ChatGPT (AS398324)"
-            echo -e " [26] GitHub (AS36459, AS19864)"
-            echo -e " [27] NVIDIA / GeForce NOW (AS40676)"
-            echo -e " [28] EA / Electronic Arts (AS29748)"
-            echo -e " [29] Blizzard / Battle.net (AS57976)"
-            echo -e " [30] Ubisoft (AS32499)"
+            print_presets
             echo -e " [0]  Cancel"
             echo ""
-            echo -n "Select preset to remove [0-30]: "
+            echo -n "Select preset to remove [0-${PRESET_COUNT}]: "
             read -r p_rem
-            case "$p_rem" in
-                1)  REM_ASNS="16509 14618" ;;
-                2)  REM_ASNS="15169 8075 22577" ;;
-                3)  REM_ASNS="43515 36040" ;;
-                4)  REM_ASNS="2906 40027" ;;
-                5)  REM_ASNS="13335 209242" ;;
-                6)  REM_ASNS="32590" ;;
-                7)  REM_ASNS="32934 63293" ;;
-                8)  REM_ASNS="8075 8068 8074 36444" ;;
-                9)  REM_ASNS="714" ;;
-                10) REM_ASNS="62041 59930 44907 211157 20473" ;;
-                11) REM_ASNS="20940 16625" ;;
-                12) REM_ASNS="54113" ;;
-                13) REM_ASNS="33494 19684 29237" ;;
-                14) REM_ASNS="138699 396986" ;;
-                15) REM_ASNS="24940 16276" ;;
-                16) REM_ASNS="394464" ;;
-                17) REM_ASNS="8403 45102 23507" ;;
-                18) REM_ASNS="46489" ;;
-                19) REM_ASNS="6507" ;;
-                20) REM_ASNS="32252 13488" ;;
-                21) REM_ASNS="9003" ;;
-                22) REM_ASNS="20224 394622" ;;
-                23) REM_ASNS="14061 63949" ;;
-                24) REM_ASNS="31898" ;;
-                25) REM_ASNS="398324" ;;
-                26) REM_ASNS="36459 19864" ;;
-                27) REM_ASNS="40676" ;;
-                28) REM_ASNS="29748" ;;
-                29) REM_ASNS="57976" ;;
-                30) REM_ASNS="32499" ;;
-                *) return ;;
-            esac
+            REM_ASNS=$(preset_asns "$p_rem")
+            [ -z "$REM_ASNS" ] && return
             for asn in $REM_ASNS; do
                 sed -i "/^${asn}:/d" "$ASN_FILE"
             done
@@ -563,7 +509,12 @@ update_self() {
             read -r confirm
             case "$confirm" in
                 [Yy]*)
-                    cp "$TMP_SCRIPT" /jffs/scripts/ASNmanager.sh
+                    # The GitHub file is an installer wrapper (cat << SCRIPT_EOF ...) -> keep only the script body
+                    if head -n 1 "$TMP_SCRIPT" | grep -q "^cat << .SCRIPT_EOF."; then
+                        sed '1d;/^SCRIPT_EOF$/,$d' "$TMP_SCRIPT" > /jffs/scripts/ASNmanager.sh
+                    else
+                        cp "$TMP_SCRIPT" /jffs/scripts/ASNmanager.sh
+                    fi
                     chmod +x /jffs/scripts/ASNmanager.sh
                     sed -i 's/\r$//' /jffs/scripts/ASNmanager.sh 2>/dev/null
                     rm -f "$TMP_SCRIPT" 2>/dev/null
@@ -610,9 +561,11 @@ show_menu() {
     echo -e " [12] Set ASN IP Subnet Auto-Refresh Schedule (Every ${INTERVAL}d @ ${TIME_VAL})"
     echo -e " [13] Backup & Restore Configuration (Internal / USB)"
     echo -e " [14] Uninstall ASN Manager"
+    webui_enabled && WEBUI_STATE="${GREEN}Enabled${NC}" || WEBUI_STATE="${RED}Disabled${NC}"
+    echo -e " [15] WebUI Addons Tab (${WEBUI_STATE})"
     echo -e " [0]  Exit"
     echo -e "${CYAN}----------------------------------------------------------------${NC}"
-    echo -n "Select an option [0-14]: "
+    echo -n "Select an option [0-15]: "
 }
 
 rebuild_worker() {
@@ -645,6 +598,9 @@ until ping -c 1 -W 2 github.com >/dev/null 2>&1 || ping -c 1 -W 2 google.com >/d
 done
 
 > "$STATS_FILE"
+> /tmp/asn_failed.txt
+ASN_TOTAL=$(grep -c ':' "$ASN_FILE")
+ASN_NUM=0
 get_ifname() {
     case "$1" in
         WAN|WAN1) echo "$(nvram get wan0_ifname 2>/dev/null)" ;;
@@ -753,6 +709,8 @@ while IFS=':' read -r asn dest src_ip; do
     [ -z "$asn" ] || [ -z "$dest" ] && continue
     info=$(get_info "$dest")
     [ -z "$info" ] && continue
+    ASN_NUM=$((ASN_NUM + 1))
+    echo "$ASN_NUM $ASN_TOTAL $asn $dest" > /tmp/asn_progress.txt
     TABLE=$(echo "$info" | cut -d' ' -f1)
     FWMARK_VAL=$(echo "$info" | cut -d' ' -f2)
     FWMARK="${FWMARK_VAL}/${FWMARK_VAL}"
@@ -801,14 +759,849 @@ while IFS=':' read -r asn dest src_ip; do
         [ "$EXEC_MODE" = "force" ] && sleep 1
     else
         [ -t 1 ] && echo -e " ${RED}[FAIL]${NC} AS${asn} -> ${dest}${src_text} ${RED}(0 subnets found)${NC}"
+        echo "${asn}:${dest}" >> /tmp/asn_failed.txt
     fi
 done < "$ASN_FILE"
+rm -f /tmp/asn_progress.txt
 WORKER_EOF
 
     chmod +x "$WORKER_SCRIPT"
     apply_schedule
     return 0
 }
+
+# =====================================================================
+#  Non-interactive CLI + Merlin WebUI (Addons tab)
+# =====================================================================
+# Namespace for WebUI files, service events and settings keys
+WEBUI_NS="asnmanager"
+ADDON_DIR="/jffs/addons/${WEBUI_NS}"
+WEBUI_SRC="$ADDON_DIR/ASNmanager.asp"
+WEBUI_TAB="ASN Manager"
+WEBUI_MARK="ASNmanager-WebUI"
+WEB_DIR="/www/ext/${WEBUI_NS}"
+SERVICE_EVENT="/jffs/scripts/service-event"
+SETTINGS_FILE="/jffs/addons/custom_settings.txt"
+LOCK_DIR="/tmp/${WEBUI_NS}-job.lock"
+ASP_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/ASNmanager.asp"
+VALID_DESTS="WAN1 WAN2 OVPN1 OVPN2 OVPN3 OVPN4 OVPN5 WGC1 WGC2 WGC3 WGC4 WGC5"
+
+# ---------- validation ----------
+is_valid_dest() { case " $VALID_DESTS " in *" $1 "*) return 0 ;; esac; return 1; }
+
+is_valid_ip() {
+    echo "$1" | grep -qE '^([0-9]{1,3}\.){3}[0-9]{1,3}$' || return 1
+    echo "$1" | awk -F. '{ for (i = 1; i <= 4; i++) if ($i > 255) exit 1 }'
+}
+
+is_valid_host() { echo "$1" | grep -qE '^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$'; }
+
+norm_asn() {
+    a=$(echo "$1" | sed -E 's/^[Aa][Ss]//; s/^0+//')
+    case "$a" in ''|*[!0-9]*) return 1 ;; esac
+    [ ${#a} -le 10 ] || return 1
+    echo "$a"
+}
+
+norm_dest() {
+    d=$(echo "$1" | tr 'a-z' 'A-Z')
+    [ "$d" = "WAN" ] && d="WAN1"
+    is_valid_dest "$d" && echo "$d"
+}
+
+mark_applied() { mkdir -p "$ADDON_DIR" && date +%s > "$ADDON_DIR/last_apply"; rm -f "$ADDON_DIR/pending"; }
+mark_pending() {
+    mkdir -p "$ADDON_DIR" || return
+    if [ $# -gt 0 ]; then printf '%s\n' "$@"; else echo "-"; fi >> "$ADDON_DIR/pending"
+}
+
+# ---------- reusable reports ----------
+ipset_status_report() {
+    echo -e "${YELLOW}--- ipset Status ---${NC}"
+    for s in $(ipset list -n 2>/dev/null | grep "^ASN_"); do
+        dest_name=$(echo "$s" | sed -E 's/ASN_([^_]+).*/\1/')
+        check_iface_up "$dest_name" && IF_STATUS="${GREEN}[ONLINE]${NC}" || IF_STATUS="${RED}[OFFLINE]${NC}"
+        ENTRY_COUNT=$(ipset list "$s" 2>/dev/null | grep -E "Number of entries:" | awk '{print $4}')
+        echo -e "${CYAN}$s${NC} ($dest_name) -> Subnets: ${GREEN}${ENTRY_COUNT:-0}${NC} $IF_STATUS"
+    done
+}
+
+route_test() {
+    target="$1"
+    if is_valid_ip "$target"; then
+        ips="$target"
+    else
+        ips=$(nslookup "$target" 2>/dev/null | grep -A 20 "Name:" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}')
+        [ -z "$ips" ] && { echo -e "${RED}Could not resolve ${target}${NC}"; return 1; }
+    fi
+    for test_ip in $ips; do
+        matched=0
+        for s in $(ipset list -n 2>/dev/null | grep "^ASN_"); do
+            if ipset test "$s" "$test_ip" 2>/dev/null; then
+                dest_name=$(echo "$s" | sed -E 's/ASN_([^_]+).*/\1/')
+                echo -e "${GREEN}MATCHED:${NC} $test_ip -> Routes to ${dest_name} (${s})"
+                matched=1; break
+            fi
+        done
+        [ $matched -eq 0 ] && echo -e "${RED}DEFAULT ROUTE:${NC} $test_ip -> Normal router routing"
+    done
+    return 0
+}
+
+# ---------- CLI actions ----------
+cli_list() {
+    [ -s "$ASN_FILE" ] || { echo "ASN list is empty."; return 0; }
+    while IFS=':' read -r asn dest src_ip; do
+        [ -z "$asn" ] && continue
+        printf "AS%-10s -> %-6s %s\n" "$asn" "$dest" "${src_ip:+[Src: $src_ip]}"
+    done < "$ASN_FILE"
+}
+
+# add <TARGET> <ASN> [ASN ...] [--src IP]
+cli_add() {
+    dest=$(norm_dest "$1") || { echo "Invalid target '$1' (use: $VALID_DESTS)"; return 1; }
+    shift
+    src=""; asns=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --src) src="$2"; shift; [ $# -gt 0 ] && shift ;;
+            *) asns="$asns $1"; shift ;;
+        esac
+    done
+    if [ -n "$src" ] && ! is_valid_ip "$src"; then echo "Invalid source IP '$src'"; return 1; fi
+    n=0; added=""
+    for raw in $(echo "$asns" | tr ',;' '  '); do
+        asn=$(norm_asn "$raw") || { echo "Skipping invalid ASN '$raw'"; continue; }
+        sed -i "/^${asn}:/d" "$ASN_FILE"
+        echo "${asn}:${dest}:${src}" >> "$ASN_FILE"
+        n=$((n + 1)); added="$added $asn"
+    done
+    sort -u "$ASN_FILE" -o "$ASN_FILE" 2>/dev/null
+    [ $n -gt 0 ] || { echo "No valid ASN given."; return 1; }
+    mark_pending $added
+    echo "Saved $n ASN(s) -> ${dest}${src:+ (Src: $src)}. Apply rules to activate."
+}
+
+# preset <NR> <TARGET> [--src IP]
+cli_preset() {
+    list=$(preset_asns "$1") || { echo "Invalid preset '$1'"; return 1; }
+    [ -z "$list" ] && { echo "Invalid preset '$1' (1-${PRESET_COUNT})"; return 1; }
+    shift
+    d="$1"; shift
+    cli_add "$d" $list "$@"
+}
+
+# edit <ASN> <TARGET> [SRC-IP]
+cli_edit() {
+    asn=$(norm_asn "$1") || { echo "Invalid ASN '$1'"; return 1; }
+    grep -q "^${asn}:" "$ASN_FILE" || { echo "AS${asn} is not in the list."; return 1; }
+    norm_dest "$2" >/dev/null || { echo "Invalid target '$2'"; return 1; }
+    if [ -n "$3" ] && ! is_valid_ip "$3"; then echo "Invalid source IP '$3'"; return 1; fi
+    if [ -n "$3" ]; then cli_add "$2" "$asn" --src "$3"; else cli_add "$2" "$asn"; fi >/dev/null || { echo "Update failed"; return 1; }
+    echo "Updated AS${asn} -> $(norm_dest "$2")${3:+ (Src: $3)}. Apply rules to activate."
+}
+
+# import <replace|merge> <ASN:TARGET:SRC>[,...]
+cli_import() {
+    mode="$1"; [ $# -gt 0 ] && shift
+    case "$mode" in replace|merge) ;; *) echo "Mode must be replace or merge"; return 1 ;; esac
+    set -f
+    list=$(echo "$*" | tr ',;' '  ')
+    [ "$mode" = "replace" ] && : > "$ASN_FILE"
+    n=0; bad=0; added=""
+    for e in $list; do
+        asn=$(norm_asn "${e%%:*}") || { bad=$((bad + 1)); continue; }
+        rest="${e#*:}"
+        [ "$rest" = "$e" ] && { bad=$((bad + 1)); continue; }
+        case "$rest" in *:*) src="${rest#*:}"; d="${rest%%:*}" ;; *) src=""; d="$rest" ;; esac
+        dest=$(norm_dest "$d") || { bad=$((bad + 1)); continue; }
+        if [ -n "$src" ] && ! is_valid_ip "$src"; then bad=$((bad + 1)); continue; fi
+        sed -i "/^${asn}:/d" "$ASN_FILE"
+        echo "${asn}:${dest}:${src}" >> "$ASN_FILE"
+        n=$((n + 1)); added="$added $asn"
+    done
+    set +f
+    sort -u "$ASN_FILE" -o "$ASN_FILE" 2>/dev/null
+    mark_pending $added
+    skipped=""; [ $bad -gt 0 ] && skipped=", $bad invalid entries skipped"
+    echo "Imported $n ASN(s) (${mode})${skipped}. Apply rules to activate."
+}
+
+cli_remove() {
+    n=0
+    for raw in $(echo "$*" | tr ',;' '  '); do
+        asn=$(norm_asn "$raw") || continue
+        grep -q "^${asn}:" "$ASN_FILE" && n=$((n + 1))
+        sed -i "/^${asn}:/d" "$ASN_FILE"
+    done
+    [ $n -gt 0 ] && mark_pending
+    echo "Removed $n ASN(s). Apply rules to activate."
+}
+
+cli_clear() {
+    > "$ASN_FILE"
+    mark_pending
+    echo "All ASNs cleared. Apply rules to remove active routing."
+}
+
+cli_apply() {
+    wmode="force"; [ "$1" = "cache" ] && wmode=""
+    if [ ! -s "$ASN_FILE" ]; then
+        cleanup_rules
+        > "$STATS_FILE"
+        mark_applied
+        echo "ASN list is empty - all ASN routing rules removed."
+        return 0
+    fi
+    rebuild_worker || return 1
+    if [ -n "$wmode" ]; then
+        echo "Fetching subnets for $(grep -c . "$ASN_FILE") ASN(s)..."
+    else
+        echo "Rebuilding rules from cache, downloading only missing ASNs..."
+    fi
+    rm -f /tmp/asn_progress.txt
+    "$WORKER_SCRIPT" $wmode >/dev/null 2>&1 &
+    wpid=$!
+    while kill -0 "$wpid" 2>/dev/null; do
+        if [ -n "$JOB_ID" ] && [ -s /tmp/asn_progress.txt ]; then
+            read -r pn pt pasn pdest < /tmp/asn_progress.txt
+            case "$pn$pt$pasn" in *[!0-9]*|'') ;; *)
+                job_status "$JOB_ID" "$JOB_ACT" "running" "AS${pasn} -> $(echo "$pdest" | tr -cd 'A-Z0-9') (${pn}/${pt})" "$pn" "$pt" ;;
+            esac
+        fi
+        sleep 2
+    done
+    wait "$wpid" 2>/dev/null
+    mark_applied
+    ok=0; fail=0
+    while IFS=':' read -r asn dest src_ip; do
+        [ -z "$asn" ] && continue
+        cnt=$(grep "^${asn}:${dest}:" "$STATS_FILE" 2>/dev/null | head -n 1 | cut -d':' -f3)
+        if [ -n "$cnt" ]; then
+            echo "[OK]   AS${asn} -> ${dest}${src_ip:+ [Src: $src_ip]} (${cnt} subnets)"; ok=$((ok + 1))
+        else
+            echo "[FAIL] AS${asn} -> ${dest} (0 subnets found)"; fail=$((fail + 1))
+        fi
+    done < "$ASN_FILE"
+    echo "Rules applied: ${ok} OK, ${fail} failed."
+}
+
+cli_schedule() {
+    case "$1" in ''|*[!0-9]*) echo "Interval must be 1-30 days"; return 1 ;; esac
+    [ "$1" -ge 1 ] && [ "$1" -le 30 ] || { echo "Interval must be 1-30 days"; return 1; }
+    echo "$2" | grep -qE '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$' || { echo "Time must be HH:MM (24h)"; return 1; }
+    echo "INTERVAL=$1" > "$SCHEDULE_FILE"
+    echo "TIME=$2" >> "$SCHEDULE_FILE"
+    apply_schedule
+    echo "Auto-refresh set: every $1 day(s) at $2."
+}
+
+# IPv4 addresses of a name. Ignores 0.0.0.0 / 127.x answers from ad blockers and retries with public DNS.
+resolve_ipv4() {
+    if is_valid_ip "$1"; then echo "$1"; return 0; fi
+    for srv in "" 1.1.1.1 8.8.8.8; do
+        r=$(nslookup "$1" $srv 2>/dev/null | awk '/^Name:/ { f = 1; next } f && /Address/' \
+            | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | grep -vE '^(0\.|127\.)' | awk '!s[$0]++' | head -n 4)
+        [ -n "$r" ] && { echo "$r"; return 0; }
+    done
+    return 1
+}
+
+# "AS<num> <holder>" for an IP, with fallbacks if ip-api.com is unreachable or rate-limited
+asn_of_ip() {
+    r=$(curl -fsSk --connect-timeout 5 -m 8 "http://ip-api.com/line/$1?fields=as" 2>/dev/null | head -n 1)
+    echo "$r" | grep -qE '^AS[0-9]+' || r=$(curl -fsSk --connect-timeout 5 -m 8 "https://ipinfo.io/$1/org" 2>/dev/null | head -n 1)
+    if ! echo "$r" | grep -qE '^AS[0-9]+'; then
+        n=$(curl -fsSk --connect-timeout 5 -m 10 "https://stat.ripe.net/data/network-info/data.json?resource=$1" 2>/dev/null \
+            | grep -oE '"asns": *\[ *"?[0-9]+' | grep -oE '[0-9]+$' | head -n 1)
+        [ -n "$n" ] && r="AS$n"
+    fi
+    echo "$r" | grep -qE '^AS[0-9]+' || return 1
+    echo "$r" | tr -cd 'A-Za-z0-9 .,&()+/_-' | cut -c1-80
+}
+
+cli_lookup() {
+    target=$(echo "$1" | sed -E 's#https?://##' | cut -d'/' -f1 | cut -d':' -f1)
+    is_valid_host "$target" || { echo "Invalid domain or IP"; return 1; }
+    ips=$(resolve_ipv4 "$target") || { echo "Could not resolve $target"; return 1; }
+    found=""
+    for ip in $ips; do
+        info=$(asn_of_ip "$ip") || { echo "$ip -> lookup failed"; continue; }
+        num=$(echo "$info" | grep -oE '^AS[0-9]+' | sed 's/^AS//')
+        holder=$(echo "$info" | sed -E 's/^AS[0-9]+ ?//')
+        in_list=$(grep "^${num}:" "$ASN_FILE" 2>/dev/null | head -n 1 | cut -d':' -f2)
+        echo "$ip -> AS${num} ${holder}${in_list:+ [in list: $in_list]}"
+        case " $found " in *" AS$num "*) ;; *) found="$found AS$num" ;; esac
+    done
+    [ -z "$found" ] && { echo "Lookup failed for $target"; return 1; }
+    echo "Result:$found"
+}
+
+cli_trace() {
+    is_valid_host "$1" || { echo "Invalid domain or IP"; return 1; }
+    traceroute -n -m 15 -q 1 -w 2 "$1" 2>&1 &
+    tr_pid=$!
+    ( sleep 45; kill "$tr_pid" 2>/dev/null ) &
+    killer=$!
+    wait "$tr_pid"
+    kill "$killer" 2>/dev/null
+    return 0
+}
+
+# ---------- WebUI data export ----------
+json_esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\r\n\t'; }
+
+web_export() {
+    [ -d "$(dirname "$WEB_DIR")" ] || return 0
+    mkdir -p "$WEB_DIR" || return 1
+    load_schedule
+    sets_tmp="/tmp/asnm_sets.$$"
+    fail_tmp="/tmp/asnm_fail.$$"
+    pend_tmp="/tmp/asnm_pend.$$"
+    ipset list -n 2>/dev/null | grep '^ASN_' > "$sets_tmp"
+    [ -f "$STATS_FILE" ] || : > "$STATS_FILE"
+    cat /tmp/asn_failed.txt > "$fail_tmp" 2>/dev/null || : > "$fail_tmp"
+
+    last_apply=$(cat "$ADDON_DIR/last_apply" 2>/dev/null); case "$last_apply" in ''|*[!0-9]*) last_apply=0 ;; esac
+    # The worker also runs from cron, at boot and from the original menu -> its stats file counts as "applied" too
+    stats_mtime=0; [ -s "$STATS_FILE" ] && stats_mtime=$(date -r "$STATS_FILE" +%s 2>/dev/null)
+    case "$stats_mtime" in ''|*[!0-9]*) stats_mtime=0 ;; esac
+    [ "$stats_mtime" -gt "$last_apply" ] && last_apply=$stats_mtime
+    if [ -f "$ADDON_DIR/pending" ]; then
+        p_mtime=$(date -r "$ADDON_DIR/pending" +%s 2>/dev/null); case "$p_mtime" in ''|*[!0-9]*) p_mtime=0 ;; esac
+        [ "$stats_mtime" -gt "$p_mtime" ] && rm -f "$ADDON_DIR/pending"
+    fi
+    list_mtime=$(date -r "$ASN_FILE" +%s 2>/dev/null); case "$list_mtime" in ''|*[!0-9]*) list_mtime=0 ;; esac
+    pending=0
+    if [ -s "$ADDON_DIR/pending" ]; then
+        pending=1
+    elif [ "$last_apply" -gt 0 ] && [ "$list_mtime" -gt "$last_apply" ]; then
+        pending=1
+    fi
+    cat "$ADDON_DIR/pending" > "$pend_tmp" 2>/dev/null || : > "$pend_tmp"
+    cron=0; cru l 2>/dev/null | grep -q "#ASN_Worker#" && cron=1
+    worker=0; [ -x "$WORKER_SCRIPT" ] && worker=1
+
+    out="$WEB_DIR/data.js.tmp"
+    {
+        printf '{"version":"%s","generated":%s,"last_apply":%s,"pending":%s,"cron":%s,"worker":%s,' \
+            "$SCRIPT_VERSION" "$(date +%s)" "$last_apply" "$pending" "$cron" "$worker"
+        printf '"schedule":{"interval":%s,"time":"%s"},' "$INTERVAL" "$(json_esc "$TIME_VAL")"
+
+        printf '"entries":['
+        awk -F':' '
+            FILENAME == ARGV[1] { cnt[$1 ":" $2] = $3; next }
+            FILENAME == ARGV[2] { sets[$0] = 1; next }
+            FILENAME == ARGV[3] { fail[$1 ":" $2] = 1; next }
+            FILENAME == ARGV[4] { pend[$1] = 1; next }
+            {
+                sub(/\r$/, "")
+                asn = $1; dest = $2; src = $3
+                if (asn !~ /^[0-9]+$/ || length(asn) > 10) next
+                if (dest !~ /^(WAN|WAN1|WAN2|OVPN[1-5]|WGC[1-5])$/) next
+                if (src !~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) src = ""
+                k = asn ":" dest
+                c = (k in cnt) ? cnt[k] + 0 : -1
+                l = (("ASN_" dest "_" asn) in sets) ? 1 : 0
+                f = ((k in fail) && !(k in cnt)) ? 1 : 0
+                nw = (asn in pend) ? 1 : 0
+                printf "%s{\"asn\":\"%s\",\"dest\":\"%s\",\"src\":\"%s\",\"subnets\":%d,\"loaded\":%d,\"failed\":%d,\"new\":%d}", (n++ ? "," : ""), asn, dest, src, c, l, f, nw
+            }' "$STATS_FILE" "$sets_tmp" "$fail_tmp" "$pend_tmp" "$ASN_FILE"
+        printf '],'
+
+        printf '"ifaces":['
+        first=1
+        for d in $VALID_DESTS; do
+            dev=$(get_ifname "$d" | tr -cd 'A-Za-z0-9._-')
+            exists=0; [ -n "$dev" ] && ip link show "$dev" >/dev/null 2>&1 && exists=1
+            up=0; check_iface_up "$d" && up=1
+            [ $first -eq 1 ] && first=0 || printf ','
+            printf '{"id":"%s","dev":"%s","exists":%s,"up":%s}' "$d" "$dev" "$exists" "$up"
+        done
+        printf '],'
+
+        printf '"devices":['
+        export_devices
+        printf '],'
+
+        printf '"presets":['
+        echo "$PRESET_DATA" | awk -F'|' '{ gsub(/["\\]/, "", $1); printf "%s{\"name\":\"%s\",\"asns\":\"%s\"}", (NR > 1 ? "," : ""), $1, $2 }'
+        printf ']}\n'
+    } > "$out" && mv "$out" "$WEB_DIR/data.js"
+    rm -f "$sets_tmp" "$fail_tmp" "$pend_tmp"
+}
+
+pubip_export() {
+    mkdir -p "$WEB_DIR" || return 1
+    tmpd="/tmp/asnm_pubip.$$"; mkdir -p "$tmpd"
+    for d in $VALID_DESTS; do
+        check_iface_up "$d" || continue
+        dev=$(get_ifname "$d")
+        [ -z "$dev" ] && continue
+        (
+            ip=$(curl -s -k --interface "$dev" --connect-timeout 4 -m 6 https://api.ipify.org 2>/dev/null)
+            is_valid_ip "$ip" || exit 0
+            geo=$(curl -s -k --connect-timeout 4 -m 6 "http://ip-api.com/json/$ip?fields=country,countryCode" 2>/dev/null)
+            cc=$(echo "$geo" | grep -oE '"countryCode":"[A-Z]{2}"' | cut -d'"' -f4)
+            cn=$(echo "$geo" | grep -oE '"country":"[^"]*"' | cut -d'"' -f4 | tr -cd 'A-Za-z .()-' | cut -c1-40)
+            # Round flags (circle-flags, MIT) cached on JFFS and delivered inline in pubip.js;
+            # the old rectangular PNG from flagcdn.com is only used as a fallback
+            flag=0; svg=""
+            if [ -n "$cc" ]; then
+                lc=$(echo "$cc" | tr 'A-Z' 'a-z')
+                fs="$ADDON_DIR/flags/$lc.svg"; fl="$ADDON_DIR/flags/$lc.png"
+                mkdir -p "$ADDON_DIR/flags"
+                if [ ! -s "$fs" ]; then
+                    for u in "https://raw.githubusercontent.com/HatScripts/circle-flags/gh-pages/flags/$lc.svg" \
+                             "https://cdn.jsdelivr.net/gh/HatScripts/circle-flags@gh-pages/flags/$lc.svg"; do
+                        if curl -fsSk --connect-timeout 5 -m 10 "$u" -o "$fs.tmp" 2>/dev/null && \
+                           head -c 5 "$fs.tmp" | grep -q '<svg' && ! grep -qi '<script\|javascript:' "$fs.tmp" && \
+                           [ "$(wc -c < "$fs.tmp")" -le 8192 ]; then
+                            mv -f "$fs.tmp" "$fs"; break
+                        fi
+                    done
+                    rm -f "$fs.tmp"
+                fi
+                if [ -s "$fs" ]; then
+                    svg=$(tr -d '\r\n\t' < "$fs" | sed 's/\\/\\\\/g; s/"/\\"/g')
+                    flag=2
+                else
+                    if [ ! -s "$fl" ]; then
+                        curl -fsSk --connect-timeout 5 -m 10 "https://flagcdn.com/w40/$lc.png" -o "$fl.tmp" 2>/dev/null && \
+                            [ -s "$fl.tmp" ] && mv -f "$fl.tmp" "$fl"
+                        rm -f "$fl.tmp"
+                    fi
+                    [ -s "$fl" ] && flag=1
+                fi
+            fi
+            printf '"%s":{"ip":"%s","cc":"%s","country":"%s","flag":%s,"svg":"%s"}' "$d" "$ip" "$cc" "$cn" "$flag" "$svg" > "$tmpd/$d"
+        ) &
+    done
+    wait
+    if [ -d "$ADDON_DIR/flags" ]; then
+        mkdir -p "$WEB_DIR/flags" && cp -f "$ADDON_DIR/flags/"*.png "$WEB_DIR/flags/" 2>/dev/null
+    fi
+    {
+        printf '{"ts":%s,"ips":{' "$(date +%s)"
+        first=1
+        for f in "$tmpd"/*; do
+            [ -s "$f" ] || continue
+            [ $first -eq 1 ] && first=0 || printf ','
+            cat "$f"
+        done
+        printf '}}\n'
+    } > "$WEB_DIR/pubip.js.tmp" && mv "$WEB_DIR/pubip.js.tmp" "$WEB_DIR/pubip.js"
+    rm -rf "$tmpd"
+}
+
+# Devices for the source picker:
+#  LAN  - DHCP clients (custom names from the ASUS client list win over DHCP hostnames)
+#  WG   - WireGuard server peers (nvram wgs1_cN_*, plus live peers from "wg show")
+#  OVPN - connected OpenVPN server clients (status files)
+export_devices() {
+    {
+        nvram get custom_clientlist 2>/dev/null | tr '<' '\n' | awk -F'>' 'NF >= 2 && $2 != "" { print "C|" toupper($2) "||" $1 }'
+        nvram get dhcp_hostnames 2>/dev/null | tr '<' '\n' | awk -F'>' 'NF >= 2 && $1 != "" { print "H|" toupper($1) "||" $2 }'
+        nvram get dhcp_staticlist 2>/dev/null | tr '<' '\n' | awk -F'>' 'NF >= 2 && $1 != "" { n = $NF; if (n ~ /^[0-9.]*$/) n = ""; print "S|" toupper($1) "|" $2 "|" n }'
+        [ -f /var/lib/misc/dnsmasq.leases ] && awk '{ n = $4; if (n == "*") n = ""; print "L|" toupper($2) "|" $3 "|" n }' /var/lib/misc/dnsmasq.leases
+
+        for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
+            addr=$(nvram get "wgs1_c${i}_addr" 2>/dev/null)
+            [ -z "$addr" ] && continue
+            wip=$(echo "$addr" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
+            [ -n "$wip" ] && echo "W|WGS1C${i}|${wip}|$(nvram get "wgs1_c${i}_name" 2>/dev/null)"
+        done
+        if command -v wg >/dev/null 2>&1; then
+            for wif in $(wg show interfaces 2>/dev/null); do
+                case "$wif" in wgs*) ;; *) continue ;; esac
+                wg show "$wif" allowed-ips 2>/dev/null | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}/32' | sed 's#/32##' | \
+                    while read -r wip; do echo "W|${wif}|${wip}|"; done
+            done
+        fi
+
+        for st in /etc/openvpn/server*/status; do
+            [ -f "$st" ] || continue
+            awk -F'[,\t]' '$1 == "CLIENT_LIST" && $4 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ { print "O|OVPN|" $4 "|" $2 }' "$st"
+        done
+    } | awk -F'|' '
+        function add(key, ip, nm, kd) {
+            if (ip in seen) { if (nm != "" && !(seen[ip] in lname)) lname[seen[ip]] = nm; return }
+            seen[ip] = key; order[++cnt] = key; mip[key] = ip; kind[key] = kd
+            if (nm != "") lname[key] = nm
+        }
+        {
+            t = $1; id = $2; ip = $3; nm = $4
+            gsub(/[^A-Za-z0-9 ._()+-]/, "", nm)
+            if (t == "C" || t == "H" || t == "S" || t == "L") { id = toupper(id); gsub(/[^0-9A-F:]/, "", id) }
+            if (id == "") next
+            if (t == "C") { if (nm != "") cname[id] = nm; next }
+            if (t == "H") { if (nm != "") hname[id] = nm; next }
+            if (ip !~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) next
+            if (t == "W") { add("W" ip, ip, nm, "wg"); next }
+            if (t == "O") { add("O" ip, ip, nm, "ovpn"); next }
+            if (id in mac) { if (nm != "" && !(id in lname)) lname[id] = nm; next }
+            if (ip in seen) next
+            mac[id] = id; add(id, ip, nm, "lan")
+        }
+        END {
+            for (i = 1; i <= cnt; i++) {
+                k = order[i]
+                n = (k in cname) ? cname[k] : ((k in hname) ? hname[k] : ((k in lname) ? lname[k] : ""))
+                printf "%s{\"ip\":\"%s\",\"mac\":\"%s\",\"name\":\"%s\",\"kind\":\"%s\"}", (i > 1 ? "," : ""), mip[k], mac[k], n, kind[k]
+            }
+        }'
+}
+
+job_status() { # id action state msg [done total]
+    mkdir -p "$WEB_DIR" 2>/dev/null
+    pd="${5:-0}"; ptot="${6:-0}"
+    case "$pd$ptot" in *[!0-9]*) pd=0; ptot=0 ;; esac
+    printf '{"id":"%s","action":"%s","state":"%s","msg":"%s","done":%s,"total":%s,"ts":%s}\n' \
+        "$1" "$2" "$3" "$(json_esc "$4")" "$pd" "$ptot" "$(date +%s)" > "$WEB_DIR/job.js.tmp" && mv "$WEB_DIR/job.js.tmp" "$WEB_DIR/job.js"
+}
+
+job_lock() {
+    if mkdir "$LOCK_DIR" 2>/dev/null; then echo $$ > "$LOCK_DIR/pid"; return 0; fi
+    p=$(cat "$LOCK_DIR/pid" 2>/dev/null)
+    [ -n "$p" ] && kill -0 "$p" 2>/dev/null && return 1
+    rm -rf "$LOCK_DIR"
+    mkdir "$LOCK_DIR" 2>/dev/null && echo $$ > "$LOCK_DIR/pid"
+}
+
+# Payload from the WebUI: "<jobid>|<action>|<arg1>|<arg2>|<arg3>"
+web_job() {
+    set -f
+    old_ifs=$IFS; IFS='|'
+    set -- $1
+    IFS=$old_ifs
+    set +f
+    id="$1"; act="$2"; a1="$3"; a2="$4"; a3="$5"
+    case "$id" in ''|*[!0-9]*) return 1 ;; esac
+    case "$act" in ''|*[!a-z]*) return 1 ;; esac
+
+    if ! job_lock; then
+        job_status "$id" "$act" "error" "Another ASN Manager job is still running."
+        return 1
+    fi
+    trap 'rm -rf "$LOCK_DIR"' EXIT
+    JOB_ID="$id"; JOB_ACT="$act"
+    job_status "$id" "$act" "running" ""
+    OUT="$WEB_DIR/output.htm"
+    : > "$OUT"
+
+    case "$act" in
+        add)
+            a3=$(echo "$a3" | tr ',' ' ')
+            set -f
+            if [ -n "$a2" ]; then cli_add "$a1" $a3 --src "$a2"; else cli_add "$a1" $a3; fi > "$OUT" 2>&1
+            rc_add=$?; set +f; [ $rc_add -eq 0 ] ;;
+        preset)
+            if [ -n "$a3" ]; then cli_preset "$a1" "$a2" --src "$a3"; else cli_preset "$a1" "$a2"; fi > "$OUT" 2>&1 ;;
+        remove)   cli_remove "$a1" > "$OUT" 2>&1 ;;
+        clear)    cli_clear > "$OUT" 2>&1 ;;
+        apply)    cli_apply > "$OUT" 2>&1 ;;
+        retry)    cli_apply cache > "$OUT" 2>&1 ;;
+        edit)     cli_edit "$a1" "$a2" "$a3" > "$OUT" 2>&1 ;;
+        import)   cli_import "$a1" "$a2" > "$OUT" 2>&1 ;;
+        schedule) cli_schedule "$a1" "$a2" > "$OUT" 2>&1 ;;
+        status)   ipset_status_report > "$OUT" 2>&1 ;;
+        ifaces)   iface_ips_report > "$OUT" 2>&1 ;;
+        lookup)   cli_lookup "$a1" > "$OUT" 2>&1 ;;
+        test)     if is_valid_host "$a1"; then route_test "$a1"; else echo "Invalid domain or IP"; false; fi > "$OUT" 2>&1 ;;
+        trace)    cli_trace "$a1" > "$OUT" 2>&1 ;;
+        refresh)  echo "Data refreshed." > "$OUT" ;;
+        *)        echo "Unknown action '$act'" > "$OUT"; false ;;
+    esac
+    rc=$?
+    esc=$(printf '\033')
+    sed -i "s/${esc}\[[0-9;]*m//g" "$OUT"
+    web_export
+    msg=$(grep . "$OUT" | tail -n 1)
+    [ $rc -eq 0 ] && job_status "$id" "$act" "done" "$msg" || job_status "$id" "$act" "error" "${msg:-Failed}"
+    rm -rf "$LOCK_DIR"; trap - EXIT
+}
+
+service_event() {
+    [ "$1" = "start" ] || return 0
+    case "$2" in
+        "${WEBUI_NS}cmd")
+            payload=$(sed -n "s/^${WEBUI_NS}_cmd //p" "$SETTINGS_FILE" 2>/dev/null | head -n 1)
+            sed -i "/^${WEBUI_NS}_cmd /d" "$SETTINGS_FILE" 2>/dev/null
+            [ -n "$payload" ] && web_job "$payload"
+            ;;
+        "${WEBUI_NS}refresh") web_export ;;
+        "${WEBUI_NS}pubip") pubip_export ;;
+    esac
+    return 0
+}
+
+# ---------- WebUI mount / install ----------
+webui_lock()   { exec 9>/tmp/addonwebui.lock; command -v flock >/dev/null 2>&1 && flock -x 9; }
+webui_unlock() { command -v flock >/dev/null 2>&1 && flock -u 9; exec 9>&-; }
+
+menu_remount() {
+    umount /www/require/modules/menuTree.js 2>/dev/null
+    mount -o bind /tmp/menuTree.js /www/require/modules/menuTree.js
+}
+
+# Where the tab appears: "addons" (default) or "vpn"
+webui_location() {
+    l=$(cat "$ADDON_DIR/webui.location" 2>/dev/null)
+    [ "$l" = "vpn" ] && echo "vpn" || echo "addons"
+}
+
+webui_set_location() {
+    case "$1" in vpn|addons) ;; *) echo "Usage: webui location <addons|vpn>"; return 1 ;; esac
+    mkdir -p "$ADDON_DIR" && echo "$1" > "$ADDON_DIR/webui.location"
+    webui_mount >/dev/null && echo "WebUI tab moved to: $1 menu. Reload the router page."
+}
+
+webui_mount() {
+    webui_enabled || return 0
+    [ -s "$WEBUI_SRC" ] || { echo "WebUI page missing: $WEBUI_SRC"; return 1; }
+    [ -f /usr/sbin/helper.sh ] || { echo "Addon API (helper.sh) not found."; return 1; }
+    . /usr/sbin/helper.sh
+    webui_lock
+
+    # Drop our previous page if its content changed (e.g. after an update)
+    old=$(cat "$ADDON_DIR/webui_page" 2>/dev/null)
+    case "$old" in
+        user[0-9]*.asp)
+            if [ -f "/www/user/$old" ] && grep -q "$WEBUI_MARK" "/www/user/$old" && \
+               [ "$(md5sum < "$WEBUI_SRC")" != "$(md5sum < "/www/user/$old")" ]; then
+                rm -f "/www/user/$old"
+            fi ;;
+    esac
+
+    am_get_webui_page "$WEBUI_SRC"
+    if [ "$am_webui_page" = "none" ]; then
+        webui_unlock
+        echo "No free WebUI slot (user1-20.asp all in use)."
+        return 1
+    fi
+    cp -f "$WEBUI_SRC" "/www/user/$am_webui_page"
+    echo "$am_webui_page" > "$ADDON_DIR/webui_page"
+
+    [ -f /tmp/menuTree.js ] || cp /www/require/modules/menuTree.js /tmp/
+    # remove our previous entries by page URL (the tab name can be shared with another install)
+    [ -n "$old" ] && sed -i "/{url: \"$old\", tabName: \"$WEBUI_TAB\"}/d" /tmp/menuTree.js
+    sed -i "/{url: \"$am_webui_page\", tabName:/d" /tmp/menuTree.js
+    entry="{url: \"$am_webui_page\", tabName: \"$WEBUI_TAB\"},"
+    if [ "$(webui_location)" = "vpn" ]; then
+        # VPN menu: insert as last tab (after Instant Guard), i.e. before the menu's "__INHERIT__" end marker
+        vpn_ln=$(grep -n 'menu_VPN"' /tmp/menuTree.js | head -n 1 | cut -d':' -f1)
+        if [ -n "$vpn_ln" ]; then
+            end_ln=$(awk -v s="$vpn_ln" 'NR > s && /tabName: *"__INHERIT__"/ { print NR; exit }' /tmp/menuTree.js)
+            [ -n "$end_ln" ] && sed -i "${end_ln}i $entry" /tmp/menuTree.js
+        fi
+    fi
+    help_ln=$(grep -n "shared-jy/redirect.htm" /tmp/menuTree.js | head -n 1 | cut -d':' -f1)
+    if grep -q "{url: \"$am_webui_page\", tabName:" /tmp/menuTree.js; then
+        :
+    elif [ -n "$help_ln" ]; then
+        # Shared "Addons" menu (vnStat-on-Merlin, scMerlin, ...) already exists -> add our tab there
+        sed -i "${help_ln}i $entry" /tmp/menuTree.js
+    else
+        # Fallback: official Merlin example location (Tools menu)
+        sed -i "/url: \"Tools_OtherSettings.asp\", tabName:/a $entry" /tmp/menuTree.js
+    fi
+    menu_remount
+    webui_unlock
+
+    mkdir -p "$WEB_DIR"
+    web_export
+    echo "WebUI mounted as $am_webui_page"
+}
+
+webui_unmount() {
+    page=$(cat "$ADDON_DIR/webui_page" 2>/dev/null)
+    webui_lock
+    if [ -f /tmp/menuTree.js ]; then
+        case "$page" in user[0-9]*.asp) sed -i "/{url: \"$page\", tabName: \"$WEBUI_TAB\"}/d" /tmp/menuTree.js ;; esac
+        menu_remount
+    fi
+    case "$page" in
+        user[0-9]*.asp) [ -f "/www/user/$page" ] && grep -q "$WEBUI_MARK" "/www/user/$page" && rm -f "/www/user/$page" ;;
+    esac
+    webui_unlock
+    rm -rf "$WEB_DIR"
+    echo "WebUI unmounted."
+}
+
+webui_install() {
+    if ! nvram get rc_support 2>/dev/null | grep -q am_addons; then
+        echo "This firmware does not support Addon WebUI pages (Merlin 384.15+ required)."
+        return 1
+    fi
+    [ "$(nvram get jffs2_scripts 2>/dev/null)" = "1" ] || echo "Warning: 'Enable JFFS custom scripts and configs' is disabled - hooks will not run."
+    mkdir -p "$ADDON_DIR"
+    if [ "$1" != "local" ]; then
+        echo "Downloading WebUI page..."
+        if curl -fsSk --connect-timeout 10 "$ASP_URL" -o "$WEBUI_SRC.new" && grep -q "$WEBUI_MARK" "$WEBUI_SRC.new"; then
+            sed -i 's/\r$//' "$WEBUI_SRC.new"
+            mv -f "$WEBUI_SRC.new" "$WEBUI_SRC"
+        else
+            rm -f "$WEBUI_SRC.new"
+            [ -s "$WEBUI_SRC" ] || { echo "Download failed and no local page at $WEBUI_SRC"; return 1; }
+            echo "Download failed - using existing local page."
+        fi
+    fi
+    [ -s "$WEBUI_SRC" ] || { echo "Missing $WEBUI_SRC"; return 1; }
+
+    ensure_script "$SERVICE_EVENT"
+    sed -i "/# ${WEBUI_MARK}\$/d" "$SERVICE_EVENT"
+    echo 'if echo "$2" | grep -q "^'"$WEBUI_NS"'"; then '"$SCRIPT_PATH"' service_event "$1" "$2" </dev/null >/dev/null 2>&1 & fi # '"$WEBUI_MARK" >> "$SERVICE_EVENT"
+
+    ensure_script "$SERVICES_START"
+    sed -i "/# ${WEBUI_MARK}\$/d" "$SERVICES_START"
+    echo "$SCRIPT_PATH webui mount >/dev/null 2>&1 & # $WEBUI_MARK" >> "$SERVICES_START"
+
+    webui_mount && echo "WebUI installed. Reload the router page and open the '$WEBUI_TAB' tab."
+}
+
+webui_enabled() { [ ! -f "$ADDON_DIR/webui.disabled" ]; }
+webui_installed() { [ -f "$ADDON_DIR/webui_page" ] && grep -q "$WEBUI_MARK" "$SERVICE_EVENT" 2>/dev/null; }
+webui_page_version() { sed -n "s/.*<!-- ${WEBUI_MARK} v\([0-9.]*\) -->.*/\1/p" "$WEBUI_SRC" 2>/dev/null | head -n 1; }
+
+# Called at menu start: install the WebUI (default) or update the page after a script update
+webui_auto() {
+    webui_enabled || return 0
+    nvram get rc_support 2>/dev/null | grep -q am_addons || return 0
+    if ! webui_installed; then
+        echo -e "${CYAN}Installing WebUI page (Addons tab)...${NC}"
+        webui_install >/dev/null 2>&1 && echo -e "${GREEN}WebUI installed.${NC}" || echo -e "${RED}WebUI install failed - see menu option [15].${NC}"
+        sleep 1
+    elif [ "$(webui_page_version)" != "$SCRIPT_VERSION" ]; then
+        webui_install >/dev/null 2>&1
+    fi
+}
+
+webui_disable() {
+    webui_unmount >/dev/null 2>&1
+    sed -i "/# ${WEBUI_MARK}\$/d" "$SERVICE_EVENT" 2>/dev/null
+    sed -i "/# ${WEBUI_MARK}\$/d" "$SERVICES_START" 2>/dev/null
+    rm -f "$ADDON_DIR/webui_page"
+    mkdir -p "$ADDON_DIR" && : > "$ADDON_DIR/webui.disabled"
+    echo "WebUI disabled."
+}
+
+webui_enable() {
+    rm -f "$ADDON_DIR/webui.disabled"
+    webui_install
+}
+
+webui_menu() {
+    clear
+    echo -e "${YELLOW}--- WebUI (Router Addons Tab) ---${NC}"
+    if ! webui_enabled; then
+        echo -e "Status: ${RED}Disabled${NC}"
+        echo -n "Enable the WebUI tab? (y/n): "; read -r c
+        case "$c" in [Yy]*) webui_enable ;; esac
+    else
+        page=$(cat "$ADDON_DIR/webui_page" 2>/dev/null)
+        webui_installed && echo -e "Status: ${GREEN}Enabled${NC} (${page})" || echo -e "Status: ${YELLOW}Enabled, not installed${NC}"
+        echo -e " [1] Disable WebUI tab"
+        echo -e " [2] Reinstall / update WebUI page"
+        [ "$(webui_location)" = "vpn" ] && echo -e " [3] Move tab to Addons menu (now: VPN)" || echo -e " [3] Move tab to VPN menu (now: Addons)"
+        echo -e " [0] Cancel"
+        echo -n "Select option [0-3]: "; read -r c
+        case "$c" in
+            1) webui_disable ;;
+            2) webui_install ;;
+            3) [ "$(webui_location)" = "vpn" ] && webui_set_location addons || webui_set_location vpn ;;
+        esac
+    fi
+    echo "" && echo -n "Press Enter to return..." && read -r _
+}
+
+webui_uninstall() {
+    webui_unmount >/dev/null 2>&1
+    sed -i "/# ${WEBUI_MARK}\$/d" "$SERVICE_EVENT" 2>/dev/null
+    sed -i "/# ${WEBUI_MARK}\$/d" "$SERVICES_START" 2>/dev/null
+    sed -i "/^${WEBUI_NS}_/d" "$SETTINGS_FILE" 2>/dev/null
+    rm -rf "$ADDON_DIR" "$WEB_DIR" "$LOCK_DIR"
+    rm -f /tmp/asn_progress.txt /tmp/asn_failed.txt /tmp/asnm_* 2>/dev/null
+    # Remove hook scripts that only contain the shebang now
+    for f in "$SERVICE_EVENT" "$SERVICES_START"; do
+        [ -f "$f" ] && [ -z "$(grep -v '^#!/bin/sh$' "$f" | grep -v '^[[:space:]]*$')" ] && rm -f "$f"
+    done
+    echo "WebUI removed."
+}
+
+cli_usage() {
+    cat << USAGE_EOF
+ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
+  (no command)                       interactive menu
+  list                               show ASN list
+  add <TARGET> <ASN>... [--src IP]   add ASN(s), TARGET: ${VALID_DESTS}
+  preset <1-${PRESET_COUNT}> <TARGET> [--src IP]  add a service preset
+  presets                            list service presets
+  remove <ASN>...                    remove ASN(s)
+  clear                              remove all ASNs
+  apply                              fetch subnets & apply rules
+  retry                              rebuild from cache, download only missing/failed ASNs
+  edit <ASN> <TARGET> [SRC-IP]       change target / source IP of an ASN
+  import <replace|merge> <ASN:TARGET:SRC>[,...]  import entries
+  status                             ipset status
+  test <IP|domain>                   check which route a target takes
+  lookup <IP|domain>                 find the ASN of a target
+  trace <IP|domain>                  traceroute
+  ifaces                             public IP / country per interface
+  schedule <days> <HH:MM>            auto-refresh schedule
+  webui install [local] | enable | disable | update | uninstall | mount | unmount | export
+  webui location <addons|vpn>        show the tab in the Addons or the VPN menu
+USAGE_EOF
+}
+
+cli_main() {
+    cmd="$1"; [ $# -gt 0 ] && shift
+    rc=0
+    case "$cmd" in
+        list)     cli_list ;;
+        add)      cli_add "$@" ;;
+        preset)   cli_preset "$@" ;;
+        presets)  print_presets ;;
+        remove|del) cli_remove "$@" ;;
+        clear)    cli_clear ;;
+        apply)    cli_apply ;;
+        retry)    cli_apply cache ;;
+        edit)     cli_edit "$@" ;;
+        import)   cli_import "$@" ;;
+        status)   ipset_status_report ;;
+        test)     if is_valid_host "$1"; then route_test "$1"; else echo "Usage: test <IP|domain>"; false; fi ;;
+        lookup)   cli_lookup "$1" ;;
+        trace)    cli_trace "$1" ;;
+        ifaces)   iface_ips_report ;;
+        pubip)    pubip_export && cat "$WEB_DIR/pubip.js" ;;
+        schedule) cli_schedule "$1" "$2" ;;
+        webui)
+            case "$1" in
+                install)   rm -f "$ADDON_DIR/webui.disabled"; webui_install "$2" ;;
+                enable)    webui_enable ;;
+                disable)   webui_disable ;;
+                update)    webui_install ;;
+                uninstall) webui_uninstall ;;
+                mount)     webui_mount ;;
+                unmount)   webui_unmount ;;
+                export)    web_export ;;
+                location)  webui_set_location "$2" ;;
+                *)         cli_usage; false ;;
+            esac ;;
+        service_event) service_event "$1" "$2"; return 0 ;;
+        help|-h|--help) cli_usage ;;
+        *)        cli_usage; false ;;
+    esac
+    rc=$?
+    # Keep the WebUI view in sync after CLI changes
+    case "$cmd" in add|preset|remove|del|clear|apply|retry|edit|import|schedule)
+        [ -f "$ADDON_DIR/webui_page" ] && web_export ;;
+    esac
+    return $rc
+}
+
+[ $# -gt 0 ] && { cli_main "$@"; exit $?; }
+
+webui_auto
 
 while true; do
     show_menu
@@ -928,37 +1721,20 @@ while true; do
             echo -e "${YELLOW}--- Rebuilding Worker & Fetching Subnets ---${NC}"
             if rebuild_worker; then
                 "$WORKER_SCRIPT" force
+                mark_applied
                 echo -e "\n${GREEN}Finished! Rules updated.${NC}"
             fi
             echo "" && echo -n "Press Enter to return..." && read -r _
             ;;
         7)
             clear
-            echo -e "${YELLOW}--- ipset Status ---${NC}"
-            for s in $(ipset list -n | grep "^ASN_"); do
-                dest_name=$(echo "$s" | sed -E 's/ASN_([^_]+).*/\1/')
-                check_iface_up "$dest_name" && IF_STATUS="${GREEN}[ONLINE]${NC}" || IF_STATUS="${RED}[OFFLINE]${NC}"
-                ENTRY_COUNT=$(ipset list "$s" 2>/dev/null | grep -E "Number of entries:" | awk '{print $4}')
-                echo -e "${CYAN}$s${NC} ($dest_name) -> Subnets: ${GREEN}${ENTRY_COUNT:-0}${NC} $IF_STATUS"
-            done
+            ipset_status_report
             echo "" && echo -n "Press Enter to return..." && read -r _
             ;;
         8)
             clear
             echo -n "Enter IP or Domain to test: " && read -r target
-            if [ -n "$target" ]; then
-                for test_ip in $(nslookup "$target" 2>/dev/null | grep -A 20 "Name:" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' || echo "$target"); do
-                    matched=0
-                    for s in $(ipset list -n | grep "^ASN_"); do
-                        if ipset test "$s" "$test_ip" 2>/dev/null; then
-                            dest_name=$(echo "$s" | sed -E 's/ASN_([^_]+).*/\1/')
-                            echo -e "${GREEN}MATCHED:${NC} $test_ip -> Routes to ${dest_name} (${s})"
-                            matched=1; break
-                        fi
-                    done
-                    [ $matched -eq 0 ] && echo -e "${RED}DEFAULT ROUTE:${NC} $test_ip -> Normal router routing"
-                done
-            fi
+            [ -n "$target" ] && route_test "$target"
             echo "" && echo -n "Press Enter to return..." && read -r _
             ;;
         9) show_interface_ips ;;
@@ -978,6 +1754,7 @@ while true; do
         12) configure_schedule ;;
         13) backup_restore_menu ;;
         14) uninstall_menu ;;
+        15) webui_menu ;;
         0) clear; exit 0 ;;
     esac
 done
