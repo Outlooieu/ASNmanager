@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v2.0.0 -->
+<!-- ASNmanager-WebUI v2.2.1 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -64,6 +64,19 @@
 /* header */
 .asnm-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px; }
 .asnm-brand { display: flex; align-items: center; gap: 12px; }
+/* orbit animation around the logo: two dashed paths with glowing dots, drawn behind the logo */
+.asnm-logo-wrap { position: relative; width: 42px; height: 42px; flex: none; margin: 0 16px 0 8px; }
+.asnm-logo-wrap .asnm-logo { position: relative; z-index: 1; }
+.asnm-orb { position: absolute; border-radius: 50%; border: 1px dashed var(--accent-ring); pointer-events: none; animation: asnm-spin 8s linear infinite; }
+.asnm-orb.o1 { left: -9px; top: -9px; right: -9px; bottom: -9px; }
+.asnm-orb.o2 { left: -17px; top: -17px; right: -17px; bottom: -17px; border-color: rgba(6,182,212,.28); animation-duration: 13s; animation-direction: reverse; }
+.asnm-orb i { position: absolute; top: -4px; left: 50%; margin-left: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+.asnm-orb i.b { top: auto; bottom: -4px; }
+.asnm-orb i.c { background: #06b6d4; box-shadow: 0 0 10px #06b6d4; }
+#asnm[data-theme="light"] .asnm-orb i { box-shadow: 0 0 5px var(--accent); }
+#asnm[data-theme="light"] .asnm-orb i.c { box-shadow: 0 0 5px #06b6d4; }
+@keyframes asnm-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .asnm-orb { animation: none; } }
 .asnm-logo { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
              background: linear-gradient(135deg, #3b82f6, #06b6d4); font-weight: 800; font-size: 15px; color: #fff; letter-spacing: .5px;
              box-shadow: 0 6px 18px rgba(59,130,246,.35); }
@@ -210,6 +223,76 @@
 #asnm_lookup_result { display: none; margin-top: 12px; }
 .asnm-divider { height: 1px; background: var(--line); margin: 14px 0; }
 .asnm-footer { text-align: center; color: var(--muted); opacity: .7; font-size: 11px; margin-top: 4px; }
+
+/* traffic statistics */
+.asnm-tr-head { cursor: pointer; user-select: none; margin-bottom: 0; }
+.asnm-tr-head .asnm-arrow { margin: 0 2px 0 0; }
+#asnm_tr_card.asnm-tr-open .asnm-tr-head { margin-bottom: 14px; }
+.asnm-tr-btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.asnm-tr-row { cursor: pointer; }
+.asnm-tr-row td:first-child { white-space: nowrap; }
+.asnm-tr-other td { background: var(--card2); }
+.asnm-tr-sub td { background: var(--row-hover); font-size: 12px; padding-top: 6px; padding-bottom: 6px; }
+.asnm-tr-sub td:first-child { padding-left: 34px; }
+.asnm-tr-subhead td { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; padding-top: 8px; }
+.asnm-bar { height: 6px; width: 90px; background: var(--input); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; display: inline-block; vertical-align: middle; }
+.asnm-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), #06b6d4); border-radius: 999px; }
+.asnm-tr-note { margin-top: 10px; font-size: 11px; color: var(--muted); }
+.asnm-tr-warn { margin-top: 8px; font-size: 12px; color: var(--warn); }
+.asnm-split { height: 8px; background: var(--line); border-radius: 999px; overflow: hidden; margin: 2px 0 6px; }
+.asnm-split > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), #06b6d4); border-radius: 999px; }
+.asnm-split-legend { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 14px; }
+.asnm-split-legend b { color: var(--text2); font-weight: 600; }
+.asnm-net { display: inline-block; margin-left: 6px; padding: 0 8px; border-radius: 999px; font-size: 10px; font-weight: 600; line-height: 16px;
+            background: var(--card2); border: 1px solid var(--line); color: var(--text2); vertical-align: 1px; white-space: nowrap; }
+.asnm-net-g { color: var(--warn); border-color: rgba(251,191,36,.45); }
+.asnm-net-v { color: var(--accent2); border-color: rgba(96,165,250,.45); }
+/* expandable rows of the traffic table */
+.asnm-tgl { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-right: 10px; flex: none; border-radius: 6px;
+            border: 1px solid var(--line); background: var(--card2); vertical-align: middle; transition: background .15s, border-color .15s; }
+.asnm-tgl::before { content: ""; width: 0; height: 0; margin-left: 1px; border-left: 5px solid var(--accent2); border-top: 4px solid transparent; border-bottom: 4px solid transparent; transition: transform .15s; }
+.asnm-tr-row.open .asnm-tgl { border-color: var(--accent); }
+.asnm-tr-row.open .asnm-tgl::before { transform: rotate(90deg); margin-left: 0; }
+.asnm-tr-row:hover td { background: var(--group-hover); }
+.asnm-tr-row:hover .asnm-tgl { border-color: var(--accent); background: var(--accent-ring); }
+.asnm-tr-cnt { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 999px; font-size: 10px; font-weight: 600; line-height: 16px;
+               background: var(--card2); border: 1px solid var(--line); color: var(--muted); vertical-align: 1px; white-space: nowrap; }
+.asnm-tr-sub.asnm-tr-row td:first-child { padding-left: 34px; }
+.asnm-tr-sub.asnm-lv2 td:first-child { padding-left: 62px; }
+.asnm-tr-hint { display: flex; align-items: center; gap: 4px; margin: 0 0 10px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.asnm-tr-hint .asnm-tgl { margin-right: 6px; cursor: default; }
+.asnm-tr-hint .asnm-link { margin-left: 10px; }
+.asnm-share { white-space: nowrap; }
+.asnm-share .asnm-bar { width: 70px; }
+.asnm-pct { display: inline-block; min-width: 50px; margin-left: 8px; text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--text2); }
+/* collapsed traffic card: make clear that it can be opened */
+.asnm-tr-head { padding: 3px 6px 3px 3px; border-radius: 10px; transition: background .15s; }
+.asnm-tr-head:hover { background: var(--row-hover); }
+.asnm-tr-head:focus-visible, .asnm-tr-bar:focus-visible, .asnm-tr-collapse:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.asnm-tr-head > .asnm-tgl { width: 26px; height: 26px; border-radius: 8px; margin-right: 0; }
+.asnm-tr-head > .asnm-tgl::before { border-left-width: 6px; border-top-width: 5px; border-bottom-width: 5px; }
+.asnm-tr-head:hover > .asnm-tgl { border-color: var(--accent); background: var(--accent-ring); }
+#asnm_tr_card.asnm-tr-open .asnm-tr-head > .asnm-tgl { border-color: var(--accent); }
+#asnm_tr_card.asnm-tr-open .asnm-tr-head > .asnm-tgl::before { transform: rotate(90deg); margin-left: 0; }
+.asnm-tr-bar { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; padding: 9px 12px; border: 1px dashed var(--input-line); border-radius: 10px;
+               font-size: 12px; font-weight: 600; color: var(--accent2); cursor: pointer; user-select: none; flex-wrap: wrap; transition: background .15s, border-color .15s; }
+.asnm-tr-bar:hover { background: var(--accent-ring); border-color: var(--accent); border-style: solid; }
+.asnm-tr-bar .asnm-tgl { width: 18px; height: 18px; margin-right: 0; border-radius: 5px; }
+.asnm-tr-bar .asnm-tgl::before { transform: rotate(90deg); margin-left: 0; }
+.asnm-tr-sum { color: var(--muted); font-weight: 500; }
+.asnm-tr-collapse { display: none; margin-top: 12px; text-align: center; font-size: 12px; font-weight: 600; color: var(--accent2); cursor: pointer; user-select: none; }
+.asnm-tr-collapse:hover { text-decoration: underline; }
+#asnm_tr_card.asnm-tr-open .asnm-tr-bar { display: none; }
+#asnm_tr_card.asnm-tr-open .asnm-tr-collapse { display: block; }
+.asnm-banner.asnm-banner-info { flex-wrap: wrap; border-color: rgba(59,130,246,.5); background: rgba(59,130,246,.1); color: var(--text); }
+.asnm-banner.asnm-banner-info::before { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-ring); }
+.asnm-upd-line { margin-top: 5px; line-height: 1.5; }
+#asnm_upd_state { color: var(--text2); font-weight: 600; }
+#asnm_upd_state.asnm-upd-new { color: var(--accent2); }
+#asnm_upd_state.asnm-upd-warn { color: var(--warn); }
+.asnm-upd-line .asnm-link { margin-left: 6px; white-space: nowrap; }
+.asnm-tr-dest { color: var(--muted); font-size: 11px; margin-left: 6px; }
+.asnm-tr-gone { color: var(--muted); font-size: 11px; margin-left: 6px; font-style: italic; }
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
@@ -222,7 +305,19 @@ var ASNM_I18N = {
     data_refreshed: 'Data refreshed:',
     banner_pending: 'The ASN list has changed since the last apply. Click <b>Apply rules</b> to activate the changes.',
     banner_failed: '{n} ASN(s) could not be loaded (0 subnets). They are marked red below - use <b>Retry failed</b>.',
+    traffic_title: 'Traffic per ASN', tr_sub_on: 'Counting since {t}', tr_sub_off: 'Counting is off', tr_sub_none: 'Statistics module not installed',
+    tr_on: 'active', tr_off: 'off', tr_btn_disable: 'Disable', tr_btn_reset: 'Disable & reset', tr_btn_enable: 'Enable',
+    tr_th_name: 'ASN / target', tr_th_down: 'Download', tr_th_up: 'Upload', tr_th_pk: 'Packets', tr_th_share: 'Share', tr_show: 'Show details', tr_hide: 'Hide details', tr_sum: 'Total {b} · {n} ASN(s)', tr_toggle_tip: 'Click to expand or collapse', tr_th_share_tip: 'Share of the total traffic. In expanded rows: share of the row above.',
+    tr_hint: 'Click a row to see the interfaces and devices behind it', tr_dev_1: '1 device', tr_dev_n: '{n} devices',
+    tr_other: 'Not assigned to an ASN', tr_by_iface: 'By interface', tr_by_client: 'By client (all interfaces)', tr_unknown: 'Other addresses (no counter rule)', tr_unknown_hint: 'Traffic from IP addresses that have no counter rule of their own, e.g. a device that connected a moment ago or sits behind another router. Show them on the router with: asnstats.sh unknown', tr_total: 'Total', tr_split_asn: 'Via ASN rules', tr_split_other: 'Not assigned',
+    tr_no_clients: 'No client traffic yet', tr_empty: 'No traffic counted yet.', tr_off_hint: 'Counting is off. Click "Enable" to start.',
+    tr_gone: 'removed from list', tr_c_reset: 'Disable counting and delete all statistics?', tr_working: 'Applying...',
+    tr_note: 'IPv4, forwarded traffic only (no router own traffic). Updates every {s} s while the card is open. Counts survive a reboot (saved hourly on the USB stick).', tr_saved_usb: 'Saved on the USB stick: {p} (last change: {t})', tr_no_usb: 'No USB stick found - the numbers are only kept in RAM and are lost on a reboot. Plug in a stick (folder ASNmanager).', net_lan: 'LAN / Wi-Fi', net_g24: 'Guest 2.4 GHz', net_g5: 'Guest 5 GHz', net_g6: 'Guest 6 GHz', net_wgs: 'WireGuard server', net_ovs: 'OpenVPN server', tr_timeout: 'No answer from the statistics module.',
     dev_lan: 'LAN / Wi-Fi devices', dev_wg: 'WireGuard server peers', dev_ovpn: 'OpenVPN server clients', wg_peer: 'WireGuard peer', ovpn_client: 'OpenVPN client',
+    upd_label: 'Update', upd_check: 'Check for updates', upd_checking: 'Checking GitHub...', upd_current: 'Up to date (v{v})', upd_checked: 'checked {t}',
+    upd_available: 'v{r} available', upd_error: 'GitHub not reachable', upd_install: 'Update now', upd_notes: 'What is new?', upd_running: 'Updating - please wait, the page reloads afterwards...',
+    banner_update: 'A new version is available: ASN Manager v{r} (installed: v{l}).',
+    upd_confirm: 'Install ASN Manager v{r} now?\nThe page reloads afterwards. ASN list, schedule and statistics are kept.',
     lang_label: 'Language', lang_default: 'Default', lang_en: 'English', theme_label: 'Theme', theme_dark: 'Dark', theme_light: 'Light', theme_blue: 'Blue',
     stat_asns: 'ASNs', stat_subnets: 'Subnets', stat_ifaces: 'Interfaces online', stat_last: 'Last applied',
     card_add_sub: 'Route an Autonomous System through a WAN or VPN interface', card_list_sub: 'Click a group to expand or collapse it',
@@ -270,7 +365,19 @@ var ASNM_I18N = {
     data_refreshed: 'Daten aktualisiert:',
     banner_pending: 'Die ASN-Liste wurde seit dem letzten Anwenden geändert. Klicke auf <b>Regeln anwenden</b>, um die Änderungen zu aktivieren.',
     banner_failed: '{n} ASN(s) konnten nicht geladen werden (0 Subnetze). Sie sind unten rot markiert - nutze <b>Fehlgeschlagene wiederholen</b>.',
+    traffic_title: 'Traffic pro ASN', tr_sub_on: 'Zählung seit {t}', tr_sub_off: 'Zählung ist aus', tr_sub_none: 'Statistik-Modul nicht installiert',
+    tr_on: 'aktiv', tr_off: 'aus', tr_btn_disable: 'Deaktivieren', tr_btn_reset: 'Deaktivieren und zurücksetzen', tr_btn_enable: 'Aktivieren',
+    tr_th_name: 'ASN / Ziel', tr_th_down: 'Download', tr_th_up: 'Upload', tr_th_pk: 'Pakete', tr_th_share: 'Anteil', tr_show: 'Details anzeigen', tr_hide: 'Details ausblenden', tr_sum: 'Gesamt {b} · {n} ASN(s)', tr_toggle_tip: 'Klicken zum Auf- oder Zuklappen', tr_th_share_tip: 'Anteil am Gesamt-Traffic. In aufgeklappten Zeilen: Anteil der übergeordneten Zeile.',
+    tr_hint: 'Zeile anklicken, um die Interfaces und Geräte dahinter zu sehen', tr_dev_1: '1 Gerät', tr_dev_n: '{n} Geräte',
+    tr_other: 'Keinem ASN zugeordnet', tr_by_iface: 'Nach Interface', tr_by_client: 'Nach Client (alle Interfaces)', tr_unknown: 'Sonstige Adressen (ohne eigene Zählregel)', tr_unknown_hint: 'Traffic von IP-Adressen ohne eigene Zählregel, z. B. ein Gerät, das sich gerade erst verbunden hat oder hinter einem anderen Router hängt. Anzeige auf dem Router mit: asnstats.sh unknown', tr_total: 'Gesamt', tr_split_asn: 'Über ASN-Regeln', tr_split_other: 'Nicht zugeordnet',
+    tr_no_clients: 'Noch kein Client-Traffic', tr_empty: 'Noch kein Traffic gezählt.', tr_off_hint: 'Die Zählung ist aus. Mit "Aktivieren" starten.',
+    tr_gone: 'aus Liste entfernt', tr_c_reset: 'Zählung deaktivieren und alle Statistikdaten löschen?', tr_working: 'Wird umgesetzt...',
+    tr_note: 'Nur IPv4 und weitergeleiteter Traffic (ohne Router-Eigenverkehr). Aktualisiert alle {s} s, solange die Karte offen ist. Die Zählstände überleben einen Neustart (stündlich auf dem USB-Stick gesichert).', tr_saved_usb: 'Gesichert auf dem USB-Stick: {p} (letzte Änderung: {t})', tr_no_usb: 'Kein USB-Stick gefunden - die Zahlen liegen nur im Arbeitsspeicher und gehen bei einem Neustart verloren. Stick einstecken (Ordner ASNmanager).', net_lan: 'LAN / WLAN', net_g24: 'Gast 2,4 GHz', net_g5: 'Gast 5 GHz', net_g6: 'Gast 6 GHz', net_wgs: 'WireGuard-Server', net_ovs: 'OpenVPN-Server', tr_timeout: 'Keine Antwort vom Statistik-Modul.',
     dev_lan: 'LAN- / WLAN-Geräte', dev_wg: 'WireGuard-Server-Peers', dev_ovpn: 'OpenVPN-Server-Clients', wg_peer: 'WireGuard-Peer', ovpn_client: 'OpenVPN-Client',
+    upd_label: 'Update', upd_check: 'Nach Updates suchen', upd_checking: 'GitHub wird geprüft...', upd_current: 'Aktuell (v{v})', upd_checked: 'geprüft {t}',
+    upd_available: 'v{r} verfügbar', upd_error: 'GitHub nicht erreichbar', upd_install: 'Jetzt aktualisieren', upd_notes: 'Was ist neu?', upd_running: 'Update läuft - bitte warten, danach lädt die Seite neu...',
+    banner_update: 'Neue Version verfügbar: ASN Manager v{r} (installiert: v{l}).',
+    upd_confirm: 'ASN Manager v{r} jetzt installieren?\nDanach lädt die Seite neu. ASN-Liste, Zeitplan und Statistik bleiben erhalten.',
     lang_label: 'Sprache', lang_default: 'Standard', lang_en: 'English', theme_label: 'Design', theme_dark: 'Dunkel', theme_light: 'Hell', theme_blue: 'Blau',
     stat_asns: 'ASNs', stat_subnets: 'Subnetze', stat_ifaces: 'Interfaces online', stat_last: 'Zuletzt angewendet',
     card_add_sub: 'Ein Autonomes System über ein WAN- oder VPN-Interface leiten', card_list_sub: 'Gruppe anklicken zum Auf- oder Zuklappen',
@@ -328,6 +435,12 @@ var ASNM_MSG_DE = [
   [/^ASN list is empty - all ASN routing rules removed\.$/, 'ASN-Liste ist leer - alle ASN-Routing-Regeln wurden entfernt.'],
   [/^Auto-refresh set: every (\d+) day\(s\) at (\S+)\.$/, 'Automatische Aktualisierung: alle $1 Tag(e) um $2.'],
   [/^Data refreshed\.$/, 'Daten aktualisiert.'],
+  [/^Updated to v([0-9.]+)\..*$/, 'Auf v$1 aktualisiert. Die Seite lädt neu.'],
+  [/^Already up to date \(v([0-9.]+)\)\.$/, 'Bereits aktuell (v$1).'],
+  [/^Could not reach GitHub.*$/, 'GitHub nicht erreichbar oder die Datei ist nicht vom ASN Manager - nichts wurde geändert.'],
+  [/^Downloaded file is damaged.*$/, 'Die heruntergeladene Datei ist beschädigt - nichts wurde geändert.'],
+  [/^The new version did not start.*$/, 'Die neue Version startete nicht - die alte wurde wiederhergestellt.'],
+  [/^Could not write the new script.*$/, 'Das neue Skript konnte nicht geschrieben werden - nichts wurde geändert.'],
   [/^Another ASN Manager job is still running\.$/, 'Es läuft noch ein anderer ASN-Manager-Auftrag.'],
   [/^AS(\d+) is not in the list\.$/, 'AS$1 ist nicht in der Liste.'],
   [/^Invalid source IP '(.*)'$/, "Ungültige Quell-IP '$1'"],
@@ -381,7 +494,7 @@ var ASNM = {
         WGC1: 'WireGuard Client 1', WGC2: 'WireGuard Client 2', WGC3: 'WireGuard Client 3', WGC4: 'WireGuard Client 4', WGC5: 'WireGuard Client 5'
     },
     order: ['WAN', 'WAN1', 'WAN2', 'OVPN1', 'OVPN2', 'OVPN3', 'OVPN4', 'OVPN5', 'WGC1', 'WGC2', 'WGC3', 'WGC4', 'WGC5'],
-    timeouts: { apply: 1800000, retry: 1800000, trace: 90000, ifaces: 90000, lookup: 30000 },
+    timeouts: { update: 240000, apply: 1800000, retry: 1800000, trace: 90000, ifaces: 90000, lookup: 30000 },
     reIp: /^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)$/,
     reHost: /^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$/,
     reEntry: /^(\d{1,10}):(WAN|WAN1|WAN2|OVPN[1-5]|WGC[1-5]):?((?:\d{1,3}\.){3}\d{1,3})?$/,
@@ -817,6 +930,10 @@ function asnmJobDone(job) {
                 function () { asnmRenderLookup('', false, job.msg); });
     }
     if (job.action === 'edit' && ok) ASNM.editing = null;
+    if (job.action === 'update') {
+        if (ok && /^Updated to/.test(job.msg || '')) { setTimeout(function () { ASNM_UPD.reload(); }, 2500); return; }   // new script + page are in place
+        asnmUpdCheck(false);                                                                                          // refresh the notice
+    }
 
     if (ok && ASNM.queue.length) {
         var next = ASNM.queue.shift();
@@ -830,7 +947,7 @@ function asnmJobDone(job) {
 function asnmSetBusy(on, action) {
     ASNM.busy = on;
     asnmApplyBusy();
-    if (on) asnmSetStatus(action === 'apply' ? t('applying') : (action === 'retry' ? t('retrying') : t('working')));
+    if (on) asnmSetStatus(action === 'apply' ? t('applying') : (action === 'retry' ? t('retrying') : (action === 'update' ? t('upd_running') : t('working'))));
 }
 
 function asnmApplyBusy() {
@@ -1090,6 +1207,320 @@ function asnmLoadTheme() {
     asnmSetTheme(n, true);
 }
 
+
+/* ============================ traffic statistics ============================ */
+var ASNM_TR = { unknownAny: false, open: false, data: null, missing: false, expanded: {}, timer: null, pending: null };
+
+function asnmFmtBytes(n) {
+    n = +n || 0;
+    var u = ['B', 'KB', 'MB', 'GB', 'TB'], i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    var d = i === 0 ? 0 : (n < 10 ? 2 : (n < 100 ? 1 : 0));
+    return n.toLocaleString(ASNM_LANG === 'de' ? 'de-DE' : 'en-US', { minimumFractionDigits: d, maximumFractionDigits: d }) + ' ' + u[i];
+}
+
+function asnmFmtNum(n) { return (+n || 0).toLocaleString(ASNM_LANG === 'de' ? 'de-DE' : 'en-US'); }
+
+// Enter / Space on the header, the bar and the collapse link work like a click (but not on the buttons inside the header)
+function asnmTrKey(ev) {
+    if (ev.target !== ev.currentTarget) return;
+    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); asnmTrToggle(); }
+}
+
+function asnmTrToggle() {
+    ASNM_TR.open = !ASNM_TR.open;
+    document.getElementById('asnm_tr_body').style.display = ASNM_TR.open ? 'block' : 'none';
+    document.getElementById('asnm_tr_head').setAttribute('aria-expanded', ASNM_TR.open ? 'true' : 'false');
+    document.getElementById('asnm_tr_card').className = 'asnm-card' + (ASNM_TR.open ? ' asnm-tr-open' : '');
+    clearTimeout(ASNM_TR.timer);
+    if (ASNM_TR.open) asnmTrLoad();
+}
+
+function asnmTrLoad(done) {
+    asnmGet('stats.js', function (txt) {
+        var d = null;
+        try { d = JSON.parse(txt); } catch (e) {}
+        ASNM_TR.missing = !d;
+        if (d) ASNM_TR.data = d;
+        asnmTrRender();
+        if (done) done(d);
+        asnmTrSchedule();
+    }, function () {
+        ASNM_TR.missing = false;
+        if (!ASNM_TR.data) ASNM_TR.data = { ts: 0, state: 'disabled', since: 0, saved: 0, interval: 10, nets: {}, rows: [] };
+        asnmTrRender();
+        if (done) done(null);
+    });
+}
+
+function asnmTrSchedule() {
+    clearTimeout(ASNM_TR.timer);
+    var d = ASNM_TR.data;
+    if (ASNM_TR.open && !ASNM_TR.pending && d && d.state === 'enabled')
+        ASNM_TR.timer = setTimeout(function () { asnmTrLoad(); }, Math.max(5, d.interval || 10) * 1000);
+}
+
+function asnmTrCmd(act) {
+    if (ASNM_TR.pending) return;
+    if (act === 'reset' && !confirm(t('tr_c_reset'))) return;
+    var f = document.formAsnmStats, page = document.formAsnm.elements['current_page'].value;
+    f.elements['current_page'].value = page;
+    f.elements['next_page'].value = page;
+    f.elements['action_script'].value = 'start_asnmanagerstats' + act;
+    asnmPost(f);
+    ASNM_TR.pending = { act: act, since: Math.floor(Date.now() / 1000) - 2, start: Date.now() };
+    asnmTrRender();
+    var want = act === 'enable' ? 'enabled' : 'disabled';
+    (function poll() {
+        asnmTrLoad(function (d) {
+            var p = ASNM_TR.pending;
+            if (!p) return;
+            if (d && d.ts >= p.since && d.state === want) { ASNM_TR.pending = null; asnmTrRender(); asnmTrSchedule(); return; }
+            if (Date.now() - p.start > 90000) { ASNM_TR.pending = null; asnmTrRender(); alert(t('tr_timeout')); return; }
+            setTimeout(poll, 1500);
+        });
+    })();
+}
+
+function asnmTrExpand(key) {
+    ASNM_TR.expanded[key] = !ASNM_TR.expanded[key];
+    asnmTrRender();
+}
+
+function asnmNetBadge(ip) {
+    var code = ASNM_TR.data && ASNM_TR.data.nets ? ASNM_TR.data.nets[ip] : '';
+    if (!code) return '';
+    var label = ({ lan: 'net_lan', g24: 'net_g24', g5: 'net_g5', g6: 'net_g6', wgs: 'net_wgs', ovs: 'net_ovs' })[code];
+    var cls = code.charAt(0) === 'g' ? ' asnm-net-g' : (code === 'wgs' || code === 'ovs' ? ' asnm-net-v' : '');
+    return ' <span class="asnm-net' + cls + '">' + asnmEsc(label ? t(label) : code.replace(/^dev:/, '')) + '</span>';
+}
+
+function asnmTrClientLabel(ip) {
+    var n = asnmDeviceName(ip);
+    return (n ? asnmEsc(n) + ' <span class="asnm-dev">' + asnmEsc(ip) + '</span>' : asnmEsc(ip)) + asnmNetBadge(ip);
+}
+
+function asnmFmtPct(p) {
+    var loc = ASNM_LANG === 'de' ? 'de-DE' : 'en-US';
+    if (!(p > 0)) return '0 %';
+    if (p < 0.1) return '<' + (0.1).toLocaleString(loc, { minimumFractionDigits: 1 }) + ' %';
+    if (p < 10) return p.toLocaleString(loc, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' %';
+    return Math.round(p).toLocaleString(loc) + ' %';
+}
+
+function asnmDevCount(n) {
+    if (!(n > 0)) return '';
+    return '<span class="asnm-tr-cnt">' + asnmEsc(n === 1 ? t('tr_dev_1') : t('tr_dev_n', { n: n })) + '</span>';
+}
+
+// base = bytes of the row above (= 100 %): the grand total for top-level rows, the parent row for expanded rows
+function asnmTrCells(db, ub, pk, base) {
+    var tot = db + ub, p = base > 0 ? Math.min(100, tot / base * 100) : 0;
+    var w = tot > 0 ? Math.max(2, Math.round(p)) : 0;
+    return '<td class="num">' + asnmFmtBytes(db) + '</td><td class="num">' + asnmFmtBytes(ub) + '</td>' +
+           '<td class="num">' + asnmFmtNum(pk) + '</td>' +
+           '<td class="asnm-share"><span class="asnm-bar"><i style="width:' + w + '%"></i></span><span class="asnm-pct">' + asnmFmtPct(p) + '</span></td>';
+}
+
+function asnmTrExpandAll(on) {
+    var d = ASNM_TR.data;
+    ASNM_TR.expanded = {};
+    if (on && d) {
+        ASNM_TR.expanded['O'] = true;
+        for (var i = 0; i < d.rows.length; i++) {
+            var r = d.rows[i];
+            ASNM_TR.expanded[r.asn === 'O' ? 'O|' + r.dest : r.dest + '|' + r.asn] = true;
+        }
+    }
+    asnmTrRender();
+}
+
+// list: [[ip, ub, up, db, dp], ...]   total: {db, ub, pk} of the row above   level: 2 = indented one more step
+function asnmTrClientRows(list, total, level) {
+    ASNM_TR.unknownSeen = false;
+    var cls = 'asnm-tr-sub' + (level === 2 ? ' asnm-lv2' : '');
+    var rows = list.slice(0).sort(function (a, b) { return (b[1] + b[3]) - (a[1] + a[3]); });
+    var base = total.db + total.ub, html = '', sdb = 0, sub = 0, spk = 0;
+    for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        sdb += r[3]; sub += r[1]; spk += r[2] + r[4];
+        html += '<tr class="' + cls + '"><td>' + asnmTrClientLabel(r[0]) + '</td>' + asnmTrCells(r[3], r[1], r[2] + r[4], base) + '</tr>';
+    }
+    var odb = total.db - sdb, oub = total.ub - sub, opk = total.pk - spk;
+    if (odb > 0 || oub > 0) {
+        ASNM_TR.unknownSeen = true; ASNM_TR.unknownAny = true;
+        html += '<tr class="' + cls + '" title="' + asnmEsc(t('tr_unknown_hint')) + '"><td class="asnm-muted">' + asnmEsc(t('tr_unknown')) + '</td>' +
+                asnmTrCells(Math.max(odb, 0), Math.max(oub, 0), Math.max(opk, 0), base) + '</tr>';
+    }
+    if (!html) html = '<tr class="' + cls + '"><td colspan="5" class="asnm-muted">' + asnmEsc(t('tr_no_clients')) + '</td></tr>';
+    return html;
+}
+
+function asnmTrRender() {
+    var d = ASNM_TR.data, st = d ? d.state : '';
+    var badge = document.getElementById('asnm_tr_state'), sub = document.getElementById('asnm_tr_sub');
+    if (ASNM_TR.missing || !d) {
+        badge.className = 'asnm-badge asnm-bad'; badge.textContent = t('tr_off');
+        sub.textContent = t('tr_sub_none');
+    } else {
+        badge.className = 'asnm-badge ' + (st === 'enabled' ? 'asnm-ok' : 'asnm-warn');
+        badge.textContent = st === 'enabled' ? t('tr_on') : t('tr_off');
+        sub.textContent = st === 'enabled' ? t('tr_sub_on', { t: asnmFmtTime(d.since) }) : t('tr_sub_off');
+    }
+    var busy = !!ASNM_TR.pending, none = ASNM_TR.missing || !d;
+    document.getElementById('asnm_tr_btn_enable').disabled = busy || none || st === 'enabled';
+    document.getElementById('asnm_tr_btn_disable').disabled = busy || none || st !== 'enabled';
+    document.getElementById('asnm_tr_btn_reset').disabled = busy || none;
+    if (busy) sub.textContent = t('tr_working');
+
+    // collapsed card: the bar under the header invites to open it and shows a one-line summary
+    document.getElementById('asnm_tr_head').title = t('tr_toggle_tip');
+    document.getElementById('asnm_tr_bar_text').textContent = t('tr_show');
+    var sumTxt = '';
+    if (d && d.rows) {
+        var sb = 0, sn = 0;
+        for (var q = 0; q < d.rows.length; q++) { sb += d.rows[q].db + d.rows[q].ub; if (d.rows[q].asn !== 'O') sn++; }
+        if (sb > 0) sumTxt = t('tr_sum', { b: asnmFmtBytes(sb), n: sn });
+    }
+    document.getElementById('asnm_tr_bar_sum').textContent = sumTxt;
+    if (!ASNM_TR.open) return;
+
+    var body = document.getElementById('asnm_tr_table'), note = document.getElementById('asnm_tr_note'), totBox = document.getElementById('asnm_tr_total');
+    ASNM_TR.unknownAny = false;
+    if (none) { totBox.innerHTML = ''; body.innerHTML = '<div class="asnm-muted" style="padding:14px;">' + asnmEsc(t('tr_sub_none')) + '</div>'; note.innerHTML = ''; return; }
+
+    // aggregate "not assigned" over all interfaces, collect ASN rows
+    var other = { db: 0, ub: 0, pk: 0, ifaces: [], clients: {} }, asns = [], max = 0, listed = {};
+    if (ASNM.data && ASNM.data.entries) for (var e = 0; e < ASNM.data.entries.length; e++)
+        listed[asnmNormDest(ASNM.data.entries[e].dest) + '|' + ASNM.data.entries[e].asn] = 1;
+    for (var i = 0; i < d.rows.length; i++) {
+        var r = d.rows[i], pk = r.up + r.dp;
+        if (r.asn === 'O') {
+            other.db += r.db; other.ub += r.ub; other.pk += pk;
+            if (r.db + r.ub > 0) other.ifaces.push(r);
+            for (var c = 0; c < r.cl.length; c++) {
+                var x = r.cl[c], o = other.clients[x[0]] || (other.clients[x[0]] = [x[0], 0, 0, 0, 0]);
+                o[1] += x[1]; o[2] += x[2]; o[3] += x[3]; o[4] += x[4];
+            }
+        } else {
+            asns.push(r);
+        }
+    }
+    asns.sort(function (a, b) { return (b.db + b.ub) - (a.db + a.ub); });
+
+    // total bar above the table: everything that was counted, split into "via ASN rules" and "not assigned"
+    var tDb = other.db, tUb = other.ub, tPk = other.pk, aDb = 0, aUb = 0;
+    for (i = 0; i < asns.length; i++) { tDb += asns[i].db; tUb += asns[i].ub; tPk += asns[i].up + asns[i].dp; aDb += asns[i].db; aUb += asns[i].ub; }
+    var tAll = tDb + tUb, pA = tAll > 0 ? Math.round((aDb + aUb) / tAll * 100) : 0;
+    totBox.innerHTML = '<div class="asnm-stats">' +
+        '<div class="asnm-stat"><div class="asnm-stat-label">' + asnmEsc(t('tr_th_down')) + '</div><div class="asnm-stat-value">' + asnmFmtBytes(tDb) + '</div></div>' +
+        '<div class="asnm-stat"><div class="asnm-stat-label">' + asnmEsc(t('tr_th_up')) + '</div><div class="asnm-stat-value">' + asnmFmtBytes(tUb) + '</div></div>' +
+        '<div class="asnm-stat"><div class="asnm-stat-label">' + asnmEsc(t('tr_total')) + '</div><div class="asnm-stat-value">' + asnmFmtBytes(tAll) + '</div></div>' +
+        '<div class="asnm-stat"><div class="asnm-stat-label">' + asnmEsc(t('tr_th_pk')) + '</div><div class="asnm-stat-value">' + asnmFmtNum(tPk) + '</div></div></div>' +
+        '<div class="asnm-split"><i style="width:' + pA + '%"></i></div>' +
+        '<div class="asnm-split-legend"><span>' + asnmEsc(t('tr_split_asn')) + ': <b>' + pA + ' %</b> (' + asnmFmtBytes(aDb + aUb) + ')</span>' +
+        '<span>' + asnmEsc(t('tr_split_other')) + ': <b>' + (tAll > 0 ? 100 - pA : 0) + ' %</b> (' + asnmFmtBytes(other.db + other.ub) + ')</span></div>';
+
+    var html = '<table class="asnm-table"><tr><th>' + t('tr_th_name') + '</th><th style="text-align:right;">' + t('tr_th_down') + '</th>' +
+               '<th style="text-align:right;">' + t('tr_th_up') + '</th><th style="text-align:right;">' + t('tr_th_pk') + '</th>' +
+               '<th title="' + asnmEsc(t('tr_th_share_tip')) + '">' + t('tr_th_share') + '</th></tr>';
+
+    var oTot = other.db + other.ub, ko = ASNM_TR.expanded['O'];
+    html += '<tr class="asnm-tr-row asnm-tr-other' + (ko ? ' open' : '') + '" onclick="asnmTrExpand(\'O\')"><td><span class="asnm-tgl"></span>' +
+            asnmEsc(t('tr_other')) + asnmDevCount(Object.keys(other.clients).length) + '</td>' + asnmTrCells(other.db, other.ub, other.pk, tAll) + '</tr>';
+    if (ko) {
+        html += '<tr class="asnm-tr-sub asnm-tr-subhead"><td colspan="5">' + asnmEsc(t('tr_by_iface')) + '</td></tr>';
+        other.ifaces.sort(function (a, b) { return (b.db + b.ub) - (a.db + a.ub); });
+        for (i = 0; i < other.ifaces.length; i++) {
+            var f = other.ifaces[i], ikey = 'O|' + f.dest, io = ASNM_TR.expanded[ikey];
+            html += '<tr class="asnm-tr-sub asnm-tr-row' + (io ? ' open' : '') + '" onclick="asnmTrExpand(\'' + asnmEsc(ikey) + '\')"><td><span class="asnm-tgl"></span>' +
+                    asnmEsc(asnmDestLabel(f.dest)) + asnmDevCount(f.cl.length) + '</td>' + asnmTrCells(f.db, f.ub, f.up + f.dp, oTot) + '</tr>';
+            if (io) html += asnmTrClientRows(f.cl, { db: f.db, ub: f.ub, pk: f.up + f.dp }, 2);
+        }
+        html += '<tr class="asnm-tr-sub asnm-tr-subhead"><td colspan="5">' + asnmEsc(t('tr_by_client')) + '</td></tr>';
+        var ol = [];
+        for (var ip in other.clients) ol.push(other.clients[ip]);
+        html += asnmTrClientRows(ol, other, 1);
+    }
+
+    for (i = 0; i < asns.length; i++) {
+        var a = asns[i], key = a.dest + '|' + a.asn, open = ASNM_TR.expanded[key];
+        html += '<tr class="asnm-tr-row' + (open ? ' open' : '') + '" onclick="asnmTrExpand(\'' + asnmEsc(key) + '\')"><td><span class="asnm-tgl"></span>' +
+                'AS' + asnmEsc(a.asn) + '<span class="asnm-tr-dest">' + asnmEsc(asnmNormDest(a.dest)) + '</span>' +
+                (listed[asnmNormDest(a.dest) + '|' + a.asn] ? '' : '<span class="asnm-tr-gone">' + asnmEsc(t('tr_gone')) + '</span>') +
+                asnmDevCount(a.cl.length) + '</td>' + asnmTrCells(a.db, a.ub, a.up + a.dp, tAll) + '</tr>';
+        if (open) html += asnmTrClientRows(a.cl, { db: a.db, ub: a.ub, pk: a.up + a.dp }, 1);
+    }
+    if (!asns.length && other.db + other.ub === 0)
+        html += '<tr><td colspan="5" class="asnm-muted" style="text-align:center;padding:12px;">' + asnmEsc(st === 'enabled' ? t('tr_empty') : t('tr_off_hint')) + '</td></tr>';
+    body.innerHTML = html + '</table>';
+
+    var n = asnmEsc(t('tr_note', { s: d.interval || 10 }));
+    if (ASNM_TR.unknownAny) n += '<div>' + asnmEsc(t('tr_unknown_hint')) + '</div>';
+    if (d.store) n += '<div>' + asnmEsc(t('tr_saved_usb', { p: d.store, t: d.saved ? asnmFmtTime(d.saved) : t('never') })) + '</div>';
+    else if (d.state === 'enabled' || (d.rows && d.rows.length)) n += '<div class="asnm-tr-warn">' + asnmEsc(t('tr_no_usb')) + '</div>';
+    note.innerHTML = n;
+}
+
+/* ============================ updates ============================ */
+var ASNM_UPD = { data: null, checking: false, reload: function () { window.location.reload(); } };
+
+function asnmUpdRender() {
+    var d = ASNM_UPD.data, st = document.getElementById('asnm_upd_state'), ban = document.getElementById('asnm_banner_update');
+    st.className = '';
+    if (ASNM_UPD.checking) st.textContent = t('upd_checking');
+    else if (!d) st.textContent = '-';
+    else if (d.error) { st.textContent = t('upd_error'); st.className = 'asnm-upd-warn'; }
+    else if (d.newer) { st.textContent = t('upd_available', { r: d.remote }); st.className = 'asnm-upd-new'; }
+    else st.textContent = t('upd_current', { v: d.local }) + ' · ' + t('upd_checked', { t: asnmFmtTime(d.ts) });
+    var show = !!(d && d.newer && !d.error);
+    ban.style.display = show ? 'flex' : 'none';
+    if (show) {
+        document.getElementById('asnm_upd_text').textContent = t('banner_update', { r: d.remote, l: d.local });
+        var a = document.getElementById('asnm_upd_notes');
+        if (/^https:\/\/github\.com\//.test(d.notes || '')) a.setAttribute('href', d.notes); else a.removeAttribute('href');
+    }
+}
+
+// reads the last result; looks at GitHub again if the result is older than 6 hours (or missing)
+function asnmUpdLoad(auto) {
+    asnmGet('update.js', function (txt) {
+        try { ASNM_UPD.data = JSON.parse(txt); } catch (e) { ASNM_UPD.data = null; }
+        asnmUpdRender();
+        var age = ASNM_UPD.data ? Date.now() / 1000 - ASNM_UPD.data.ts : 1e9;
+        if (auto && age > 21600) asnmUpdCheck(false);
+    }, function () { asnmUpdRender(); if (auto) asnmUpdCheck(false); });
+}
+
+function asnmUpdCheck(manual) {
+    if (ASNM_UPD.checking) return;
+    ASNM_UPD.checking = true; asnmUpdRender();
+    var prev = ASNM_UPD.data ? ASNM_UPD.data.ts : 0, started = Date.now();
+    var f = document.formAsnmStats, page = document.formAsnm.elements['current_page'].value;
+    f.elements['current_page'].value = page;
+    f.elements['next_page'].value = page;
+    f.elements['action_script'].value = 'start_' + ASNM_NS + 'updatecheck';
+    asnmPost(f);
+    function done() { ASNM_UPD.checking = false; asnmUpdRender(); }
+    function again() { if (Date.now() - started > 45000) done(); else setTimeout(poll, 2000); }
+    function poll() {
+        asnmGet('update.js', function (txt) {
+            var d = null;
+            try { d = JSON.parse(txt); } catch (e) {}
+            if (d && d.ts !== prev) { ASNM_UPD.data = d; done(); return; }      // a new result (independent of clock differences)
+            again();
+        }, again);
+    }
+    setTimeout(poll, 2500);
+}
+
+function asnmUpdate() {
+    var d = ASNM_UPD.data;
+    if (!d || !d.newer || ASNM.busy) return;
+    if (!confirm(t('upd_confirm', { r: d.remote }))) return;
+    asnmSend('update', []);
+}
+
 function initial() {
     var page = window.location.pathname.substring(1);
     document.formAsnm.elements['current_page'].value = page;
@@ -1101,6 +1532,8 @@ function initial() {
     show_menu();
     asnmLoadData(true);
     asnmLoadPubip(true);
+    asnmUpdLoad(true);
+    asnmTrLoad();
 }
 </script>
 </head>
@@ -1118,6 +1551,14 @@ function initial() {
 <input type="hidden" name="preferred_lang" id="preferred_lang" value="<% nvram_get("preferred_lang"); %>"/>
 <input type="hidden" name="firmver" value="<% nvram_get("firmver"); %>"/>
 <input type="hidden" name="amng_custom" id="amng_custom" value=""/>
+</form>
+<form method="post" name="formAsnmStats" action="/start_apply.htm" onsubmit="return false;">
+<input type="hidden" name="current_page" value=""/>
+<input type="hidden" name="next_page" value=""/>
+<input type="hidden" name="modified" value="0"/>
+<input type="hidden" name="action_mode" value="apply"/>
+<input type="hidden" name="action_wait" value="0"/>
+<input type="hidden" name="action_script" value=""/>
 </form>
 <form method="post" name="formAsnmPubip" action="/start_apply.htm" onsubmit="return false;">
 <input type="hidden" name="current_page" value=""/>
@@ -1143,15 +1584,23 @@ function initial() {
 <div id="asnm">
   <div class="asnm-header">
     <div class="asnm-brand">
-      <div class="asnm-logo">AS</div>
+      <div class="asnm-logo-wrap">
+        <span class="asnm-orb o1" aria-hidden="true"><i></i><i class="b"></i></span>
+        <span class="asnm-orb o2" aria-hidden="true"><i class="c"></i></span>
+        <div class="asnm-logo">AS</div>
+      </div>
       <div><div class="asnm-title">ASN Manager</div><div class="asnm-sub" data-i18n="subtitle"></div></div>
     </div>
     <div class="asnm-meta">
       <div class="asnm-meta-top"><span class="asnm-seg-label" data-i18n="lang_label"></span><div class="asnm-seg" id="asnm_lang"></div>
         <span class="asnm-seg-label" style="margin-left:6px;" data-i18n="theme_label"></span><div class="asnm-seg" id="asnm_theme"></div></div>
-      <span class="asnm-chip" id="asnm_version">-</span>&nbsp; <span data-i18n="data_refreshed"></span> <span id="asnm_generated">-</span></div>
+      <span class="asnm-chip" id="asnm_version">-</span>&nbsp; <span data-i18n="data_refreshed"></span> <span id="asnm_generated">-</span>
+      <div class="asnm-upd-line"><span id="asnm_upd_state">-</span><span class="asnm-link" id="asnm_upd_btn" data-i18n="upd_check" onclick="asnmUpdCheck(true);"></span></div></div>
   </div>
 
+  <div id="asnm_banner_update" class="asnm-banner asnm-banner-info"><span id="asnm_upd_text"></span><span class="asnm-spacer"></span>
+    <a id="asnm_upd_notes" class="asnm-link" target="_blank" rel="noopener" data-i18n="upd_notes"></a>
+    <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="upd_install" onclick="asnmUpdate();"/></div>
   <div id="asnm_banner" class="asnm-banner"><span data-i18n-html="banner_pending"></span></div>
   <div id="asnm_banner_failed" class="asnm-banner asnm-banner-bad"></div>
 
@@ -1209,6 +1658,32 @@ function initial() {
           <input type="button" class="button_gen asnm-ghost asnm-small-btn" data-i18n-value="btn_cancel" onclick="asnmImportCancel();"/>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="asnm-card" id="asnm_tr_card">
+    <div class="asnm-card-head asnm-tr-head" id="asnm_tr_head" role="button" tabindex="0" aria-expanded="false" onclick="asnmTrToggle();" onkeydown="asnmTrKey(event);">
+      <span class="asnm-tgl" id="asnm_tr_arrow" aria-hidden="true"></span>
+      <svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+      <div class="asnm-card-titles"><h3 data-i18n="traffic_title"></h3><div class="asnm-card-sub" id="asnm_tr_sub"></div></div>
+      <span class="asnm-badge" id="asnm_tr_state"></span>
+      <div class="asnm-tr-btns" onclick="event.stopPropagation();">
+        <input type="button" id="asnm_tr_btn_disable" class="button_gen asnm-small-btn" data-i18n-value="tr_btn_disable" onclick="asnmTrCmd('disable');"/>
+        <input type="button" id="asnm_tr_btn_reset" class="button_gen asnm-small-btn asnm-danger" data-i18n-value="tr_btn_reset" onclick="asnmTrCmd('reset');"/>
+        <input type="button" id="asnm_tr_btn_enable" class="button_gen asnm-small-btn asnm-primary" data-i18n-value="tr_btn_enable" onclick="asnmTrCmd('enable');"/>
+      </div>
+    </div>
+    <div class="asnm-tr-bar" id="asnm_tr_bar" role="button" tabindex="0" onclick="asnmTrToggle();" onkeydown="asnmTrKey(event);">
+      <span class="asnm-tgl" aria-hidden="true"></span><span id="asnm_tr_bar_text"></span><span class="asnm-tr-sum" id="asnm_tr_bar_sum"></span>
+    </div>
+    <div id="asnm_tr_body" style="display:none;">
+      <div id="asnm_tr_total"></div>
+      <div class="asnm-tr-hint"><span class="asnm-tgl" aria-hidden="true"></span><span data-i18n="tr_hint"></span>
+        <span class="asnm-link" data-i18n="expand_all" onclick="asnmTrExpandAll(true);"></span>
+        <span class="asnm-link" data-i18n="collapse_all" onclick="asnmTrExpandAll(false);"></span></div>
+      <div class="asnm-table-wrap"><div id="asnm_tr_table"></div></div>
+      <div class="asnm-tr-note" id="asnm_tr_note"></div>
+      <div class="asnm-tr-collapse" role="button" tabindex="0" onclick="asnmTrToggle();" onkeydown="asnmTrKey(event);"><span data-i18n="tr_hide"></span></div>
     </div>
   </div>
 
