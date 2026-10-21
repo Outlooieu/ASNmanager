@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.2.6
+version=3.3.0
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.2.6"
+SCRIPT_VERSION="3.3.0"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -324,6 +324,9 @@ proc_reap() {
 #  IP / CIDR: part of the marking set of its target (like the subnets of an ASN).
 #  Domain: dnsmasq fills an ipset (one per target / source group) with the addresses it resolves for the domain
 #  and all its subdomains; that set is NOT rebuilt by "apply", so what was learned stays.
+#  Learned addresses expire after CU_TIMEOUT (7 days) unless they are looked up again (dnsmasq adds them anew,
+#  which starts the time again), and they are saved (USB device, else /jffs at most every 6 h, and at shutdown)
+#  and put back at boot, so routing is right again before the devices look the names up.
 #  Every entry also has its own set ASNC_<id> (IP: the range, domain: the addresses learned for just this domain).
 #  It does not route anything - it is used for the traffic statistics and the "learned" numbers per entry.
 # =====================================================================
@@ -400,8 +403,9 @@ cli_custom() {
         early)  cu_apply_dom ;;
         purge)  cu_purge ;;
         learned) cu_learned_report "$2" ;;
+        save)   cu_learned_save force ;;
         list|"") cu_list ;;
-        *)      echo "Usage: custom list | learned [ID] | apply | early | purge" ;;
+        *)      echo "Usage: custom list | learned [ID] | save | apply | early | purge" ;;
     esac
 }
 
@@ -528,8 +532,86 @@ cu_dnsmasq_write() {
     logger -t ASNmanager "Domain routing: dnsmasq configuration changed, dnsmasq restarted"
 }
 
+CU_TIMEOUT=${CU_TIMEOUT:-604800}               # learned addresses: 7 days after their last lookup
+CU_SAVE_FILE="asn_manager_domains.txt"         # saved learned addresses (USB device, next to the statistics)
+CU_HOOK="ASNmanager-Domains"
+
+# a domain set (hash:ip with expiry). Prints "new" when it was just created. An old set without expiry
+# (before v3.3.0) is rebuilt with its addresses kept: filled copy, swapped in (works while rules use the set)
+cu_set_make() {
+    if ! ipset list -n 2>/dev/null | grep -qx "$1"; then
+        ipset create "$1" hash:ip family inet hashsize 1024 maxelem 262144 timeout "$CU_TIMEOUT" 2>/dev/null
+        echo new; return 0
+    fi
+    ipset list -t "$1" 2>/dev/null | grep -q '^Header:.*timeout' && return 0
+    csm_t="${1}_m"
+    ipset destroy "$csm_t" 2>/dev/null
+    ipset create "$csm_t" hash:ip family inet hashsize 1024 maxelem 262144 timeout "$CU_TIMEOUT" 2>/dev/null || return 0
+    ipset list "$1" 2>/dev/null | awk '/^Members:/ { f = 1; next } f && $1 ~ /^[0-9.]+$/ { print $1 }' | \
+        while read -r csm_ip; do ipset add -exist "$csm_t" "$csm_ip" 2>/dev/null; done
+    ipset swap "$csm_t" "$1" 2>/dev/null
+    ipset destroy "$csm_t" 2>/dev/null
+    return 0
+}
+
+# where the learned addresses are kept: the USB device of the statistics (hourly) and the flash (/jffs, every
+# 6 hours and at shutdown - at boot the USB device is often not mounted yet)
+cu_save_usb() { csp_d=$(ts_store_dir 2>/dev/null) && [ -n "$csp_d" ] && mkdir -p "$csp_d" 2>/dev/null && echo "$csp_d/$CU_SAVE_FILE"; }
+cu_save_jffs() { mkdir -p "$ADDON_DIR" 2>/dev/null && echo "$ADDON_DIR/domains.saved"; }
+
+# save [force]: "SET IP SECONDS_LEFT" of every domain set, only when the addresses changed; force = shutdown
+cu_learned_save() {
+    ipset list -n 2>/dev/null | grep -qE '^ASN[DC]_' || return 0
+    cls_tmp=/tmp/asnmanager-domains.save
+    for cls_s in $(ipset list -n 2>/dev/null | grep -E '^ASN[DC]_' | grep -v '_m$'); do
+        ipset list "$cls_s" 2>/dev/null | awk -v s="$cls_s" '/^Members:/ { f = 1; next }
+            f && $1 ~ /^[0-9.]+$/ { t = 0; for (i = 2; i < NF; i++) if ($i == "timeout") t = $(i + 1); print s, $1, t }'
+    done > "$cls_tmp"
+    [ -s "$cls_tmp" ] || { rm -f "$cls_tmp"; return 0; }
+    for cls_f in $(cu_save_usb) $(cu_save_jffs); do
+        if [ "$1" != "force" ] && [ -f "$cls_f" ]; then
+            cls_age=$(( $(date +%s) - $(date -r "$cls_f" +%s 2>/dev/null || echo 0) ))
+            cls_min=3600; case "$cls_f" in /jffs/*) cls_min=21600 ;; esac
+            [ "$cls_age" -lt "$cls_min" ] && continue
+            [ "$(cut -d' ' -f1,2 "$cls_tmp" | sort)" = "$(cut -d' ' -f1,2 "$cls_f" 2>/dev/null | sort)" ] && continue
+        fi
+        cp -f "$cls_tmp" "$cls_f.new" 2>/dev/null && mv -f "$cls_f.new" "$cls_f"
+    done
+    rm -f "$cls_tmp"
+}
+
+# put the saved addresses back into the sets that were just created ($@); the remaining time counts on
+cu_learned_restore() {
+    [ $# -gt 0 ] || return 0
+    clr_f=""
+    for clr_c in $(cu_save_usb) $(cu_save_jffs); do      # the newer of the two copies
+        [ -s "$clr_c" ] || continue
+        if [ -z "$clr_f" ] || [ "$(date -r "$clr_c" +%s 2>/dev/null || echo 0)" -gt "$(date -r "$clr_f" +%s 2>/dev/null || echo 0)" ]; then clr_f=$clr_c; fi
+    done
+    [ -n "$clr_f" ] || return 0
+    clr_n=0
+    for clr_s in "$@"; do
+        awk -v s="$clr_s" -v max="$CU_TIMEOUT" '$1 == s && $2 ~ /^[0-9.]+$/ { t = $3 + 0; if (t <= 0 || t > max) t = max; print $2, t }' "$clr_f" | \
+            while read -r clr_ip clr_t; do ipset add -exist "$clr_s" "$clr_ip" timeout "$clr_t" 2>/dev/null; done
+        clr_n=$((clr_n + 1))
+    done
+    logger -t ASNmanager "Domain routing: saved addresses put back into $clr_n new set(s)"
+}
+
+# shutdown hook (services-stop): save the learned addresses; only while there are domain entries
+cu_hook_sync() {
+    if [ -n "$1" ]; then
+        ensure_script /jffs/scripts/services-stop
+        grep -q "# ${CU_HOOK}\$" /jffs/scripts/services-stop 2>/dev/null || \
+            echo "$SCRIPT_PATH custom save >/dev/null 2>&1 # ${CU_HOOK}" >> /jffs/scripts/services-stop
+    elif [ -f /jffs/scripts/services-stop ]; then
+        sed -i "/# ${CU_HOOK}\$/d" /jffs/scripts/services-stop
+    fi
+    return 0
+}
+
 cu_apply_dom() {
-    : > "$CU_GROUPS.raw"; : > /tmp/asnmanager-dnsmasq.lines; cad_new=""
+    : > "$CU_GROUPS.raw"; : > /tmp/asnmanager-dnsmasq.lines; cad_new=""; cad_fresh=""
     if [ -s "$CUSTOM_FILE" ]; then
         while IFS=: read -r cid cdest csrc ckind cval; do
             [ "$ckind" = "dom" ] || continue
@@ -538,7 +620,7 @@ cu_apply_dom() {
             cad_set="ASND_${cdest}_$(echo "$cad_key" | md5sum | cut -c1-6)"
             printf '%s\t%s\t%s\n' "$cad_key" "$cad_set" "$cval" >> "$CU_GROUPS.raw"
             # one line per domain: the group set routes, the entry's own set counts what was learned for this domain
-            ipset list -n 2>/dev/null | grep -qx "ASNC_$cid" || { ipset create "ASNC_$cid" hash:ip family inet hashsize 1024 maxelem 262144 2>/dev/null; cad_new=force; }
+            [ "$(cu_set_make "ASNC_$cid")" = "new" ] && { cad_new=force; cad_fresh="$cad_fresh ASNC_$cid"; }
             echo "ipset=/$cval/$cad_set,ASNC_$cid" >> /tmp/asnmanager-dnsmasq.lines
         done < "$CUSTOM_FILE"
     fi
@@ -552,12 +634,14 @@ cu_apply_dom() {
     while IFS="$(printf '\t')" read -r cad_key cad_set cad_list; do
         [ -n "$cad_set" ] || continue
         cad_t=${cad_key%%|*}; cad_src=${cad_key#*|}
-        ipset list -n 2>/dev/null | grep -qx "$cad_set" || { ipset create "$cad_set" hash:ip family inet hashsize 1024 maxelem 262144 2>/dev/null; cad_new=force; }
+        [ "$(cu_set_make "$cad_set")" = "new" ] && { cad_new=force; cad_fresh="$cad_fresh $cad_set"; }
         if cu_usable "$cad_t"; then cu_route "$cad_t"; cu_rules_add "$cad_set" "$cad_t" "$cad_src"; fi
     done < "$CU_GROUPS"
+    cu_learned_restore $cad_fresh
     cu_dnsmasq_write /tmp/asnmanager-dnsmasq.lines "$cad_new"
     rm -f /tmp/asnmanager-dnsmasq.lines
     cu_cset_cleanup
+    cu_hook_sync "$(cut -f2 "$CU_GROUPS" 2>/dev/null)"
 }
 
 # per-entry sets of entries that no longer exist (a set the statistics still use is removed by its next sync)
@@ -590,10 +674,13 @@ cu_learned_report() {
         [ -n "$1" ] && [ "$1" != "$cid" ] && continue
         clr_any=1
         echo -e "${CYAN}$cid${NC} *.$cval -> $cdest${csrc:+ [Src: $csrc]}: ${GREEN}$(cu_learned "$cid" "$cdest" "$csrc")${NC} address(es) learned"
-        cu_learned_ips "$cid" | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | awk '{ printf "  %s\n", $1 }'
+        ipset list "ASNC_$cid" 2>/dev/null | awk '/^Members:/ { f = 1; next } f && $1 ~ /^[0-9.]+$/ {
+                t = -1; for (i = 2; i < NF; i++) if ($i == "timeout") t = $(i + 1)
+                printf "%s %s\n", $1, (t < 0 ? "" : (t >= 86400 ? "(expires in " int(t / 86400) " d)" : "(expires in " int(t / 3600) " h)")) }' | \
+            sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | awk '{ printf "  %-16s %s %s %s %s\n", $1, $2, $3, $4, $5 }'
     done < "$CUSTOM_FILE"
     [ $clr_any -eq 1 ] || echo "No domain entry${1:+ with id $1}."
-    echo "(dnsmasq stores only the addresses, not which subdomain they belong to)"
+    echo "(dnsmasq stores only the addresses, not which subdomain they belong to; an address expires $((CU_TIMEOUT / 86400)) days after its last lookup)"
 }
 
 # small file for the WebUI: learned numbers of the domain entries (refreshed by the statistics loop too)
@@ -633,6 +720,8 @@ cu_apply() {
 cu_purge() {
     for cp_s in $(ipset list -n 2>/dev/null | grep '^ASND_'); do cu_rules_del "$cp_s"; ipset destroy "$cp_s" 2>/dev/null; done
     for cp_s in $(ipset list -n 2>/dev/null | grep '^ASNC_'); do ipset destroy "$cp_s" 2>/dev/null; done
+    cu_hook_sync ""
+    rm -f "$(cu_save_jffs)" "$(cu_save_usb)" 2>/dev/null
     cu_dnsmasq_write /dev/null
     rm -f "$CU_GROUPS" "$CU_STATUS" /tmp/asnmanager-dnsmasq.lines
 }
@@ -4272,7 +4361,7 @@ cli_main() {
             esac ;;
         check)
             case "$1" in
-                run) proc_reap; rc_run_once ;;
+                run) proc_reap; cu_learned_save >/dev/null 2>&1; rc_run_once ;;
                 *)   rc_print ;;
             esac ;;
         update)

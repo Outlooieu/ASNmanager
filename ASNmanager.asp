@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.2.6 -->
+<!-- ASNmanager-WebUI v3.3.0 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -398,7 +398,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.2.6';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.3.0';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -475,7 +475,7 @@ var ASNM_I18N = {
     perf_stats_asn: 'Per ASN (exact)', perf_stats_iface: 'Per interface (light)',
     tr_all: 'All traffic', tr_mode_iface: 'Counting per interface and device only (no ASN breakdown) - saves CPU.', tr_mode_change: 'Change',
     rs_s_smode: 'Statistics detail', rs_s_rules: 'Marking rules', rs_v_asn: 'per ASN', rs_v_iface: 'per interface', rs_v_comb: 'combined', rs_v_single: 'one per ASN',
-    back_router: '← Router', add_entries: 'Entries', kind_ip: 'IP', kind_dom: 'Domain', st_learned: '{n} learned', lr_tip: 'Show the learned addresses', lr_head: 'Addresses learned for *.{d}', lr_more: '... and {n} more (all of them: ASNmanager.sh custom learned {id})', lr_none: 'No address learned yet.', lr_note: 'dnsmasq only stores the addresses, not which subdomain they belong to. A name that was already in the DNS cache is learned when its cache entry expires.',
+    back_router: '← Router', add_entries: 'Entries', kind_ip: 'IP', kind_dom: 'Domain', st_learned: '{n} learned', lr_tip: 'Show the learned addresses', lr_head: 'Addresses learned for *.{d}', lr_more: '... and {n} more (all of them: ASNmanager.sh custom learned {id})', lr_none: 'No address learned yet.', lr_note: 'dnsmasq only stores the addresses, not which subdomain they belong to. An address is removed 7 days after its last lookup; the addresses are saved and put back after a router restart.',
     add_domnote: 'A domain also covers all its subdomains. It only works for devices that use the router as their DNS server (not with DoH or fixed DNS servers; IPv4 only). The router learns the addresses when a device looks the name up.',
     rc_nolearned: 'none learned', rc_tip_nolearned: 'No address has been learned for this domain yet. A device has to look the name up through the router\'s DNS server (dnsmasq). Not covered: devices with another DNS server or DoH, and names that an AdGuard Home in front answers without passing through dnsmasq.',
     lang_label: 'Language', lang_default: 'Default', lang_en: 'English', theme_label: 'Theme', theme_dark: 'Dark', theme_light: 'Light', theme_blue: 'Blue',
@@ -595,7 +595,7 @@ var ASNM_I18N = {
     perf_stats_asn: 'Pro ASN (genau)', perf_stats_iface: 'Pro Interface (leicht)',
     tr_all: 'Gesamter Verkehr', tr_mode_iface: 'Gezählt wird nur pro Interface und Gerät (ohne ASN-Aufteilung) - spart CPU.', tr_mode_change: 'Ändern',
     rs_s_smode: 'Statistik-Detail', rs_s_rules: 'Marker-Regeln', rs_v_asn: 'pro ASN', rs_v_iface: 'pro Interface', rs_v_comb: 'zusammengefasst', rs_v_single: 'einzeln pro ASN',
-    back_router: '← Router', add_entries: 'Einträge', kind_ip: 'IP', kind_dom: 'Domain', st_learned: '{n} gelernt', lr_tip: 'Gelernte Adressen anzeigen', lr_head: 'Für *.{d} gelernte Adressen', lr_more: '... und {n} weitere (alle: ASNmanager.sh custom learned {id})', lr_none: 'Noch keine Adresse gelernt.', lr_note: 'dnsmasq speichert nur die Adressen, nicht zu welcher Subdomain sie gehören. Ein Name, der schon im DNS-Zwischenspeicher lag, wird gelernt, sobald sein Eintrag dort abläuft.',
+    back_router: '← Router', add_entries: 'Einträge', kind_ip: 'IP', kind_dom: 'Domain', st_learned: '{n} gelernt', lr_tip: 'Gelernte Adressen anzeigen', lr_head: 'Für *.{d} gelernte Adressen', lr_more: '... und {n} weitere (alle: ASNmanager.sh custom learned {id})', lr_none: 'Noch keine Adresse gelernt.', lr_note: 'dnsmasq speichert nur die Adressen, nicht zu welcher Subdomain sie gehören. Eine Adresse wird 7 Tage nach ihrer letzten Abfrage entfernt; die Adressen werden gesichert und nach einem Router-Neustart wiederhergestellt.',
     add_domnote: 'Eine Domain gilt auch für alle Subdomains. Sie wirkt nur für Geräte, die den Router als DNS-Server nutzen (nicht bei DoH oder fest eingestelltem DNS; nur IPv4). Der Router lernt die Adressen, wenn ein Gerät den Namen auflöst.',
     rc_nolearned: 'nichts gelernt', rc_tip_nolearned: 'Für diese Domain wurde noch keine Adresse gelernt. Ein Gerät muss den Namen über den DNS-Server des Routers (dnsmasq) auflösen. Nicht erfasst werden Geräte mit anderem DNS-Server oder DoH und Namen, die ein davorgeschalteter AdGuard Home beantwortet, ohne dass sie über dnsmasq laufen.',
     lang_label: 'Sprache', lang_default: 'Standard', lang_en: 'English', theme_label: 'Design', theme_dark: 'Dunkel', theme_light: 'Hell', theme_blue: 'Blau',

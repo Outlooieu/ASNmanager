@@ -1,3 +1,9 @@
+## v3.3.0
+
+- New: learned domain addresses expire **7 days after their last lookup**. Every time a device looks the name up again, dnsmasq adds the address anew and the time starts again, so addresses in use stay; servers a service no longer uses drop out. Existing sets are rebuilt with their addresses kept (no gap in the routing)
+- New: learned domain addresses **survive a router restart**. They are saved on the USB device (hourly, only when they changed), on the flash every 6 hours and at shutdown (`services-stop`, only while there are domain entries); at boot they are put back with their remaining time before the devices look anything up. Routing is right again from the first second, also for VPN targets. Command line: `custom save`
+- `custom learned` shows for each address when it expires
+
 ## v3.2.6
 
 - Fewer dnsmasq restarts: a restart is only done when the `ipset=` lines in `dnsmasq.conf.add` change (dnsmasq reads them only at start). When just a domain set is new (new entry with the same lines, or the sets after a reboot), the DNS cache is emptied with SIGHUP instead - dnsmasq keeps running, DNS does not drop out. With the cache off (`cache-size=0`, e.g. when AdGuard Home answers in front of dnsmasq) nothing is done at all. Each restart also sets off the start-up of other DNS add-ons (AdGuard Home moves dnsmasq to port 553), which is now avoided where possible
