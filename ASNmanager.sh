@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.1.1
+version=3.1.3
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.1.1"
+SCRIPT_VERSION="3.1.3"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -1985,7 +1985,8 @@ web_job() {
     rc=$?
     esc=$(printf '\033')
     sed -i "s/${esc}\[[0-9;]*m//g" "$OUT"
-    web_export
+    # after an update this process is still the OLD script (old version number in its data): the new script writes the data
+    if [ "$act" = "update" ] && grep -q '^Updated to' "$OUT"; then "$SCRIPT_PATH" webui export >/dev/null 2>&1; else web_export; fi
     msg=$(grep . "$OUT" | tail -n 1)
     [ $rc -eq 0 ] && job_status "$id" "$act" "done" "$msg" || job_status "$id" "$act" "error" "${msg:-Failed}"
     rm -rf "$LOCK_DIR"; trap - EXIT

@@ -1,3 +1,11 @@
+## v3.1.3
+
+- Fixed: after "Update now" in the WebUI the header kept showing the old version (and "Data refreshed" the old time) although the update was installed. The script that is still running at the end of the update is the OLD one and wrote the page data with its own version number. Now the new script writes the data after an update; in addition the page notices data from an older script and asks for fresh data once per session (so it also works when the update is done by an older version)
+
+## v3.1.2
+
+- WebUI: the device picker with checkboxes (several devices, "All devices") is now also used in the service presets and when editing a row of the list; while a row is edited the list frame no longer clips the picker
+
 ## v3.1.1
 
 - WebUI: "Add ASNs, IPs or domains" has a device picker with checkboxes like the suggestions - several devices can be ticked, "All devices" clears the choice; the chosen IPs appear in the source field, which can still be typed by hand (the picker follows)

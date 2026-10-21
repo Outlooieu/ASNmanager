@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.1.1 -->
+<!-- ASNmanager-WebUI v3.1.3 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -381,12 +381,14 @@
 .asnm-back:hover { border-color: var(--accent); color: var(--text); }
 .asnm-kind { display: inline-block; padding: 0 7px; margin-right: 4px; border: 1px solid var(--line); border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
 #asnm_add_domnote { color: var(--warn); }
-#asnm_add_ms .asnm-ms-btn { width: 165px; }
+#asnm_add_ms .asnm-ms-btn, #asnm_preset_ms .asnm-ms-btn { width: 165px; }
+#asnm_edit_ms .asnm-ms-btn { width: 200px; }
 .asnm-tr-dest { color: var(--muted); font-size: 11px; margin-left: 6px; }
 .asnm-tr-gone { color: var(--muted); font-size: 11px; margin-left: 6px; font-style: italic; }
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
+var ASNM_PAGE_VER = '3.1.3';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -798,8 +800,17 @@ function asnmLoadData(first) {
     });
 }
 
+// the data file was written by an older script (e.g. the old script that finished an update): ask for fresh data once per session
+function asnmVersionFix(v) {
+    if (!v || v === ASNM_PAGE_VER) return;
+    var k = 'asnm_vfix_' + ASNM_NS + '_' + ASNM_PAGE_VER;
+    try { if (sessionStorage.getItem(k)) return; sessionStorage.setItem(k, '1'); } catch (e) { return; }
+    asnmSend('refresh', []);
+}
+
 function asnmRender() {
     var d = ASNM.data;
+    asnmVersionFix(d.version);
     document.getElementById('asnm_version').textContent = 'v' + d.version;
     document.getElementById('asnm_last_apply').textContent = asnmFmtTime(d.last_apply);
     document.getElementById('asnm_generated').textContent = asnmFmtTime(d.generated);
@@ -828,7 +839,7 @@ function asnmRender() {
     asnmFillTargets(document.getElementById('asnm_add_dest'));
     asnmFillTargets(document.getElementById('asnm_preset_dest'));
     asnmDevMsRender('asnm_add_ms', 'asnm_add_src');
-    asnmFillDevices(document.getElementById('asnm_preset_dev'));
+    asnmDevMsRender('asnm_preset_ms', 'asnm_preset_src');
     asnmRenderPresets();
     asnmRenderList();
     asnmRenderIfaces();
@@ -1006,8 +1017,8 @@ function asnmRenderList() {
         if (ASNM.editing === e.asn) {
             html += '<tr class="asnm-editing"><td></td><td>' + asnmEntryCell(e) + '</td>' +
                 '<td colspan="4"><select id="asnm_edit_dest" class="input_option">' + asnmTargetOptions(asnmNormDest(e.dest)) + '</select><br/>' +
-                '<input type="text" id="asnm_edit_src" class="input_15_table" maxlength="600" style="margin-top:6px;width:230px;" value="' + asnmEsc(e.src) + '" placeholder="' + asnmEsc(t('src_empty')) + '"/>' +
-                '<select class="input_option asnm-devsel" style="width:210px;margin:6px 0 0 6px;" onchange="asnmPickDevice(this,\'asnm_edit_src\')">' + asnmDeviceOptions('') + '</select></td>' +
+                '<input type="text" id="asnm_edit_src" class="input_15_table" maxlength="600" style="margin-top:6px;width:230px;" oninput="asnmDevMsRender(\'asnm_edit_ms\',\'asnm_edit_src\');" value="' + asnmEsc(e.src) + '" placeholder="' + asnmEsc(t('src_empty')) + '"/>' +
+                '<div class="asnm-ms" id="asnm_edit_ms" style="margin:6px 0 0 6px;vertical-align:top;"></div></td>' +
                 '<td><input type="button" class="button_gen asnm-small-btn asnm-btn asnm-primary" value="' + asnmEsc(t('btn_save')) + '" onclick="asnmEditSave(\'' + a + '\')"/> ' +
                 '<input type="button" class="button_gen asnm-small-btn" value="' + asnmEsc(t('btn_cancel')) + '" onclick="asnmEdit(null)"/></td></tr>';
             continue;
@@ -1031,6 +1042,9 @@ function asnmRenderList() {
     html += '</table>';
     document.getElementById('asnm_list').innerHTML = html;
     document.getElementById('asnm_list_summary').textContent = t('summary', { n: entries.length, s: total });
+    // while a row is edited the list's frame must not clip the device picker
+    document.getElementById('asnm_list').parentNode.style.overflow = ASNM.editing ? 'visible' : '';
+    if (ASNM.editing) asnmDevMsRender('asnm_edit_ms', 'asnm_edit_src');
     asnmApplyBusy();
 }
 
@@ -2641,8 +2655,8 @@ function asnmTabBadges() {
 
 function initial() {
     document.addEventListener('click', function () {
-        var b = document.getElementById('asnm_add_ms');
-        if (b) b.className = 'asnm-ms';
+        var ids = ['asnm_add_ms', 'asnm_preset_ms', 'asnm_edit_ms'];
+        for (var i = 0; i < ids.length; i++) { var b = document.getElementById(ids[i]); if (b) b.className = 'asnm-ms'; }
     });
     try { ASNM_TR.unit = localStorage.getItem('asnm_rate_unit') === 'mbyte' ? 'mbyte' : 'mbit'; } catch (e) { ASNM_TR.unit = 'mbit'; }
     asnmUnitMark();
@@ -2812,8 +2826,8 @@ function initial() {
       <div class="asnm-field asnm-full"><span class="asnm-label" data-i18n="preset"></span><select id="asnm_preset"></select></div>
       <div class="asnm-field"><span class="asnm-label" data-i18n="target"></span><select id="asnm_preset_dest"></select></div>
       <div class="asnm-field"><span class="asnm-label" data-i18n="src_ip"></span>
-        <div class="asnm-inline"><input type="text" id="asnm_preset_src" maxlength="600" data-i18n-ph="ph_ip" autocomplete="off" style="flex:0 0 150px;"/>
-          <select id="asnm_preset_dev" class="asnm-devsel" onchange="asnmPickDevice(this,'asnm_preset_src')"></select></div></div>
+        <div class="asnm-inline"><input type="text" id="asnm_preset_src" maxlength="600" data-i18n-ph="ph_ip" autocomplete="off" style="flex:1 1 150px; min-width:0;" oninput="asnmDevMsRender('asnm_preset_ms','asnm_preset_src');"/>
+          <div class="asnm-ms" id="asnm_preset_ms"></div></div></div>
     </div>
     <div class="asnm-row" style="margin-top:14px;"><input type="button" class="button_gen asnm-btn" data-i18n-value="btn_add_preset" onclick="asnmAddPreset();"/></div>
   </div>
