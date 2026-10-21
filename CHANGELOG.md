@@ -1,3 +1,7 @@
+## v3.1.10
+
+- `stats diag`: the counting loop was reported as a "hanging" run once it had been running for more than 15 minutes. It is meant to run all the time and is now listed as the counting loop; the clean-up of hanging runs already left it alone
+
 ## v3.1.9
 
 - Fixed: dnsmasq adds an address to the domain set only when it fetches the answer from its upstream server, not when it answers from its cache. Names the devices had looked up before the domain entry was made were therefore learned only after their cache entry expired - until then such connections bypassed the rule (for a VPN target: past the VPN). Now dnsmasq is restarted once (about 2 seconds without DNS, the cache is emptied) when a domain set is created: a new domain entry, or the sets after a reboot. Applying the rules again does not restart it

@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.1.9
+version=3.1.10
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.1.9"
+SCRIPT_VERSION="3.1.10"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -2979,6 +2979,9 @@ ts_diag() {
         fi
         case "$td_c" in *"ASNmanager.sh ")                                 # the menu in an SSH window
             echo "                        pid $td_p, running $td_a s: an open menu (SSH window) - leave it with [e]"; continue ;; esac
+        if [ "$td_p" = "$td_lp" ]; then                                # the counting loop is meant to run all the time
+            echo "                        pid $td_p, running $td_a s: the counting loop (runs all the time - not hanging)"; continue
+        fi
         td_all=$((td_all + 1)); [ "$td_a" -gt 900 ] && td_old=$((td_old + 1))
         echo "                        pid $td_p, running $td_a s: $(echo "$td_c" | cut -c1-70)"
     done
