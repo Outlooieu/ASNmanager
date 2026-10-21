@@ -1,3 +1,11 @@
+## v3.1.9
+
+- Fixed: dnsmasq adds an address to the domain set only when it fetches the answer from its upstream server, not when it answers from its cache. Names the devices had looked up before the domain entry was made were therefore learned only after their cache entry expired - until then such connections bypassed the rule (for a VPN target: past the VPN). Now dnsmasq is restarted once (about 2 seconds without DNS, the cache is emptied) when a domain set is created: a new domain entry, or the sets after a reboot. Applying the rules again does not restart it
+- New: IP / CIDR and domain entries have their own rows in "Traffic per ASN / target" (before, they were counted under "Not assigned to an ASN"). Every entry gets a small set of its own (`ASNC_<id>`) that is used only for counting; the dnsmasq lines are written per domain (`ipset=/domain/<group set>,ASNC_<id>`), so the "learned" number belongs to exactly this domain
+- New: click "N learned" in the list to see the learned addresses (the first 200); command line `ASNmanager.sh custom learned [ID]`, and `custom list` shows the numbers. The number on the page refreshes every 30 seconds (from the statistics loop while counting runs)
+- The "learned" number is read from the entry's own set (the group set of the target is the fallback), no longer through a helper file in RAM
+- IDs of custom entries are never given out twice (the statistics keep their numbers under the ID)
+
 ## v3.1.8
 
 - Fixed: a domain entry could show "none learned" (and count as a warning) although the list already said "4 learned": the routing check only runs every 5 minutes. The page now treats such an outdated "none learned" as "being checked" and starts a new check (once a minute at most); if really nothing was learned the warning stays

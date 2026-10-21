@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.1.8
+version=3.1.9
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -324,6 +324,8 @@ proc_reap() {
 #  IP / CIDR: part of the marking set of its target (like the subnets of an ASN).
 #  Domain: dnsmasq fills an ipset (one per target / source group) with the addresses it resolves for the domain
 #  and all its subdomains; that set is NOT rebuilt by "apply", so what was learned stays.
+#  Every entry also has its own set ASNC_<id> (IP: the range, domain: the addresses learned for just this domain).
+#  It does not route anything - it is used for the traffic statistics and the "learned" numbers per entry.
 # =====================================================================
 CUSTOM_FILE="/jffs/scripts/custom_list.txt"
 DNSMASQ_ADD="/jffs/configs/dnsmasq.conf.add"
@@ -352,7 +354,14 @@ cu_kind() {
     return 1
 }
 cu_has() { grep -q "^$1:" "$CUSTOM_FILE" 2>/dev/null; }
-cu_next_id() { cnx=$(sed -n 's/^C\([0-9][0-9]*\):.*/\1/p' "$CUSTOM_FILE" 2>/dev/null | sort -n | tail -n 1); echo "C$(( ${cnx:-0} + 1 ))"; }
+# ids are never given out twice (the traffic statistics keep their numbers under the id): high-water mark in .seq
+cu_next_id() {
+    cnx=$(sed -n 's/^C\([0-9][0-9]*\):.*/\1/p' "$CUSTOM_FILE" 2>/dev/null | sort -n | tail -n 1)
+    cnq=$(cat "$CUSTOM_FILE.seq" 2>/dev/null); case "$cnq" in ''|*[!0-9]*) cnq=0 ;; esac
+    [ "${cnx:-0}" -gt "$cnq" ] && cnq=${cnx:-0}
+    cnq=$((cnq + 1)); echo "$cnq" > "$CUSTOM_FILE.seq"
+    echo "C$cnq"
+}
 # cu_save KIND TARGET SOURCES VALUE -> prints the id; the same kind + value is replaced
 cu_save() {
     [ -f "$CUSTOM_FILE" ] || : > "$CUSTOM_FILE"
@@ -370,8 +379,9 @@ cu_list() {
     [ -s "$CUSTOM_FILE" ] || { echo "No custom entries (IP/CIDR or domains)."; return 0; }
     while IFS=: read -r cl_id cl_d cl_s cl_k cl_v; do
         [ -n "$cl_id" ] || continue
+        cl_x=""; [ "$cl_k" = "dom" ] && cl_x="  ($(cu_learned "$cl_id" "$cl_d" "$cl_s") learned)"
         [ "$cl_k" = "dom" ] && cl_v="*.${cl_v}"
-        printf "%-5s %-6s -> %-6s %s\n" "$cl_id" "$cl_k" "$cl_d" "$cl_v${cl_s:+  [Src: $cl_s]}"
+        printf "%-5s %-6s -> %-6s %s\n" "$cl_id" "$cl_k" "$cl_d" "$cl_v${cl_s:+  [Src: $cl_s]}$cl_x"
     done < "$CUSTOM_FILE"
 }
 cu_print_section() {
@@ -389,8 +399,9 @@ cli_custom() {
         apply)  cu_apply ;;
         early)  cu_apply_dom ;;
         purge)  cu_purge ;;
+        learned) cu_learned_report "$2" ;;
         list|"") cu_list ;;
-        *)      echo "Usage: custom list | apply | early | purge" ;;
+        *)      echo "Usage: custom list | learned [ID] | apply | early | purge" ;;
     esac
 }
 
@@ -468,6 +479,9 @@ cu_apply_ip() {
     cai_single=0; [ -f "$RULES_SINGLE" ] && cai_single=1
     while IFS=: read -r cid cdest csrc ckind cval; do
         [ "$ckind" = "ip" ] || continue
+        case "$cid" in C[0-9]*) ;; *) continue ;; esac
+        ipset create "ASNC_$cid" hash:net family inet hashsize 64 maxelem 1024 2>/dev/null
+        ipset flush "ASNC_$cid" 2>/dev/null; ipset add -exist "ASNC_$cid" "$cval" 2>/dev/null
         if ! cu_usable "$cdest"; then printf '%s\tdown\n' "$cid" >> "$CU_STATUS"; continue; fi
         cu_route "$cdest"
         if [ "$cai_single" = "1" ]; then
@@ -484,13 +498,21 @@ cu_apply_ip() {
     done < "$CUSTOM_FILE"
 }
 
-# writes (or removes) our block in dnsmasq.conf.add; dnsmasq is restarted only when the block changed
+# writes (or removes) our block in dnsmasq.conf.add; dnsmasq is restarted when the block changed, or with $2 = force
+# (a domain set was just created: dnsmasq adds an address only when it fetches the answer from its upstream, not
+# when it answers from its cache - the restart empties the cache, so names already looked up are learned again)
 cu_dnsmasq_write() {
     cdw_new=/tmp/asnmanager-dnsmasq.new
     if [ -f "$DNSMASQ_ADD" ]; then sed "/^${CU_BEGIN}\$/,/^${CU_END}\$/d" "$DNSMASQ_ADD" > "$cdw_new"; else : > "$cdw_new"; fi
     if [ -s "$1" ]; then { echo "$CU_BEGIN"; cat "$1"; echo "$CU_END"; } >> "$cdw_new"; fi
     if [ -f "$DNSMASQ_ADD" ]; then cdw_cur="$DNSMASQ_ADD"; else cdw_cur=/dev/null; fi
-    if cmp -s "$cdw_new" "$cdw_cur"; then rm -f "$cdw_new"; return 0; fi
+    if cmp -s "$cdw_new" "$cdw_cur"; then
+        rm -f "$cdw_new"
+        [ "$2" = "force" ] || return 0
+        service restart_dnsmasq >/dev/null 2>&1
+        logger -t ASNmanager "Domain routing: new domain set, dnsmasq restarted (cache emptied)"
+        return 0
+    fi
     if [ -s "$cdw_new" ]; then mkdir -p "$(dirname "$DNSMASQ_ADD")" && cp "$cdw_new" "$DNSMASQ_ADD"; else rm -f "$DNSMASQ_ADD"; fi
     rm -f "$cdw_new"
     service restart_dnsmasq >/dev/null 2>&1
@@ -498,12 +520,17 @@ cu_dnsmasq_write() {
 }
 
 cu_apply_dom() {
-    : > "$CU_GROUPS.raw"
+    : > "$CU_GROUPS.raw"; : > /tmp/asnmanager-dnsmasq.lines; cad_new=""
     if [ -s "$CUSTOM_FILE" ]; then
         while IFS=: read -r cid cdest csrc ckind cval; do
             [ "$ckind" = "dom" ] || continue
+            case "$cid" in C[0-9]*) ;; *) continue ;; esac
             cad_key="${cdest}|${csrc}"
-            printf '%s\tASND_%s_%s\t%s\n' "$cad_key" "$cdest" "$(echo "$cad_key" | md5sum | cut -c1-6)" "$cval" >> "$CU_GROUPS.raw"
+            cad_set="ASND_${cdest}_$(echo "$cad_key" | md5sum | cut -c1-6)"
+            printf '%s\t%s\t%s\n' "$cad_key" "$cad_set" "$cval" >> "$CU_GROUPS.raw"
+            # one line per domain: the group set routes, the entry's own set counts what was learned for this domain
+            ipset list -n 2>/dev/null | grep -qx "ASNC_$cid" || { ipset create "ASNC_$cid" hash:ip family inet hashsize 1024 maxelem 262144 2>/dev/null; cad_new=force; }
+            echo "ipset=/$cval/$cad_set,ASNC_$cid" >> /tmp/asnmanager-dnsmasq.lines
         done < "$CUSTOM_FILE"
     fi
     awk -F'\t' '{ if ($1 in l) l[$1] = l[$1] " " $3; else { l[$1] = $3; s[$1] = $2 } } END { for (k in l) printf "%s\t%s\t%s\n", k, s[k], l[k] }' "$CU_GROUPS.raw" > "$CU_GROUPS.new"
@@ -513,16 +540,70 @@ cu_apply_dom() {
         cu_rules_del "$cad_s"
         cut -f2 "$CU_GROUPS" | grep -qx "$cad_s" || ipset destroy "$cad_s" 2>/dev/null
     done
-    : > /tmp/asnmanager-dnsmasq.lines
     while IFS="$(printf '\t')" read -r cad_key cad_set cad_list; do
         [ -n "$cad_set" ] || continue
         cad_t=${cad_key%%|*}; cad_src=${cad_key#*|}
-        ipset create "$cad_set" hash:ip family inet hashsize 1024 maxelem 262144 2>/dev/null
+        ipset list -n 2>/dev/null | grep -qx "$cad_set" || { ipset create "$cad_set" hash:ip family inet hashsize 1024 maxelem 262144 2>/dev/null; cad_new=force; }
         if cu_usable "$cad_t"; then cu_route "$cad_t"; cu_rules_add "$cad_set" "$cad_t" "$cad_src"; fi
-        echo "ipset=/$(echo "$cad_list" | sed 's# #/#g')/$cad_set" >> /tmp/asnmanager-dnsmasq.lines
     done < "$CU_GROUPS"
-    cu_dnsmasq_write /tmp/asnmanager-dnsmasq.lines
+    cu_dnsmasq_write /tmp/asnmanager-dnsmasq.lines "$cad_new"
     rm -f /tmp/asnmanager-dnsmasq.lines
+    cu_cset_cleanup
+}
+
+# per-entry sets of entries that no longer exist (a set the statistics still use is removed by its next sync)
+cu_cset_cleanup() {
+    for ccc_s in $(ipset list -n 2>/dev/null | grep '^ASNC_'); do
+        cu_has "${ccc_s#ASNC_}" || ipset destroy "$ccc_s" 2>/dev/null
+    done
+    return 0
+}
+
+# number of addresses learned for a domain entry: its own set; an older group set as fallback
+cu_learned() {            # ID TARGET SOURCES
+    cl_c=$(ipset list -t "ASNC_$1" 2>/dev/null | sed -n 's/^Number of entries: //p')
+    if [ -z "$cl_c" ]; then
+        cl_set=$(awk -F'\t' -v k="${2}|${3}" '$1 == k { print $2; exit }' "$CU_GROUPS" 2>/dev/null)
+        [ -n "$cl_set" ] || cl_set="ASND_${2}_$(echo "${2}|${3}" | md5sum | cut -c1-6)"
+        cl_c=$(ipset list -t "$cl_set" 2>/dev/null | sed -n 's/^Number of entries: //p')
+    fi
+    echo "${cl_c:-0}"
+}
+# the learned addresses of a domain entry (max. $2 lines)
+cu_learned_ips() { ipset list "ASNC_$1" 2>/dev/null | awk -v m="${2:-100000}" '/^Members:/ { f = 1; next } f && $1 ~ /^[0-9.]+$/ && n++ < m { print $1 }'; }
+
+# CLI: learned [ID] - addresses dnsmasq has put into the set of each domain entry
+cu_learned_report() {
+    [ -s "$CUSTOM_FILE" ] || { echo "No custom entries."; return 0; }
+    clr_any=0
+    while IFS=: read -r cid cdest csrc ckind cval; do
+        [ "$ckind" = "dom" ] || continue
+        [ -n "$1" ] && [ "$1" != "$cid" ] && continue
+        clr_any=1
+        echo -e "${CYAN}$cid${NC} *.$cval -> $cdest${csrc:+ [Src: $csrc]}: ${GREEN}$(cu_learned "$cid" "$cdest" "$csrc")${NC} address(es) learned"
+        cu_learned_ips "$cid" | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | awk '{ printf "  %s\n", $1 }'
+    done < "$CUSTOM_FILE"
+    [ $clr_any -eq 1 ] || echo "No domain entry${1:+ with id $1}."
+    echo "(dnsmasq stores only the addresses, not which subdomain they belong to)"
+}
+
+# small file for the WebUI: learned numbers of the domain entries (refreshed by the statistics loop too)
+cu_learned_js() {
+    [ -d "$WEB_DIR" ] || return 0
+    {
+        printf '{"ts":%s,"c":{' "$(date +%s)"
+        cljs_n=0
+        if [ -s "$CUSTOM_FILE" ]; then
+            while IFS=: read -r cid cdest csrc ckind cval; do
+                [ "$ckind" = "dom" ] || continue
+                case "$cid" in C[0-9]*) ;; *) continue ;; esac
+                [ $cljs_n -gt 0 ] && printf ','
+                printf '"%s":%s' "$cid" "$(cu_learned "$cid" "$cdest" "$csrc")"
+                cljs_n=$((cljs_n + 1))
+            done < "$CUSTOM_FILE"
+        fi
+        printf '}}\n'
+    } > "$WEB_DIR/learned.js.tmp" 2>/dev/null && mv -f "$WEB_DIR/learned.js.tmp" "$WEB_DIR/learned.js"
 }
 
 cu_apply() {
@@ -535,12 +616,14 @@ cu_apply() {
             if cu_usable "$cdest"; then printf '%s\tok\n' "$cid" >> "$CU_STATUS"; else printf '%s\tdown\n' "$cid" >> "$CU_STATUS"; fi
         done < "$CUSTOM_FILE"
     fi
+    cu_cset_cleanup
     return 0
 }
 
 # removes everything of the domain routing: rules, sets, our lines in dnsmasq.conf.add
 cu_purge() {
     for cp_s in $(ipset list -n 2>/dev/null | grep '^ASND_'); do cu_rules_del "$cp_s"; ipset destroy "$cp_s" 2>/dev/null; done
+    for cp_s in $(ipset list -n 2>/dev/null | grep '^ASNC_'); do ipset destroy "$cp_s" 2>/dev/null; done
     cu_dnsmasq_write /dev/null
     rm -f "$CU_GROUPS" "$CU_STATUS" /tmp/asnmanager-dnsmasq.lines
 }
@@ -556,18 +639,19 @@ cu_json() {
             cj_st=$(awk -F'\t' -v k="$cid" '$1 == k { print $2; exit }' "$CU_STATUS" 2>/dev/null)
             cj_l=0; [ "$cj_st" = "ok" ] && cj_l=1
             cj_new=0; grep -qx "$cid" "$1" 2>/dev/null && cj_new=1
-            cj_c=0
+            cj_c=0; cj_ips=""
             if [ "$ckind" = "dom" ]; then
-                cj_set=$(awk -F'\t' -v k="${cdest}|${csrc}" '$1 == k { print $2; exit }' "$CU_GROUPS" 2>/dev/null)
-                [ -n "$cj_set" ] && cj_c=$(ipset list -t "$cj_set" 2>/dev/null | sed -n 's/^Number of entries: //p')
+                cj_c=$(cu_learned "$cid" "$cdest" "$csrc")
+                cj_ips=$(cu_learned_ips "$cid" 200 | awk '{ printf "%s\"%s\"", (n++ ? "," : ""), $1 }')
             fi
             [ $cj_n -gt 0 ] && printf ','
-            printf '{"id":"%s","dest":"%s","src":"%s","kind":"%s","value":"%s","loaded":%d,"new":%d,"learned":%d}' \
-                "$cid" "$cdest" "$(echo "$csrc" | tr -cd '0-9.,')" "$ckind" "$(echo "$cval" | tr -cd 'A-Za-z0-9./-')" "$cj_l" "$cj_new" "${cj_c:-0}"
+            printf '{"id":"%s","dest":"%s","src":"%s","kind":"%s","value":"%s","loaded":%d,"new":%d,"learned":%d,"ips":[%s]}' \
+                "$cid" "$cdest" "$(echo "$csrc" | tr -cd '0-9.,')" "$ckind" "$(echo "$cval" | tr -cd 'A-Za-z0-9./-')" "$cj_l" "$cj_new" "${cj_c:-0}" "$cj_ips"
             cj_n=$((cj_n + 1))
         done < "$CUSTOM_FILE"
     fi
     printf '],'
+    cu_learned_js >/dev/null 2>&1
 }
 
 # routing check rows of the custom entries (appended to check.js)
@@ -588,7 +672,8 @@ cu_check_rows() {          # $1 = rc_out file, $2 = number of rows already writt
             rc_rule_active "ASN_${cdest}_${cid}" "$d" "$sample" || { [ "$code" = "skipped" ] || code=norule; }
         else
             cc_set=$(awk -F'\t' -v k="${cdest}|${csrc}" '$1 == k { print $2; exit }' "$CU_GROUPS" 2>/dev/null)
-            sample=""; [ -n "$cc_set" ] && sample=$(ipset list "$cc_set" 2>/dev/null | awk '/^Members:/ { f = 1; next } f && NF { print $1; exit }')
+            sample=$(cu_learned_ips "$cid" 1)
+            [ -z "$sample" ] && [ -n "$cc_set" ] && sample=$(ipset list "$cc_set" 2>/dev/null | awk '/^Members:/ { f = 1; next } f && NF { print $1; exit }')
             if [ -z "$cc_set" ] || ! echo "$rc_rules" | grep -q -- "--match-set $cc_set dst"; then code=norule
             elif [ -z "$sample" ]; then code=nolearned; fi
         fi
@@ -620,6 +705,11 @@ cu_ipset_report() {
         cir_c=$(ipset list -t "$cir_s" 2>/dev/null | sed -n 's/^Number of entries: //p')
         echo -e "${CYAN}$cir_s${NC} (domains, filled by dnsmasq) -> learned addresses: ${GREEN}${cir_c:-0}${NC}"
     done
+    if [ $cir_n -gt 0 ] && [ -s "$CUSTOM_FILE" ]; then
+        while IFS=: read -r cid cdest csrc ckind cval; do
+            [ "$ckind" = "dom" ] && echo "   $cid *.$cval: $(cu_learned "$cid" "$cdest" "$csrc") learned  (list: ASNmanager.sh custom learned $cid)"
+        done < "$CUSTOM_FILE"
+    fi
     return 0
 }
 
@@ -903,7 +993,7 @@ uninstall_menu() {
             done
             rm -f /tmp/asn_[0-9]*.txt /tmp/asn_counts.txt /tmp/asn_progress.txt /tmp/asn_failed.txt /tmp/ASNmanager-*.tmp /tmp/ASNmanager-update.sh 2>/dev/null
             rm -rf "/jffs/scripts/asn_cache" 2>/dev/null
-            rm -f "$ASN_FILE" "$CUSTOM_FILE" "$SCHEDULE_FILE" "$STATS_FILE" "$WORKER_SCRIPT" "$SCRIPT_PATH" "$SCRIPT_PATH.bak" "$SCRIPT_PATH.new" 2>/dev/null
+            rm -f "$ASN_FILE" "$CUSTOM_FILE" "$CUSTOM_FILE.seq" "$SCHEDULE_FILE" "$STATS_FILE" "$WORKER_SCRIPT" "$SCRIPT_PATH" "$SCRIPT_PATH.bak" "$SCRIPT_PATH.new" 2>/dev/null
             rm -rf /tmp/${WEBUI_NS}-* /tmp/asnm_* /tmp/asn_display_*.tmp /tmp/asn_sec_*.tmp /tmp/asnstats 2>/dev/null
             [ $bk_del -eq 1 ] && echo "$bk_files" | while read -r bk_f; do [ -n "$bk_f" ] && rm -f "$bk_f"; done
             for bk_d in /tmp/mnt/*/ASNmanager /tmp/mnt/*/*/ASNmanager; do [ -d "$bk_d" ] && rmdir "$bk_d" 2>/dev/null; done
@@ -2255,14 +2345,37 @@ ts_bank() { # add counter lines from stdin to the working base file (zero lines 
     rm -f "$TS_RT/bank.tmp"
 }
 
+# rules of one row: TARGET KEY SET SOURCES  (KEY = ASN number or custom entry id C<n>; uses $clients)
+ts_plan_row() {
+    tpr_srcs=""
+    for x in $(echo "$4" | tr ',' ' '); do echo "$x" | grep -qE '^[0-9]{1,3}(\.[0-9]{1,3}){3}$' && tpr_srcs="$tpr_srcs $x"; done
+    echo "ASC_U_${1}_${2}" >> "$TS_RT/plan.chains"; echo "ASC_D_${1}_${2}" >> "$TS_RT/plan.chains"
+    if [ -n "$tpr_srcs" ]; then
+        for x in $tpr_srcs; do
+            printf 'U|%s|%s|\t-A ASC_U_%s -s %s/32 -m set --match-set %s dst -g ASC_U_%s_%s\n' "$1" "$2" "$1" "$x" "$3" "$1" "$2"
+            printf 'D|%s|%s|\t-A ASC_D_%s -d %s/32 -m set --match-set %s src -g ASC_D_%s_%s\n' "$1" "$2" "$1" "$x" "$3" "$1" "$2"
+            printf 'U|%s|%s|%s\t-A ASC_U_%s_%s -s %s/32\n' "$1" "$2" "$x" "$1" "$2" "$x"
+            printf 'D|%s|%s|%s\t-A ASC_D_%s_%s -d %s/32\n' "$1" "$2" "$x" "$1" "$2" "$x"
+        done
+    else
+        printf 'U|%s|%s|\t-A ASC_U_%s -m set --match-set %s dst -g ASC_U_%s_%s\n' "$1" "$2" "$1" "$3" "$1" "$2"
+        printf 'D|%s|%s|\t-A ASC_D_%s -m set --match-set %s src -g ASC_D_%s_%s\n' "$1" "$2" "$1" "$3" "$1" "$2"
+        for ip in $clients; do
+            printf 'U|%s|%s|%s\t-A ASC_U_%s_%s -s %s/32\n' "$1" "$2" "$ip" "$1" "$2" "$ip"
+            printf 'D|%s|%s|%s\t-A ASC_D_%s_%s -d %s/32\n' "$1" "$2" "$ip" "$1" "$2" "$ip"
+        done
+    fi
+}
+
 # ---------- build the wanted rule set (plan.rules / plan.chains / plan.jumps) ----------
 ts_build_plan() {
-    sets=$(ipset list -n 2>/dev/null | grep '^ASN_')
+    sets=$(ipset list -n 2>/dev/null | grep -E '^ASNC?_')
     clients=$(ts_client_ips)
     tmode=$(ts_mode); okey=O; [ "$tmode" = "iface" ] && okey=ALL
     : > "$TS_RT/plan.rules"; : > "$TS_RT/plan.chains"; : > "$TS_RT/plan.jumps"
 
-    used=$( [ -f "$ASN_FILE" ] && awk -F':' '$1 ~ /^[0-9]+$/ { d = ($2 == "WAN") ? "WAN1" : $2; print d }' "$ASN_FILE" | sort -u )
+    used=$( { [ -f "$ASN_FILE" ] && awk -F':' '$1 ~ /^[0-9]+$/ { d = ($2 == "WAN") ? "WAN1" : $2; print d }' "$ASN_FILE"
+              [ -f "$CUSTOM_FILE" ] && awk -F':' '$1 ~ /^C[0-9]+$/ { d = ($2 == "WAN") ? "WAN1" : $2; print d }' "$CUSTOM_FILE"; } | sort -u )
     for d in $VALID_DESTS; do
         dev=$(get_ifname "$d")
         [ -z "$dev" ] && continue
@@ -2273,31 +2386,23 @@ ts_build_plan() {
         echo "-A FORWARD -i $dev -j ASC_D_$d" >> "$TS_RT/plan.jumps"
         echo "ASC_U_$d" >> "$TS_RT/plan.chains"; echo "ASC_D_$d" >> "$TS_RT/plan.chains"
 
-        # ASN rules of this target in list order (first match wins) - not in the light mode
+        # custom entries first (their marking rules come first as well), then the ASN rules in list order
+        # (first match wins) - not in the light mode
+        if [ -s "$CUSTOM_FILE" ] && [ "$tmode" = "asn" ]; then
+            while IFS=':' read -r cid cdest csrc ckind cval; do
+                case "$cid" in C[0-9]*) ;; *) continue ;; esac
+                [ "$(ts_nd "$cdest")" = "$d" ] || continue
+                echo "$sets" | grep -qx "ASNC_$cid" || continue
+                ts_plan_row "$d" "$cid" "ASNC_$cid" "$csrc"
+            done < "$CUSTOM_FILE" >> "$TS_RT/plan.rules"
+        fi
         if [ -f "$ASN_FILE" ] && [ "$tmode" = "asn" ]; then
             while IFS=':' read -r asn rdest src; do
                 case "$asn" in ''|*[!0-9]*) continue ;; esac
                 [ "$(ts_nd "$rdest")" = "$d" ] || continue
                 set_name="ASN_${rdest}_${asn}"
                 echo "$sets" | grep -qx "$set_name" || continue
-                srcs=""
-                for x in $(echo "$src" | tr ',' ' '); do echo "$x" | grep -qE '^[0-9]{1,3}(\.[0-9]{1,3}){3}$' && srcs="$srcs $x"; done
-                echo "ASC_U_${d}_${asn}" >> "$TS_RT/plan.chains"; echo "ASC_D_${d}_${asn}" >> "$TS_RT/plan.chains"
-                if [ -n "$srcs" ]; then
-                    for x in $srcs; do
-                        printf 'U|%s|%s|\t-A ASC_U_%s -s %s/32 -m set --match-set %s dst -g ASC_U_%s_%s\n' "$d" "$asn" "$d" "$x" "$set_name" "$d" "$asn"
-                        printf 'D|%s|%s|\t-A ASC_D_%s -d %s/32 -m set --match-set %s src -g ASC_D_%s_%s\n' "$d" "$asn" "$d" "$x" "$set_name" "$d" "$asn"
-                        printf 'U|%s|%s|%s\t-A ASC_U_%s_%s -s %s/32\n' "$d" "$asn" "$x" "$d" "$asn" "$x"
-                        printf 'D|%s|%s|%s\t-A ASC_D_%s_%s -d %s/32\n' "$d" "$asn" "$x" "$d" "$asn" "$x"
-                    done
-                else
-                    printf 'U|%s|%s|\t-A ASC_U_%s -m set --match-set %s dst -g ASC_U_%s_%s\n' "$d" "$asn" "$d" "$set_name" "$d" "$asn"
-                    printf 'D|%s|%s|\t-A ASC_D_%s -m set --match-set %s src -g ASC_D_%s_%s\n' "$d" "$asn" "$d" "$set_name" "$d" "$asn"
-                    for ip in $clients; do
-                        printf 'U|%s|%s|%s\t-A ASC_U_%s_%s -s %s/32\n' "$d" "$asn" "$ip" "$d" "$asn" "$ip"
-                        printf 'D|%s|%s|%s\t-A ASC_D_%s_%s -d %s/32\n' "$d" "$asn" "$ip" "$d" "$asn" "$ip"
-                    done
-                fi
+                ts_plan_row "$d" "$asn" "$set_name" "$src"
             done < "$ASN_FILE" >> "$TS_RT/plan.rules"
         fi
 
@@ -2359,6 +2464,9 @@ ts_sync() {
         grep -q "^${a}:${d}:" "$ASN_FILE" 2>/dev/null && continue
         iptables-save 2>/dev/null | grep -q -- "--match-set $s " || ipset destroy "$s" 2>/dev/null
     done
+    for s in $(ipset list -n 2>/dev/null | grep '^ASNC_'); do
+        grep -q "^${s#ASNC_}:" "$CUSTOM_FILE" 2>/dev/null || ipset destroy "$s" 2>/dev/null
+    done
 
     ts_net_codes > "$TS_RT/nets.txt"
     ts_live > "$TS_RT/last_live.txt"
@@ -2376,7 +2484,8 @@ ts_remove_rules() {
 ts_signature() {
     {
         date -r "$ASN_FILE" +%s 2>/dev/null
-        ipset list -n 2>/dev/null | grep '^ASN_' | sort
+        date -r "$CUSTOM_FILE" +%s 2>/dev/null
+        ipset list -n 2>/dev/null | grep -E '^ASNC?_' | sort
         ts_client_ips | sort
         for d in $VALID_DESTS; do dev=$(get_ifname "$d"); [ -n "$dev" ] && [ -d "/sys/class/net/$dev" ] && echo "$d=$dev"; done
         ip route show 2>/dev/null | md5sum
@@ -2488,7 +2597,7 @@ ts_export() {
         }
         {
             split($1, k, "|"); d = k[1]; dest = k[2]; x = k[3]; ip = k[4]
-            if (dest !~ /^[A-Z0-9]+$/ || x !~ /^([0-9]+|O)$/) next
+            if (dest !~ /^[A-Z0-9]+$/ || x !~ /^([0-9]+|C[0-9]+|O)$/) next
             id = dest "|" x
             if (!(id in seen)) { seen[id] = 1; order[++n] = id }
             if (ip == "") { if (d == "U") { ub[id] += $3; up[id] += $2 } else { db[id] += $3; dp[id] += $2 } ; next }
@@ -2726,6 +2835,7 @@ ts_loop() {
         fi
         ts_rates
         ts_export reuse
+        cu_learned_js >/dev/null 2>&1
         now=$(date +%s)
         if [ $((now - last_save)) -ge "$TS_SAVE_EVERY" ]; then ts_save; last_save=$now; fi
         if [ $((now - last_sg)) -ge "$SG_EVERY" ]; then
@@ -4015,6 +4125,7 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   retry                              rebuild from cache, download only missing/failed ASNs
   edit <ASN|Cn> <TARGET> [SRC-IP]    change target / source IP of an ASN or custom entry
   custom list | apply | early | purge   custom entries (IP/CIDR, domains): list / apply (done by "apply") / purge
+  custom learned [ID]                addresses dnsmasq has learned for the domain entries
   import <replace|merge> <ASN:TARGET:SRC>[,...]  import entries
   status                             ipset status
   test <IP|domain>                   check which route a target takes

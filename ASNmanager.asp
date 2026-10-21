@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.1.8 -->
+<!-- ASNmanager-WebUI v3.1.9 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -379,6 +379,9 @@
 .asnm-rs-det { margin-left: 26px; font-size: 11px; color: var(--muted); line-height: 1.5; }
 .asnm-back { display: inline-block; margin-right: 8px; padding: 3px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--text2); font-size: 12px; font-weight: 600; text-decoration: none; }
 .asnm-back:hover { border-color: var(--accent); color: var(--text); }
+.asnm-lr td { font-size: 12px; }
+.asnm-lr-list { margin: 6px 0; line-height: 22px; max-height: 180px; overflow-y: auto; }
+.asnm-lr-list code { display: inline-block; padding: 0 6px; margin: 0 4px 4px 0; border: 1px solid var(--line); border-radius: 6px; font-size: 11px; }
 .asnm-kind { display: inline-block; padding: 0 7px; margin-right: 4px; border: 1px solid var(--line); border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
 #asnm_add_domnote { color: var(--warn); }
 #asnm_add_ms .asnm-ms-btn, #asnm_preset_ms .asnm-ms-btn { width: 165px; }
@@ -388,7 +391,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.1.8';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.1.9';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -428,7 +431,7 @@ var ASNM_I18N = {
     sg_on_list: 'on the list for: {d} ({t}) - Add extends the devices of this rule', sg_noacct: 'The byte counters for connections could not be switched on - no suggestions possible.',
     sg_th_asn: 'ASN', sg_th_b: 'Traffic', sg_th_cl: 'Used by', sg_th_t: 'Target', sg_th_dev: 'Device', sg_all: 'All devices', sg_grp_used: 'Uses this ASN', sg_add: 'Add', sg_more: '+{n} more',
     sg_note: 'Estimate from the connection table of the router, evaluated every minute (very short connections can be missed). Destination addresses are looked up via ip-api.com (at most 10 per minute). ASNs that are already in the list are hidden. "Add" puts the ASN on the list - then apply the rules.',
-    sec_tbl: 'Traffic per ASN / target', sec_cnt: '{n} ASN(s)', sg_f_show: 'Show', sg_f_dev: 'Device', sg_f_q: 'Search ASN or name',
+    sec_tbl: 'Traffic per ASN / target', sec_cnt: '{n} entry(ies)', sg_f_show: 'Show', sg_f_dev: 'Device', sg_f_q: 'Search ASN or name',
     sg_f_count: '{x} of {y} ASN(s)', sg_f_total: ' - {n} found in total, the 100 largest are listed', sg_n_dev: '{n} devices', sg_nomatch: 'No ASN matches the filter.',
     sg_all_dev_f: 'All devices', sg_th_b_dev: 'Traffic of this device',
     fo_title: 'Failover', fo_sub: 'If a target fails, its ASNs use the next working fallback.', fo_th_t: 'Target', fo_th_1: '1st fallback', fo_th_2: '2nd fallback',
@@ -465,7 +468,7 @@ var ASNM_I18N = {
     perf_stats_asn: 'Per ASN (exact)', perf_stats_iface: 'Per interface (light)',
     tr_all: 'All traffic', tr_mode_iface: 'Counting per interface and device only (no ASN breakdown) - saves CPU.', tr_mode_change: 'Change',
     rs_s_smode: 'Statistics detail', rs_s_rules: 'Marking rules', rs_v_asn: 'per ASN', rs_v_iface: 'per interface', rs_v_comb: 'combined', rs_v_single: 'one per ASN',
-    back_router: '← Router', add_entries: 'Entries', kind_ip: 'IP', kind_dom: 'Domain', st_learned: '{n} learned',
+    back_router: '← Router', add_entries: 'Entries', kind_ip: 'IP', kind_dom: 'Domain', st_learned: '{n} learned', lr_tip: 'Show the learned addresses', lr_head: 'Addresses learned for *.{d}', lr_more: '... and {n} more (all of them: ASNmanager.sh custom learned {id})', lr_none: 'No address learned yet.', lr_note: 'dnsmasq only stores the addresses, not which subdomain they belong to. A name that was already in the DNS cache is learned when its cache entry expires.',
     add_domnote: 'A domain also covers all its subdomains. It only works for devices that use the router as their DNS server (not with DoH or fixed DNS servers; IPv4 only). The router learns the addresses when a device looks the name up.',
     rc_nolearned: 'none learned', rc_tip_nolearned: 'No address has been learned for this domain yet. A device has to look the name up through the router\'s DNS server (dnsmasq). Not covered: devices with another DNS server or DoH, and names that an AdGuard Home in front answers without passing through dnsmasq.',
     lang_label: 'Language', lang_default: 'Default', lang_en: 'English', theme_label: 'Theme', theme_dark: 'Dark', theme_light: 'Light', theme_blue: 'Blue',
@@ -545,7 +548,7 @@ var ASNM_I18N = {
     sg_on_list: 'auf der Liste für: {d} ({t}) - Hinzufügen ergänzt die Geräte dieser Regel', sg_noacct: 'Die Byte-Zähler für Verbindungen ließen sich nicht einschalten - keine Vorschläge möglich.',
     sg_th_asn: 'ASN', sg_th_b: 'Traffic', sg_th_cl: 'Genutzt von', sg_th_t: 'Ziel', sg_th_dev: 'Gerät', sg_all: 'Alle Geräte', sg_grp_used: 'Nutzt dieses ASN', sg_add: 'Hinzufügen', sg_more: '+{n} weitere',
     sg_note: 'Schätzung aus der Verbindungstabelle des Routers, jede Minute ausgewertet (sehr kurze Verbindungen können fehlen). Die Ziel-Adressen werden über ip-api.com zugeordnet (höchstens 10 pro Minute). ASNs, die schon in der Liste stehen, sind ausgeblendet. "Hinzufügen" setzt das ASN auf die Liste - danach die Regeln anwenden.',
-    sec_tbl: 'Traffic nach ASN / Ziel', sec_cnt: '{n} ASN(s)', sg_f_show: 'Anzeigen', sg_f_dev: 'Gerät', sg_f_q: 'ASN oder Name suchen',
+    sec_tbl: 'Traffic nach ASN / Ziel', sec_cnt: '{n} Einträge', sg_f_show: 'Anzeigen', sg_f_dev: 'Gerät', sg_f_q: 'ASN oder Name suchen',
     sg_f_count: '{x} von {y} ASN(s)', sg_f_total: ' - insgesamt {n} gefunden, die 100 größten sind aufgeführt', sg_n_dev: '{n} Geräte', sg_nomatch: 'Kein ASN passt zum Filter.',
     sg_all_dev_f: 'Alle Geräte', sg_th_b_dev: 'Traffic dieses Geräts',
     fo_title: 'Ausweich-Ziele (Failover)', fo_sub: 'Fällt ein Ziel aus, nutzen seine ASNs das nächste funktionierende Ausweich-Ziel.', fo_th_t: 'Ziel', fo_th_1: '1. Ausweich', fo_th_2: '2. Ausweich',
@@ -582,7 +585,7 @@ var ASNM_I18N = {
     perf_stats_asn: 'Pro ASN (genau)', perf_stats_iface: 'Pro Interface (leicht)',
     tr_all: 'Gesamter Verkehr', tr_mode_iface: 'Gezählt wird nur pro Interface und Gerät (ohne ASN-Aufteilung) - spart CPU.', tr_mode_change: 'Ändern',
     rs_s_smode: 'Statistik-Detail', rs_s_rules: 'Marker-Regeln', rs_v_asn: 'pro ASN', rs_v_iface: 'pro Interface', rs_v_comb: 'zusammengefasst', rs_v_single: 'einzeln pro ASN',
-    back_router: '← Router', add_entries: 'Einträge', kind_ip: 'IP', kind_dom: 'Domain', st_learned: '{n} gelernt',
+    back_router: '← Router', add_entries: 'Einträge', kind_ip: 'IP', kind_dom: 'Domain', st_learned: '{n} gelernt', lr_tip: 'Gelernte Adressen anzeigen', lr_head: 'Für *.{d} gelernte Adressen', lr_more: '... und {n} weitere (alle: ASNmanager.sh custom learned {id})', lr_none: 'Noch keine Adresse gelernt.', lr_note: 'dnsmasq speichert nur die Adressen, nicht zu welcher Subdomain sie gehören. Ein Name, der schon im DNS-Zwischenspeicher lag, wird gelernt, sobald sein Eintrag dort abläuft.',
     add_domnote: 'Eine Domain gilt auch für alle Subdomains. Sie wirkt nur für Geräte, die den Router als DNS-Server nutzen (nicht bei DoH oder fest eingestelltem DNS; nur IPv4). Der Router lernt die Adressen, wenn ein Gerät den Namen auflöst.',
     rc_nolearned: 'nichts gelernt', rc_tip_nolearned: 'Für diese Domain wurde noch keine Adresse gelernt. Ein Gerät muss den Namen über den DNS-Server des Routers (dnsmasq) auflösen. Nicht erfasst werden Geräte mit anderem DNS-Server oder DoH und Namen, die ein davorgeschalteter AdGuard Home beantwortet, ohne dass sie über dnsmasq laufen.',
     lang_label: 'Sprache', lang_default: 'Standard', lang_en: 'English', theme_label: 'Design', theme_dark: 'Dunkel', theme_light: 'Hell', theme_blue: 'Blau',
@@ -786,7 +789,7 @@ function asnmLoadData(first) {
         if (typeof asnmPerfMark === 'function') asnmPerfMark();
         if (ASNM.data.custom) for (var ci = 0; ci < ASNM.data.custom.length; ci++) {
             var cc = ASNM.data.custom[ci];
-            ASNM.data.entries.push({ asn: cc.id, dest: cc.dest, src: cc.src, subnets: cc.kind === 'ip' ? 1 : -1, loaded: cc.loaded, failed: 0, 'new': cc['new'], kind: cc.kind, value: cc.value, learned: cc.learned });
+            ASNM.data.entries.push({ asn: cc.id, dest: cc.dest, src: cc.src, subnets: cc.kind === 'ip' ? 1 : -1, loaded: cc.loaded, failed: 0, 'new': cc['new'], kind: cc.kind, value: cc.value, learned: cc.learned, ips: cc.ips || [] });
         }
         ASNM.data.devices.sort(function (a, b) {
             var x = a.ip.split('.'), y = b.ip.split('.');
@@ -1027,7 +1030,7 @@ function asnmRenderList() {
         var iface = asnmIface(e.dest), state, rowCls = '';
         if (e.failed) { state = '<span class="asnm-badge asnm-bad">' + t('st_failed') + '</span>'; rowCls = ' class="asnm-failed"'; }
         else if (e['new'] && !e.loaded) state = '<span class="asnm-badge asnm-warn">' + t('st_new') + '</span>';
-        else if (e.loaded && iface && iface.up) state = '<span class="asnm-badge asnm-ok">' + t('st_active') + '</span>' + (e.kind === 'dom' ? ' <span class="asnm-muted">' + asnmEsc(t('st_learned', { n: e.learned || 0 })) + '</span>' : '');
+        else if (e.loaded && iface && iface.up) state = '<span class="asnm-badge asnm-ok">' + t('st_active') + '</span>' + (e.kind === 'dom' ? ' <span class="asnm-link asnm-muted" id="asnm_lr_' + a + '" title="' + asnmEsc(t('lr_tip')) + '" onclick="asnmLrToggle(\'' + a + '\');">' + asnmEsc(t('st_learned', { n: e.learned || 0 })) + '</span>' : '');
         else if (e.loaded) state = '<span class="asnm-badge asnm-warn">' + t('st_down') + '</span>';
         else state = '<span class="asnm-muted">' + t('st_not_applied') + '</span>';
 
@@ -1038,6 +1041,7 @@ function asnmRenderList() {
                 '<td id="asnm_rc_' + a + '">' + asnmRcBadge(e, rcMap) + '</td>' +
                 '<td class="asnm-actions"><input type="button" class="button_gen asnm-small-btn asnm-btn" value="' + asnmEsc(t('btn_edit')) + '" onclick="asnmEdit(\'' + a + '\')"/> ' +
                 '<input type="button" class="button_gen asnm-small-btn asnm-btn" value="' + asnmEsc(t('btn_remove')) + '" onclick="asnmRemove([\'' + a + '\'])"/></td></tr>';
+        if (e.kind === 'dom' && ASNM.lrOpen === e.asn) html += asnmLrRow(e);
     }
     html += '</table>';
     document.getElementById('asnm_list').innerHTML = html;
@@ -1410,6 +1414,50 @@ function asnmLabelById(id) {
     for (var i = 0; i < en.length; i++) if (en[i].asn === id) return asnmEntryLabel(en[i]);
     return 'AS' + id;
 }
+// learned addresses of a domain entry (data.js carries the first 200)
+function asnmLrRow(e) {
+    var ips = e.ips || [], h = '<tr class="asnm-lr"><td></td><td colspan="6"><b>' + asnmEsc(t('lr_head', { d: e.value })) + '</b><div class="asnm-lr-list">';
+    if (!ips.length) h += '<span class="asnm-muted">' + asnmEsc(t('lr_none')) + '</span>';
+    for (var i = 0; i < ips.length; i++) h += '<code>' + asnmEsc(ips[i]) + '</code> ';
+    h += '</div>';
+    if ((e.learned || 0) > ips.length) h += '<div class="asnm-muted">' + asnmEsc(t('lr_more', { n: e.learned - ips.length, id: e.asn })) + '</div>';
+    return h + '<div class="asnm-muted">' + asnmEsc(t('lr_note')) + '</div></td></tr>';
+}
+function asnmLrToggle(id) {
+    ASNM.lrOpen = ASNM.lrOpen === id ? null : id;
+    asnmRender();
+    // the list in data.js may be older than the number: fetch fresh data once when opening
+    if (ASNM.lrOpen && !ASNM.busy) asnmSend('refresh', []);
+}
+// live numbers: learned.js is rewritten by the statistics loop (every few seconds while counting runs) and on every refresh
+function asnmLrLoad() {
+    if (!ASNM.data || !ASNM.data.entries || ASNM.editing) return;
+    var any = false;
+    for (var i = 0; i < ASNM.data.entries.length; i++) if (ASNM.data.entries[i].kind === 'dom') { any = true; break; }
+    if (!any) return;
+    asnmGet('learned.js', function (txt) {
+        var d = null; try { d = JSON.parse(txt); } catch (e) { return; }
+        if (!d || !d.c || !ASNM.data) return;
+        for (var j = 0; j < ASNM.data.entries.length; j++) {
+            var e = ASNM.data.entries[j];
+            if (e.kind !== 'dom' || d.c[e.asn] === undefined || d.c[e.asn] === e.learned) continue;
+            e.learned = d.c[e.asn];
+            var el = document.getElementById('asnm_lr_' + e.asn);
+            if (el) el.textContent = t('st_learned', { n: e.learned });
+        }
+    });
+}
+
+// stats row name: ASN, or the custom entry (IP range / domain) behind an id like "C3"
+function asnmTrRowLabel(r) {
+    if (/^C\d+$/.test(r.asn) && ASNM.data && ASNM.data.entries)
+        for (var i = 0; i < ASNM.data.entries.length; i++) {
+            var e = ASNM.data.entries[i];
+            if (e.asn === r.asn && e.kind) return asnmEntryCell(e);
+        }
+    return /^C\d+$/.test(r.asn) ? asnmEsc(r.asn) : 'AS' + asnmEsc(r.asn);
+}
+
 function asnmEntryCell(e) {
     if (e.kind === 'ip') return '<span class="asnm-kind">' + asnmEsc(t('kind_ip')) + '</span> ' + asnmEsc(e.value);
     if (e.kind === 'dom') return '<span class="asnm-kind">' + asnmEsc(t('kind_dom')) + '</span> *.' + asnmEsc(e.value);
@@ -2090,7 +2138,7 @@ function asnmTrRender() {
     for (i = 0; i < asns.length; i++) {
         var a = asns[i], key = a.dest + '|' + a.asn, open = ASNM_TR.expanded[key];
         html += '<tr class="asnm-tr-row' + (open ? ' open' : '') + '" onclick="asnmTrExpand(\'' + asnmEsc(key) + '\')"><td><span class="asnm-tgl"></span>' +
-                'AS' + asnmEsc(a.asn) + '<span class="asnm-tr-dest">' + asnmEsc(asnmNormDest(a.dest)) + '</span>' +
+                asnmTrRowLabel(a) + '<span class="asnm-tr-dest">' + asnmEsc(asnmNormDest(a.dest)) + '</span>' +
                 (listed[asnmNormDest(a.dest) + '|' + a.asn] ? '' : '<span class="asnm-tr-gone">' + asnmEsc(t('tr_gone')) + '</span>') +
                 asnmDevCount(a.cl.length) + '</td>' + asnmTrCells(a.db, a.ub, a.up + a.dp, tAll, a.rd || 0, a.ru || 0) + '</tr>';
         if (open) html += asnmTrClientRows(a.cl, { db: a.db, ub: a.ub, pk: a.up + a.dp, rd: a.rd || 0, ru: a.ru || 0 }, 1);
@@ -2703,6 +2751,7 @@ function initial() {
     setInterval(function () { asnmRcLoad(false); }, 60000);
     asnmFoLoad();
     setInterval(asnmFoLoad, 30000);
+    setInterval(asnmLrLoad, 30000);
     asnmTrLoad();
 }
 </script>
