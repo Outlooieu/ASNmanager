@@ -1,27 +1,27 @@
-## v3.1.15
+## v3.2.5
 
 - "Apply rules" is much faster: the rules are rebuilt from the saved subnets and only ASNs that are not cached yet are downloaded. If the ASN list has not changed since the last build and no IP range was removed or changed, only the IP / domain entries are applied (a few seconds, the ASN rules stay as they are). No confirmation needed any more
 - New button "Reload all subnets" (command line `apply full` or `reload`): downloads the subnets of every ASN again and rebuilds everything - what "Apply rules" did until now. The daily schedule keeps doing this anyway
 - Command line: `apply` works like the button, `apply full` / `reload` like before; the menu entry still downloads everything
 
-## v3.1.14
+## v3.2.4
 
 - WebUI: no empty strip and no extra line between the sections of the ASN list any more; the header bar of each section separates them
 
-## v3.1.13
+## v3.2.3
 
 - WebUI: the three sections of the ASN list stand out more - a header bar with an icon, a larger title and the number of entries as a badge (grey when empty), and a dividing line between the sections
 
-## v3.1.12
+## v3.2.2
 
 - Fixed: the routing test (menu [12], `test <IP|domain>`, WebUI) only looked at the ASN sets, so an address of an IP / CIDR or domain entry was shown as "DEFAULT ROUTE" although it is routed. It now checks the custom entries first and names the entry (e.g. "custom entry C3: 181.209.202.0/24")
 
-## v3.1.11
+## v3.2.1
 
 - WebUI: the ASN list has three sections - **ASNs**, **IP / CIDR ranges** and **Domains** - each with the columns entry, source device, subnets (for domains: learned addresses), state and routing, grouped by target. IP and domain entries no longer get lost between the ASNs; the sections are shown even when empty, with a hint how to add entries
 - Domains: the "learned" number is its own column; a click shows the learned addresses. Every section has its own "select all" box; each target group opens and closes per section
 
-## v3.1.10
+## v3.2.0
 
 - `stats diag`: the counting loop was reported as a "hanging" run once it had been running for more than 15 minutes. It is meant to run all the time and is now listed as the counting loop; the clean-up of hanging runs already left it alone
 
