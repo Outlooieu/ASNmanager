@@ -1,3 +1,7 @@
+## v3.1.6
+
+- `stats diag`: a finished process that its parent has not collected yet and the menu open in an SSH window were reported as "hanging"; now they are shown as what they are, and only real runs are counted
+
 ## v3.1.5
 
 - Fixed: hanging processes piled up on the router (dozens of "check run" and "stats loop" processes, constant CPU load, statistics buttons without answer). Cause: BusyBox `nslookup` has no time limit and can wait for ever (the routing check resolves the names of the VPN servers, the suggestions look up addresses). Now every name lookup is limited to 6 seconds and every `curl` has a maximum time (public IP, update check, WebUI page)

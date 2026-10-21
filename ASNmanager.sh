@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.1.5
+version=3.1.6
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.1.5"
+SCRIPT_VERSION="3.1.6"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -2835,11 +2835,18 @@ ts_diag() {
     td_old=0; td_all=0
     for td_p in $(ps w 2>/dev/null | grep -E 'ASNmanager\.sh|asn-bypass' | grep -v grep | awk '{ print $1 }'); do
         [ "$td_p" = "$$" ] && continue
-        td_a=$(proc_age "$td_p"); td_all=$((td_all + 1)); [ "$td_a" -gt 900 ] && td_old=$((td_old + 1))
-        echo "                        pid $td_p, running $td_a s: $(tr '\0' ' ' 2>/dev/null < /proc/$td_p/cmdline | cut -c1-70)"
+        td_c=$(tr '\0' ' ' 2>/dev/null < /proc/$td_p/cmdline)
+        td_a=$(proc_age "$td_p")
+        if [ -z "$td_c" ]; then                                        # finished, its parent has not collected it yet
+            echo "                        pid $td_p: finished, not yet collected by its parent (harmless)"; continue
+        fi
+        case "$td_c" in *"ASNmanager.sh ")                                 # the menu in an SSH window
+            echo "                        pid $td_p, running $td_a s: an open menu (SSH window) - leave it with [e]"; continue ;; esac
+        td_all=$((td_all + 1)); [ "$td_a" -gt 900 ] && td_old=$((td_old + 1))
+        echo "                        pid $td_p, running $td_a s: $(echo "$td_c" | cut -c1-70)"
     done
-    if [ $td_old -gt 0 ]; then echo "[WARN] processes:        $td_old of $td_all ASN Manager processes run for more than 15 minutes (hanging) - cleaned up by the next routing check, or now with: rescue"
-    else echo "[OK]   processes:        $td_all ASN Manager process(es), none hanging"; fi
+    if [ $td_old -gt 0 ]; then echo "[WARN] processes:        $td_old of $td_all ASN Manager runs take more than 15 minutes (hanging) - cleaned up by the next routing check, or now with: rescue"
+    else echo "[OK]   processes:        $td_all ASN Manager run(s) in progress, none hanging"; fi
     echo "[INFO] timing:           the next line shows how long one export of the page data takes"
     td_t0=$(date +%s); ts_export >/dev/null 2>&1; echo "                         $(( $(date +%s) - td_t0 )) s"
 }
