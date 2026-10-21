@@ -1,3 +1,11 @@
+## v3.4.0
+
+- **Fixed: traffic could leave through the wrong target.** The marks of the targets overlapped: the routing rule of WGC1 (`0x6100/0x6100`) also matched the mark of WGC3 (`0x6300`), WGC2 matched it as well, WAN1 matched WAN2 (`0x8500`), OVPN1/OVPN2 matched OVPN3 and others. Whenever such a pair was in use, traffic meant for one target could go through another. Every target now has one exact value in the mark field `0xff00`; marks are set and the routing rules match with this mask (checked with test packets: the old WGC1 form matched every WGC3 packet, the new one none)
+- **Fixed: custom entries now really win over ASNs.** An address in a domain or IP entry and in an ASN of another target got both marks, and the target with the lower routing priority won - WAN1 always. Now a marking rule only marks a packet that has no target yet, so the first matching rule wins; custom entries are above the ASN rules. Example: ZDF on WGC3 for one device while Akamai (AS20940) stays on WAN1 for everyone else
+- IP / CIDR entries mark through their own set `ASNC_<id>` (no longer the combined set of their target), so a range wins over an ASN that contains it; removing or changing a range no longer needs a rebuild
+- Overlapping ASNs of two targets keep the old precedence (WAN2, WAN1, OVPN1-5, WGC1-5): the rules are built in that order
+- The routing rules of the old form are removed by the first rebuild after the update ("Apply rules" rebuilds once, even when nothing else changed); failover rules (including "Block") use the new form as well
+
 ## v3.3.1
 
 - Suggestions: "+N more" in the "Used by" column can be clicked - it shows every device with the traffic it caused to this ASN, one per line; "show less" folds the list again. Hovering over the column lists all devices too

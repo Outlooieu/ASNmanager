@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.3.1
+version=3.4.0
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.3.1"
+SCRIPT_VERSION="3.4.0"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -107,6 +107,13 @@ check_iface_up() {
             ;;
     esac
 }
+
+# Every target owns one exact value in the mark field 0xff00 (marks are set and matched with this mask, so 0x6300
+# (WGC3) does not also match the rule of 0x6100 (WGC1) as with the old "value/value" form). A marking rule only
+# marks a packet that has no target yet: the first matching rule wins - custom entries (IP / domain) sit above the
+# ASN rules, and the ASN rules are built so that the old precedence of overlapping ASNs stays (lowest prio first).
+MARK_MASK=0xff00
+mark_old_rules_del() { while ip rule del fwmark "$1/$1" 2>/dev/null; do :; done; }   # the form before v3.4.0
 
 get_target_info() {
     case "$1" in
@@ -434,12 +441,13 @@ cli_cimport() {
 
 # ---------------- applying: routing rule + table of a target, marking rules, sets ----------------
 cu_usable() { check_iface_up "$1" >/dev/null 2>&1 || grep -q "^${1}=" "$FO_CONF" 2>/dev/null; }
-cu_fw() { cf=$(get_target_info "$1" | cut -d' ' -f2); echo "${cf}/${cf}"; }
+cu_fw() { cf=$(get_target_info "$1" | cut -d' ' -f2); echo "${cf}/${MARK_MASK}"; }
 cu_route() {
     cr_info=$(get_target_info "$1"); [ -n "$cr_info" ] || return 1
     cr_table=$(echo "$cr_info" | cut -d' ' -f1); cr_mark=$(echo "$cr_info" | cut -d' ' -f2); cr_prio=$(echo "$cr_info" | cut -d' ' -f3)
-    cr_fw="${cr_mark}/${cr_mark}"
-    ip rule show 2>/dev/null | grep -q "fwmark ${cr_fw}" || ip rule add from 0/0 fwmark "$cr_fw" table "$cr_table" prio "$cr_prio" 2>/dev/null
+    cr_fw="${cr_mark}/${MARK_MASK}"
+    mark_old_rules_del "$cr_mark"
+    ip rule show 2>/dev/null | grep -q "fwmark ${cr_fw} " || ip rule add from 0/0 fwmark "$cr_fw" table "$cr_table" prio "$cr_prio" 2>/dev/null
     case "$1" in
         OVPN*|WGC*)
             cr_dev=$(get_ifname "$1")
@@ -456,10 +464,10 @@ cu_rules_add() {          # SET TARGET SOURCES
     cu_rules_del "$1"
     cra_fw=$(cu_fw "$2")
     if [ -n "$3" ]; then
-        iptables -t mangle -I PREROUTING 1 -s "$3" -m set --match-set "$1" dst -j MARK --set-mark "$cra_fw"
+        iptables -t mangle -I PREROUTING 1 -s "$3" -m set --match-set "$1" dst -m mark --mark "0/$MARK_MASK" -j MARK --set-mark "$cra_fw"
     else
-        iptables -t mangle -I PREROUTING 1 -m set --match-set "$1" dst -j MARK --set-mark "$cra_fw"
-        iptables -t mangle -I OUTPUT 1 -m set --match-set "$1" dst -j MARK --set-mark "$cra_fw"
+        iptables -t mangle -I PREROUTING 1 -m set --match-set "$1" dst -m mark --mark "0/$MARK_MASK" -j MARK --set-mark "$cra_fw"
+        iptables -t mangle -I OUTPUT 1 -m set --match-set "$1" dst -m mark --mark "0/$MARK_MASK" -j MARK --set-mark "$cra_fw"
     fi
 }
 # the combined set of a target + source group (the worker made it for the ASNs; created here if only custom entries use the group)
@@ -479,25 +487,16 @@ cu_group_set() {          # TARGET SOURCES -> prints the set name
 
 cu_apply_ip() {
     [ -s "$CUSTOM_FILE" ] || return 0
-    [ -f "$UGROUPS_FILE" ] || : > "$UGROUPS_FILE"
-    cai_single=0; [ -f "$RULES_SINGLE" ] && cai_single=1
+    # every IP entry marks through its own set ASNC_<id> (not the combined set of its target): its rule sits above
+    # the ASN rules, so a range wins over an ASN that contains it
     while IFS=: read -r cid cdest csrc ckind cval; do
         [ "$ckind" = "ip" ] || continue
         case "$cid" in C[0-9]*) ;; *) continue ;; esac
         ipset create "ASNC_$cid" hash:net family inet hashsize 64 maxelem 1024 2>/dev/null
         ipset flush "ASNC_$cid" 2>/dev/null; ipset add -exist "ASNC_$cid" "$cval" 2>/dev/null
-        if ! cu_usable "$cdest"; then printf '%s\tdown\n' "$cid" >> "$CU_STATUS"; continue; fi
+        if ! cu_usable "$cdest"; then cu_rules_del "ASNC_$cid"; printf '%s\tdown\n' "$cid" >> "$CU_STATUS"; continue; fi
         cu_route "$cdest"
-        if [ "$cai_single" = "1" ]; then
-            cai_set="ASN_${cdest}_${cid}"
-            ipset create "$cai_set" hash:net family inet hashsize 1024 maxelem 65536 2>/dev/null
-            ipset flush "$cai_set" 2>/dev/null
-            ipset add -exist "$cai_set" "$cval" 2>/dev/null
-            cu_rules_add "$cai_set" "$cdest" "$csrc"
-        else
-            cai_set=$(cu_group_set "$cdest" "$csrc")
-            ipset add -exist "$cai_set" "$cval" 2>/dev/null
-        fi
+        cu_rules_add "ASNC_$cid" "$cdest" "$csrc"
         printf '%s\tok\n' "$cid" >> "$CU_STATUS"
     done < "$CUSTOM_FILE"
 }
@@ -647,7 +646,7 @@ cu_apply_dom() {
 # per-entry sets of entries that no longer exist (a set the statistics still use is removed by its next sync)
 cu_cset_cleanup() {
     for ccc_s in $(ipset list -n 2>/dev/null | grep '^ASNC_'); do
-        cu_has "${ccc_s#ASNC_}" || ipset destroy "$ccc_s" 2>/dev/null
+        cu_has "${ccc_s#ASNC_}" || { cu_rules_del "$ccc_s"; ipset destroy "$ccc_s" 2>/dev/null; }
     done
     return 0
 }
@@ -719,7 +718,7 @@ cu_apply() {
 # removes everything of the domain routing: rules, sets, our lines in dnsmasq.conf.add
 cu_purge() {
     for cp_s in $(ipset list -n 2>/dev/null | grep '^ASND_'); do cu_rules_del "$cp_s"; ipset destroy "$cp_s" 2>/dev/null; done
-    for cp_s in $(ipset list -n 2>/dev/null | grep '^ASNC_'); do ipset destroy "$cp_s" 2>/dev/null; done
+    for cp_s in $(ipset list -n 2>/dev/null | grep '^ASNC_'); do cu_rules_del "$cp_s"; ipset destroy "$cp_s" 2>/dev/null; done
     cu_hook_sync ""
     rm -f "$(cu_save_jffs)" "$(cu_save_usb)" 2>/dev/null
     cu_dnsmasq_write /dev/null
@@ -767,7 +766,7 @@ cu_check_rows() {          # $1 = rc_out file, $2 = number of rows already writt
             sample=${cval%%/*}
             case "$cval" in */32) ;; *) sample=$(echo "$sample" | awk -F. '{ printf "%d.%d.%d.%d", $1, $2, $3, ($4 + 1) % 256 }') ;; esac
             if [ -n "$sample" ] && cut -d' ' -f1 "$EP_CACHE" 2>/dev/null | grep -qx "$sample"; then code=skipped; fi
-            rc_rule_active "ASN_${cdest}_${cid}" "$d" "$sample" || { [ "$code" = "skipped" ] || code=norule; }
+            echo "$rc_rules" | grep -q -- "--match-set ASNC_$cid dst" || { [ "$code" = "skipped" ] || code=norule; }
         else
             cc_set=$(awk -F'\t' -v k="${cdest}|${csrc}" '$1 == k { print $2; exit }' "$CU_GROUPS" 2>/dev/null)
             sample=$(cu_learned_ips "$cid" 1)
@@ -1029,7 +1028,7 @@ cleanup_rules() {
         if [ -n "$info" ]; then
             TABLE=$(echo "$info" | cut -d' ' -f1)
             FWMARK_VAL=$(echo "$info" | cut -d' ' -f2)
-            FWMARK="${FWMARK_VAL}/${FWMARK_VAL}"
+            FWMARK="${FWMARK_VAL}/${MARK_MASK}"
             
             iptables -t mangle -S PREROUTING 2>/dev/null | grep "match-set $active_set " | sed 's/^-A /-D /' | while read -r rule; do
                 iptables -t mangle $rule 2>/dev/null
@@ -1039,6 +1038,7 @@ cleanup_rules() {
             done
             
             while ip rule del fwmark "$FWMARK" 2>/dev/null; do :; done
+            mark_old_rules_del "$FWMARK_VAL"
             
             case "$dest_name" in
                 OVPN*|WGC*)
@@ -1423,6 +1423,7 @@ check_iface_up() {
             ;;
     esac
 }
+MARK_MASK=0xff00        # same as the main script: exact target value in the mark field, first matching rule wins
 get_info() {
     case "$1" in
         WAN|WAN1) echo "254 0x8000 9990" ;;
@@ -1471,7 +1472,7 @@ for active_set in $(ipset list -n | grep -E "^ASNU?_"); do
     if [ -n "$info" ]; then
         TABLE=$(echo "$info" | cut -d' ' -f1)
         FWMARK_VAL=$(echo "$info" | cut -d' ' -f2)
-        FWMARK="${FWMARK_VAL}/${FWMARK_VAL}"
+        FWMARK="${FWMARK_VAL}/${MARK_MASK}"
         
         iptables -t mangle -S PREROUTING 2>/dev/null | grep "match-set $active_set " | sed 's/^-A /-D /' | while read -r rule; do
             iptables -t mangle $rule 2>/dev/null
@@ -1481,6 +1482,7 @@ for active_set in $(ipset list -n | grep -E "^ASNU?_"); do
         done
         
         while ip rule del fwmark "$FWMARK" 2>/dev/null; do :; done
+        while ip rule del fwmark "${FWMARK_VAL}/${FWMARK_VAL}" 2>/dev/null; do :; done
         
         case "$dest_name" in
             OVPN*|WGC*)
@@ -1495,6 +1497,15 @@ done
 
 [ "$EXEC_MODE" = "force" ] && echo -e "${YELLOW}Downloading fresh ASN data from internet...${NC}" || echo -e "${YELLOW}Restoring ASN data from local cache...${NC}"
 
+# build order: rules are inserted at the top and the first matching rule wins, so the targets are built from the
+# highest prio number to the lowest - an address in ASNs of two targets goes where it went before v3.4.0
+ASN_ORDER=/tmp/asn_order.txt
+o_n=0
+while IFS=':' read -r o_asn o_dest o_src; do
+    [ -n "$o_asn" ] || continue
+    o_n=$((o_n + 1)); o_p=$(get_info "$o_dest" | cut -d' ' -f3)
+    printf '%s\t%s\t%s:%s:%s\n' "${o_p:-0}" "$o_n" "$o_asn" "$o_dest" "$o_src"
+done < "$ASN_FILE" | sort -t "$(printf '\t')" -k1,1nr -k2,2n | cut -f3 > "$ASN_ORDER"
 while IFS=':' read -r asn dest src_ip; do
     [ -z "$asn" ] || [ -z "$dest" ] && continue
     info=$(get_info "$dest")
@@ -1503,7 +1514,7 @@ while IFS=':' read -r asn dest src_ip; do
     echo "$ASN_NUM $ASN_TOTAL $asn $dest" > /tmp/asn_progress.txt
     TABLE=$(echo "$info" | cut -d' ' -f1)
     FWMARK_VAL=$(echo "$info" | cut -d' ' -f2)
-    FWMARK="${FWMARK_VAL}/${FWMARK_VAL}"
+    FWMARK="${FWMARK_VAL}/${MARK_MASK}"
     PRIO=$(echo "$info" | cut -d' ' -f3)
 
     fetch_asn_prefixes "$asn"
@@ -1528,6 +1539,7 @@ while IFS=':' read -r asn dest src_ip; do
             case "$DONE_DESTS" in *" $dest "*) ;; *)
                 DONE_DESTS="$DONE_DESTS$dest "
                 while ip rule del fwmark "$FWMARK" 2>/dev/null; do :; done
+                while ip rule del fwmark "${FWMARK_VAL}/${FWMARK_VAL}" 2>/dev/null; do :; done
                 ip rule add from 0/0 fwmark "$FWMARK" table "$TABLE" prio "$PRIO"
                 if [ -n "$iface_dev" ]; then
                     case "$dest" in
@@ -1549,10 +1561,10 @@ while IFS=':' read -r asn dest src_ip; do
                     ipset flush "$gname" 2>/dev/null
                     printf '%s\t%s\n' "$gkey" "$gname" >> "$UGROUPS"
                     if [ -n "$src_ip" ]; then
-                        iptables -t mangle -I PREROUTING 1 -s "$src_ip" -m set --match-set "$gname" dst -j MARK --set-mark "$FWMARK"
+                        iptables -t mangle -I PREROUTING 1 -s "$src_ip" -m set --match-set "$gname" dst -m mark --mark "0/$MARK_MASK" -j MARK --set-mark "$FWMARK"
                     else
-                        iptables -t mangle -I PREROUTING 1 -m set --match-set "$gname" dst -j MARK --set-mark "$FWMARK"
-                        iptables -t mangle -I OUTPUT 1 -m set --match-set "$gname" dst -j MARK --set-mark "$FWMARK"
+                        iptables -t mangle -I PREROUTING 1 -m set --match-set "$gname" dst -m mark --mark "0/$MARK_MASK" -j MARK --set-mark "$FWMARK"
+                        iptables -t mangle -I OUTPUT 1 -m set --match-set "$gname" dst -m mark --mark "0/$MARK_MASK" -j MARK --set-mark "$FWMARK"
                     fi
                 fi
                 # overlapping prefixes of two ASNs are fine (-exist); the set is filled while its rule is already active
@@ -1561,10 +1573,10 @@ while IFS=':' read -r asn dest src_ip; do
             if [ "$rule_done" = "0" ]; then
                 # one rule per ASN (also the fallback if the combined set could not be filled)
                 if [ -n "$src_ip" ]; then
-                    iptables -t mangle -I PREROUTING 1 -s "$src_ip" -m set --match-set "$IPSET_NAME" dst -j MARK --set-mark "$FWMARK"
+                    iptables -t mangle -I PREROUTING 1 -s "$src_ip" -m set --match-set "$IPSET_NAME" dst -m mark --mark "0/$MARK_MASK" -j MARK --set-mark "$FWMARK"
                 else
-                    iptables -t mangle -I PREROUTING 1 -m set --match-set "$IPSET_NAME" dst -j MARK --set-mark "$FWMARK"
-                    iptables -t mangle -I OUTPUT 1 -m set --match-set "$IPSET_NAME" dst -j MARK --set-mark "$FWMARK"
+                    iptables -t mangle -I PREROUTING 1 -m set --match-set "$IPSET_NAME" dst -m mark --mark "0/$MARK_MASK" -j MARK --set-mark "$FWMARK"
+                    iptables -t mangle -I OUTPUT 1 -m set --match-set "$IPSET_NAME" dst -m mark --mark "0/$MARK_MASK" -j MARK --set-mark "$FWMARK"
                 fi
             fi
         fi
@@ -1578,15 +1590,14 @@ while IFS=':' read -r asn dest src_ip; do
         [ -t 1 ] && echo -e " ${RED}[FAIL]${NC} AS${asn} -> ${dest}${src_text} ${RED}(0 subnets found)${NC}"
         echo "${asn}:${dest}" >> /tmp/asn_failed.txt
     fi
-done < "$ASN_FILE"
-rm -f /tmp/asn_progress.txt
+done < "$ASN_ORDER"
+rm -f "$ASN_ORDER" /tmp/asn_progress.txt
 # custom entries (IP/CIDR into the combined sets, domain rules)
 [ -x /jffs/scripts/ASNmanager.sh ] && /jffs/scripts/ASNmanager.sh custom apply >/dev/null 2>&1
 # VPN servers always via WAN (tunnel protection), also after a scheduled run
 [ -x /jffs/scripts/ASNmanager.sh ] && /jffs/scripts/ASNmanager.sh guard >/dev/null 2>&1
 # the ASN list these sets were built from (RAM): "apply" can then skip the rebuild when only custom entries changed
 cp -f "$ASN_FILE" /tmp/asnmanager-applied.asns 2>/dev/null
-awk -F: '$4 == "ip" { print $2 ":" $3 ":" $5 }' /jffs/scripts/custom_list.txt 2>/dev/null > /tmp/asnmanager-applied.ips
 WORKER_EOF
 
     chmod +x "$WORKER_SCRIPT"
@@ -1847,18 +1858,14 @@ cli_clear() {
 #   cache:  rebuild every ASN rule from the saved subnets, download only ASNs that are not cached yet
 #   force:  download the subnets of every ASN again, then rebuild (the daily schedule does this anyway)
 APPLIED_ASNS="/tmp/asnmanager-applied.asns"
-APPLIED_IPS="/tmp/asnmanager-applied.ips"
-# IP entries as "target:sources:range" - a range that was removed or changed is only cleared by a rebuild
-cu_ip_lines() { awk -F: '$4 == "ip" { print $2 ":" $3 ":" $5 }' "$CUSTOM_FILE" 2>/dev/null; }
 cli_apply() {
     amode="${1:-smart}"
     case "$amode" in full|reload) amode=force ;; esac
-    if [ "$amode" = "smart" ] && [ -s "$ASN_FILE" ] && cmp -s "$ASN_FILE" "$APPLIED_ASNS" && [ -f "$APPLIED_IPS" ] && \
-       ipset list -n 2>/dev/null | grep -qE '^ASNU?_' && \
-       { cu_ip_lines > /tmp/asnmanager-ips.now; [ -z "$(ts_not_in /tmp/asnmanager-ips.now "$APPLIED_IPS")" ]; }; then
+    # (the marking rules must already be in the form of v3.4.0: after an update the first apply rebuilds them)
+    if [ "$amode" = "smart" ] && [ -s "$ASN_FILE" ] && cmp -s "$ASN_FILE" "$APPLIED_ASNS" && \
+       ipset list -n 2>/dev/null | grep -qE '^ASNU?_' && iptables -t mangle -S PREROUTING 2>/dev/null | grep -q -- "--mark 0x0/$MARK_MASK"; then
         echo "ASN list unchanged since the last build - applying the IP / domain entries only."
         : > "$CU_STATUS"; cu_apply
-        cu_ip_lines > "$APPLIED_IPS"
         mark_applied
         cu_list
         echo "Rules applied: ASN rules kept, custom entries applied."
@@ -3694,20 +3701,21 @@ fo_set_rule() {
     if [ "$2" = "BLOCK" ]; then fr_want="unreachable"; wtab=""
     else wtab=$ptab; [ "$2" != "$1" ] && wtab=$(fo_info "$2" | cut -d' ' -f1); [ -n "$wtab" ] || return 1; fr_want="lookup $(fo_tname "$wtab")"; fi
     fr_cur=$(ip rule show 2>/dev/null | awk -v p="$pprio:" '$1 == p')
-    if [ "$(echo "$fr_cur" | grep -c .)" = "1" ] && echo "$fr_cur" | grep -q "fwmark $pmark/$pmark $fr_want\$"; then return 0; fi
+    if [ "$(echo "$fr_cur" | grep -c .)" = "1" ] && echo "$fr_cur" | grep -q "fwmark $pmark/$MARK_MASK $fr_want\$"; then return 0; fi
     while ip rule del prio "$pprio" 2>/dev/null; do :; done
-    if [ -z "$wtab" ]; then ip rule add fwmark "$pmark/$pmark" prio "$pprio" unreachable
-    else ip rule add from all fwmark "$pmark/$pmark" table "$wtab" prio "$pprio"; fi
+    if [ -z "$wtab" ]; then ip rule add fwmark "$pmark/$MARK_MASK" prio "$pprio" unreachable
+    else ip rule add from all fwmark "$pmark/$MARK_MASK" table "$wtab" prio "$pprio"; fi
 }
 
 # "Block" stops the devices only; the router's own traffic for this mark goes via WAN
 fo_self_rule() {
     pmark=$(fo_info "$1" | cut -d' ' -f2); [ -n "$pmark" ] || return 0
-    fs_has=$(ip rule show 2>/dev/null | grep -c "^${FO_SELF_PRIO}:.*iif lo.*fwmark $pmark/$pmark")
+    while ip rule del iif lo fwmark "$pmark/$pmark" prio "$FO_SELF_PRIO" 2>/dev/null; do :; done   # form before v3.4.0
+    fs_has=$(ip rule show 2>/dev/null | grep -c "^${FO_SELF_PRIO}:.*iif lo.*fwmark $pmark/$MARK_MASK")
     if [ "$2" = "BLOCK" ]; then
-        [ "$fs_has" -gt 0 ] || ip rule add iif lo fwmark "$pmark/$pmark" lookup main prio "$FO_SELF_PRIO" 2>/dev/null
+        [ "$fs_has" -gt 0 ] || ip rule add iif lo fwmark "$pmark/$MARK_MASK" lookup main prio "$FO_SELF_PRIO" 2>/dev/null
     else
-        while ip rule del iif lo fwmark "$pmark/$pmark" prio "$FO_SELF_PRIO" 2>/dev/null; do :; done
+        while ip rule del iif lo fwmark "$pmark/$MARK_MASK" prio "$FO_SELF_PRIO" 2>/dev/null; do :; done
     fi
     return 0
 }
