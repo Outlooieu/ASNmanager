@@ -1,3 +1,9 @@
+## v3.1.15
+
+- "Apply rules" is much faster: the rules are rebuilt from the saved subnets and only ASNs that are not cached yet are downloaded. If the ASN list has not changed since the last build and no IP range was removed or changed, only the IP / domain entries are applied (a few seconds, the ASN rules stay as they are). No confirmation needed any more
+- New button "Reload all subnets" (command line `apply full` or `reload`): downloads the subnets of every ASN again and rebuilds everything - what "Apply rules" did until now. The daily schedule keeps doing this anyway
+- Command line: `apply` works like the button, `apply full` / `reload` like before; the menu entry still downloads everything
+
 ## v3.1.14
 
 - WebUI: no empty strip and no extra line between the sections of the ASN list any more; the header bar of each section separates them

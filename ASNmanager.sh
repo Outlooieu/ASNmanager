@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.1.14
+version=3.1.15
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.1.14"
+SCRIPT_VERSION="3.1.15"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -1486,6 +1486,9 @@ rm -f /tmp/asn_progress.txt
 [ -x /jffs/scripts/ASNmanager.sh ] && /jffs/scripts/ASNmanager.sh custom apply >/dev/null 2>&1
 # VPN servers always via WAN (tunnel protection), also after a scheduled run
 [ -x /jffs/scripts/ASNmanager.sh ] && /jffs/scripts/ASNmanager.sh guard >/dev/null 2>&1
+# the ASN list these sets were built from (RAM): "apply" can then skip the rebuild when only custom entries changed
+cp -f "$ASN_FILE" /tmp/asnmanager-applied.asns 2>/dev/null
+awk -F: '$4 == "ip" { print $2 ":" $3 ":" $5 }' /jffs/scripts/custom_list.txt 2>/dev/null > /tmp/asnmanager-applied.ips
 WORKER_EOF
 
     chmod +x "$WORKER_SCRIPT"
@@ -1741,8 +1744,30 @@ cli_clear() {
     echo "All ASNs cleared. Apply rules to remove active routing."
 }
 
+# apply [smart|cache|force]
+#   smart (default): only the custom entries if the ASN list is unchanged since the last build, otherwise like cache
+#   cache:  rebuild every ASN rule from the saved subnets, download only ASNs that are not cached yet
+#   force:  download the subnets of every ASN again, then rebuild (the daily schedule does this anyway)
+APPLIED_ASNS="/tmp/asnmanager-applied.asns"
+APPLIED_IPS="/tmp/asnmanager-applied.ips"
+# IP entries as "target:sources:range" - a range that was removed or changed is only cleared by a rebuild
+cu_ip_lines() { awk -F: '$4 == "ip" { print $2 ":" $3 ":" $5 }' "$CUSTOM_FILE" 2>/dev/null; }
 cli_apply() {
-    wmode="force"; [ "$1" = "cache" ] && wmode=""
+    amode="${1:-smart}"
+    case "$amode" in full|reload) amode=force ;; esac
+    if [ "$amode" = "smart" ] && [ -s "$ASN_FILE" ] && cmp -s "$ASN_FILE" "$APPLIED_ASNS" && [ -f "$APPLIED_IPS" ] && \
+       ipset list -n 2>/dev/null | grep -qE '^ASNU?_' && \
+       { cu_ip_lines > /tmp/asnmanager-ips.now; [ -z "$(ts_not_in /tmp/asnmanager-ips.now "$APPLIED_IPS")" ]; }; then
+        echo "ASN list unchanged since the last build - applying the IP / domain entries only."
+        : > "$CU_STATUS"; cu_apply
+        cu_ip_lines > "$APPLIED_IPS"
+        mark_applied
+        cu_list
+        echo "Rules applied: ASN rules kept, custom entries applied."
+        rc_check >/dev/null 2>&1
+        return 0
+    fi
+    wmode="force"; [ "$amode" != "force" ] && wmode=""
     if [ ! -s "$ASN_FILE" ]; then
         cleanup_rules
         > "$STATS_FILE"
@@ -2129,7 +2154,8 @@ web_job() {
             if [ -n "$a3" ]; then cli_preset "$a1" "$a2" --src "$a3"; else cli_preset "$a1" "$a2"; fi > "$OUT" 2>&1 ;;
         remove)   cli_remove "$a1" > "$OUT" 2>&1 ;;
         clear)    cli_clear > "$OUT" 2>&1 ;;
-        apply)    cli_apply > "$OUT" 2>&1 ;;
+        apply)    cli_apply smart > "$OUT" 2>&1 ;;
+        reload)   cli_apply force > "$OUT" 2>&1 ;;
         retry)    cli_apply cache > "$OUT" 2>&1 ;;
         edit)     cli_edit "$a1" "$a2" "$a3" > "$OUT" 2>&1 ;;
         import)   cli_import "$a1" "$a2" > "$OUT" 2>&1 ;;
@@ -4135,7 +4161,9 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   presets                            list service presets
   remove <ENTRY>...                  remove ASN(s) / entries (ASN, C1 ... id from "list", IP/CIDR or domain)
   clear                              remove all ASNs
-  apply                              fetch subnets & apply rules
+  apply [full]                       apply rules: from the saved subnets, only new ASNs are downloaded
+                                     (only the IP / domain entries if the ASN list is unchanged); full = download all
+  reload                             same as "apply full"
   retry                              rebuild from cache, download only missing/failed ASNs
   edit <ASN|Cn> <TARGET> [SRC-IP]    change target / source IP of an ASN or custom entry
   custom list | apply | early | purge   custom entries (IP/CIDR, domains): list / apply (done by "apply") / purge
@@ -4181,7 +4209,8 @@ cli_main() {
         presets)  print_presets ;;
         remove|del) cli_remove "$@" ;;
         clear)    cli_clear ;;
-        apply)    cli_apply ;;
+        apply)    cli_apply "${1:-smart}" ;;
+        reload)   cli_apply force ;;
         retry)    cli_apply cache ;;
         edit)     cli_edit "$@" ;;
         import)   cli_import "$@" ;;
@@ -4249,7 +4278,7 @@ cli_main() {
     esac
     rc=$?
     # Keep the WebUI view in sync after CLI changes
-    case "$cmd" in add|preset|remove|del|clear|apply|retry|edit|import|schedule|restore|custom)
+    case "$cmd" in add|preset|remove|del|clear|apply|reload|retry|edit|import|schedule|restore|custom)
         [ -f "$ADDON_DIR/webui_page" ] && web_export ;;
     esac
     return $rc

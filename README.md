@@ -145,6 +145,7 @@ Features:
 
 - Modern interface with **Dark**, **Light** and **Blue** theme, language switch (router default / English), a small orbit animation around the logo (switched off automatically when the operating system asks for reduced motion)
 - Status tiles, "Apply rules" with live progress bar (e.g. `AS13335 -> WGC1 (3 of 12)`), retry for failed ASNs only (0 subnets are highlighted red)
+- "Apply rules" builds from the saved subnets and downloads only new ASNs; if only IP / domain entries were added or changed, only those are applied (seconds). "Reload all subnets" downloads every ASN again (the daily schedule does this anyway). Command line: `apply`, `apply full`
 - ASN list grouped per interface (collapsible, collapsed by default), edit target / source IP inline, remove single, selected or all entries
 - Add ASNs or service presets, source device picker with names: LAN / Wi-Fi clients, WireGuard server peers and connected OpenVPN server clients
 - Find the ASN of a domain or IP and add it with one click (ignores 0.0.0.0 answers from ad blockers)

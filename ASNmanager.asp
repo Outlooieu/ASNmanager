@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.1.14 -->
+<!-- ASNmanager-WebUI v3.1.15 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -398,7 +398,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.1.14';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.1.15';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -449,7 +449,7 @@ var ASNM_I18N = {
     rc_tip_fo: 'Target {dev} is down - failover: sample address {ip} goes via {got}.', rc_blocked: 'blocked', rc_tip_blocked: 'Target {d} is down - the traffic is blocked (failover "Block").',
     job_busy: 'Another job is still running ({a}). The page shows it until it is finished - then please repeat your action.',
     job_running: 'A job started earlier is still running ({a}) - the page shows it until it is finished.',
-    act_apply: 'Apply rules', act_retry: 'Retry failed ASNs', act_update: 'Update', act_import: 'Restore', act_add: 'Add entries', act_preset: 'Add preset',
+    act_apply: 'Apply rules', act_reload: 'Reload all subnets', act_retry: 'Retry failed ASNs', act_update: 'Update', act_import: 'Restore', act_add: 'Add entries', act_preset: 'Add preset',
     act_remove: 'Remove', act_clear: 'Clear list', act_edit: 'Edit', act_schedule: 'Schedule', act_failover: 'Failover', act_statssave: 'USB saving',
     tab_asns: 'ASNs', tab_traffic: 'Traffic', tab_targets: 'Targets & failover', tab_diag: 'Diagnostics', tab_settings: 'Settings',
     sub_manual: 'Enter ASNs', sub_lookup: 'Find by domain / IP', sub_presets: 'Service presets', rc_to_list: 'Show ASN list',
@@ -482,7 +482,7 @@ var ASNM_I18N = {
     stat_asns: 'ASNs', stat_subnets: 'Subnets', stat_ifaces: 'Interfaces online', stat_last: 'Last applied',
     card_add_sub: 'Route an Autonomous System, an IP range or a domain through a WAN or VPN interface', card_list_sub: 'Click a group to expand or collapse it',
     status: 'Status', version: 'Version', last_applied: 'Rules last applied', auto_refresh: 'Auto-refresh of subnets', actions: 'Actions',
-    btn_apply: 'Apply rules', btn_reload: 'Reload data', btn_retry: 'Retry failed',
+    btn_apply: 'Apply rules', btn_full: 'Reload all subnets', btn_full_tip: 'Download the subnets of every ASN again and rebuild all rules (the daily schedule does this anyway)', btn_reload: 'Reload data', btn_retry: 'Retry failed',
     add_asns: 'Add ASNs, IPs or domains', asns: 'ASN(s)', target: 'Target interface', src_ip: 'Source device IP', src_empty: 'empty = all devices',
     btn_add: 'Add', presets: 'Service presets', preset: 'Preset', btn_add_preset: 'Add preset',
     lookup_title: 'Find ASN for a domain or IP', domain_ip: 'Domain / IP', btn_lookup: 'Look up', th_ip: 'IP', th_holder: 'Owner',
@@ -510,12 +510,12 @@ var ASNM_I18N = {
     pick_device: '- select device -', no_asns: 'No ASNs configured yet.', summary: '{n} ASN(s), {s} subnets loaded',
     hint_multi: 'ASN, IP / CIDR range (/8 to /32) or domain - several: separated by commas', hint_optional: 'optional',
     ph_asns: 'e.g. AS13335, 181.209.202.0/24, *.googlevideo.com', ph_ip: 'e.g. 192.168.1.50 or 192.168.1.50,192.168.1.60', ph_domain: 'e.g. netflix.com', ph_diag: 'e.g. one.one.one.one',
-    working: 'Working...', applying: 'Applying rules - this can take a few minutes for many ASNs...', retrying: 'Rebuilding from cache, downloading only failed ASNs...',
+    working: 'Working...', applying: 'Applying rules - from the saved subnets, only new ASNs are downloaded...', reloading: 'Downloading the subnets of all ASNs - this can take a few minutes...', retrying: 'Rebuilding from cache, downloading only failed ASNs...',
     progress: 'AS{asn} -> {dest}  ({d} of {t})', running_x: 'Running {a}...',
     timeout: 'No answer from the router (timeout). Check that the service-event hook is installed.',
     no_data: 'No data from router. Is ASN Manager installed?', parse_err: 'Could not read data from router.',
     done: 'Done.', failed: 'Failed.', no_output: '(no output)',
-    c_apply: 'Fetch current subnets for all ASNs and rebuild the routing rules now?',
+    c_apply: 'Fetch current subnets for all ASNs and rebuild the routing rules now?', c_full: 'Download the subnets of all ASNs again and rebuild every rule? This takes a few minutes; "Apply rules" is enough for normal changes.',
     c_remove_one: 'Remove {asn} from the list?', c_remove_n: 'Remove {n} entries from the list?',
     c_clear: 'Remove ALL ASNs from the list?\nActive routing stays until you click "Apply rules".',
     c_replace: 'Replace the current list ({n} entries) with {m} entries from the backup?',
@@ -569,7 +569,7 @@ var ASNM_I18N = {
     rc_tip_fo: 'Ziel {dev} ist ausgefallen - Ausweich: Beispiel-Adresse {ip} geht über {got}.', rc_blocked: 'gesperrt', rc_tip_blocked: 'Ziel {d} ist ausgefallen - der Verkehr ist gesperrt (Ausweich "Sperren").',
     job_busy: 'Es läuft noch ein anderer Auftrag ({a}). Die Seite zeigt ihn an, bis er fertig ist - danach bitte deine Aktion wiederholen.',
     job_running: 'Ein vorher gestarteter Auftrag läuft noch ({a}) - die Seite zeigt ihn an, bis er fertig ist.',
-    act_apply: 'Regeln anwenden', act_retry: 'Fehlgeschlagene wiederholen', act_update: 'Update', act_import: 'Wiederherstellen', act_add: 'Einträge hinzufügen', act_preset: 'Vorlage hinzufügen',
+    act_apply: 'Regeln anwenden', act_reload: 'Alle Subnetze neu laden', act_retry: 'Fehlgeschlagene wiederholen', act_update: 'Update', act_import: 'Wiederherstellen', act_add: 'Einträge hinzufügen', act_preset: 'Vorlage hinzufügen',
     act_remove: 'Entfernen', act_clear: 'Liste leeren', act_edit: 'Bearbeiten', act_schedule: 'Zeitplan', act_failover: 'Failover', act_statssave: 'USB-Sicherung',
     tab_asns: 'ASNs', tab_traffic: 'Traffic', tab_targets: 'Ziele & Failover', tab_diag: 'Diagnose', tab_settings: 'Einstellungen',
     sub_manual: 'ASNs eingeben', sub_lookup: 'Per Domain / IP suchen', sub_presets: 'Dienst-Vorlagen', rc_to_list: 'Zur ASN-Liste',
@@ -602,7 +602,7 @@ var ASNM_I18N = {
     stat_asns: 'ASNs', stat_subnets: 'Subnetze', stat_ifaces: 'Interfaces online', stat_last: 'Zuletzt angewendet',
     card_add_sub: 'Ein Autonomes System, einen IP-Bereich oder eine Domain über ein WAN- oder VPN-Interface leiten', card_list_sub: 'Gruppe anklicken zum Auf- oder Zuklappen',
     status: 'Status', version: 'Version', last_applied: 'Regeln zuletzt angewendet', auto_refresh: 'Automatische Aktualisierung', actions: 'Aktionen',
-    btn_apply: 'Regeln anwenden', btn_reload: 'Daten neu laden', btn_retry: 'Fehlgeschlagene wiederholen',
+    btn_apply: 'Regeln anwenden', btn_full: 'Alle neu laden', btn_full_tip: 'Die Subnetze aller ASNs neu herunterladen und alle Regeln neu aufbauen (der tägliche Zeitplan macht das ohnehin)', btn_reload: 'Daten neu laden', btn_retry: 'Fehlgeschlagene wiederholen',
     add_asns: 'ASNs, IPs oder Domains hinzufügen', asns: 'ASN(s)', target: 'Ziel-Interface', src_ip: 'Quell-IP des Geräts', src_empty: 'leer = alle Geräte',
     btn_add: 'Hinzufügen', presets: 'Dienst-Vorlagen', preset: 'Vorlage', btn_add_preset: 'Vorlage hinzufügen',
     lookup_title: 'ASN zu Domain oder IP finden', domain_ip: 'Domain / IP', btn_lookup: 'Suchen', th_ip: 'IP', th_holder: 'Inhaber',
@@ -630,12 +630,12 @@ var ASNM_I18N = {
     pick_device: '- Gerät auswählen -', no_asns: 'Noch keine ASNs eingetragen.', summary: '{n} ASN(s), {s} Subnetze geladen',
     hint_multi: 'ASN, IP-/CIDR-Bereich (/8 bis /32) oder Domain - mehrere: mit Komma trennen', hint_optional: 'optional',
     ph_asns: 'z. B. AS13335, 181.209.202.0/24, *.googlevideo.com', ph_ip: 'z. B. 192.168.1.50 oder 192.168.1.50,192.168.1.60', ph_domain: 'z. B. netflix.com', ph_diag: 'z. B. one.one.one.one',
-    working: 'Wird ausgeführt...', applying: 'Regeln werden angewendet - bei vielen ASNs kann das einige Minuten dauern...', retrying: 'Neuaufbau aus dem Cache, nur fehlgeschlagene ASNs werden geladen...',
+    working: 'Wird ausgeführt...', applying: 'Regeln werden angewendet - aus den gespeicherten Subnetzen, nur neue ASNs werden geladen...', reloading: 'Subnetze aller ASNs werden geladen - das kann einige Minuten dauern...', retrying: 'Neuaufbau aus dem Cache, nur fehlgeschlagene ASNs werden geladen...',
     progress: 'AS{asn} -> {dest}  ({d} von {t})', running_x: '{a} läuft...',
     timeout: 'Keine Antwort vom Router (Zeitüberschreitung). Prüfe, ob der service-event-Hook installiert ist.',
     no_data: 'Keine Daten vom Router. Ist ASN Manager installiert?', parse_err: 'Daten vom Router konnten nicht gelesen werden.',
     done: 'Fertig.', failed: 'Fehlgeschlagen.', no_output: '(keine Ausgabe)',
-    c_apply: 'Aktuelle Subnetze für alle ASNs laden und die Routing-Regeln jetzt neu aufbauen?',
+    c_apply: 'Aktuelle Subnetze für alle ASNs laden und die Routing-Regeln jetzt neu aufbauen?', c_full: 'Die Subnetze aller ASNs neu herunterladen und alle Regeln neu aufbauen? Das dauert einige Minuten; für normale Änderungen reicht "Regeln anwenden".',
     c_remove_one: '{asn} aus der Liste entfernen?', c_remove_n: '{n} Einträge aus der Liste entfernen?',
     c_clear: 'ALLE ASNs aus der Liste entfernen?\nDas aktive Routing bleibt bestehen, bis du "Regeln anwenden" klickst.',
     c_replace: 'Die aktuelle Liste ({n} Einträge) durch {m} Einträge aus der Sicherung ersetzen?',
@@ -664,6 +664,7 @@ var ASNM_MSG_DE = [
   [/^Imported (\d+) ASN\(s\) \((replace|merge)\)(?:, (\d+) invalid entries skipped)?\. Apply rules to activate\.$/, function (m, n, mode, bad) {
       return n + ' ASN(s) importiert (' + (mode === 'replace' ? 'ersetzt' : 'hinzugefügt') + ')' + (bad ? ', ' + bad + ' ungültige übersprungen' : '') + '. Zum Aktivieren "Regeln anwenden" klicken.'; }],
   [/^Rules applied: (\d+) OK, (\d+) failed\.$/, 'Regeln angewendet: $1 OK, $2 fehlgeschlagen.'],
+  [/^Rules applied: ASN rules kept, custom entries applied\.$/, 'Regeln angewendet: ASN-Regeln unverändert, IP- und Domain-Einträge angewendet.'],
   [/^ASN list is empty - all ASN routing rules removed\.$/, 'ASN-Liste ist leer - alle ASN-Routing-Regeln wurden entfernt.'],
   [/^Auto-refresh set: every (\d+) day\(s\) at (\S+)\.$/, 'Automatische Aktualisierung: alle $1 Tag(e) um $2.'],
   [/^Data refreshed\.$/, 'Daten aktualisiert.'],
@@ -736,6 +737,8 @@ function asnmApplyI18n() {
     for (i = 0; i < els.length; i++) els[i].value = t(els[i].getAttribute('data-i18n-value'));
     els = document.querySelectorAll('[data-i18n-ph]');
     for (i = 0; i < els.length; i++) els[i].setAttribute('placeholder', t(els[i].getAttribute('data-i18n-ph')));
+    els = document.querySelectorAll('[data-i18n-title]');
+    for (i = 0; i < els.length; i++) els[i].setAttribute('title', t(els[i].getAttribute('data-i18n-title')));
 }
 
 /* ============================ state ============================ */
@@ -749,7 +752,7 @@ var ASNM = {
         WGC1: 'WireGuard Client 1', WGC2: 'WireGuard Client 2', WGC3: 'WireGuard Client 3', WGC4: 'WireGuard Client 4', WGC5: 'WireGuard Client 5'
     },
     order: ['WAN', 'WAN1', 'WAN2', 'OVPN1', 'OVPN2', 'OVPN3', 'OVPN4', 'OVPN5', 'WGC1', 'WGC2', 'WGC3', 'WGC4', 'WGC5'],
-    timeouts: { speedtest: 150000, update: 240000, apply: 1800000, retry: 1800000, trace: 90000, ifaces: 90000, lookup: 30000 },
+    timeouts: { speedtest: 150000, update: 240000, apply: 1800000, reload: 1800000, retry: 1800000, trace: 90000, ifaces: 90000, lookup: 30000 },
     reIp: /^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)$/,
     reHost: /^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$/,
     reEntry: /^(\d{1,10}):(WAN|WAN1|WAN2|OVPN[1-5]|WGC[1-5]):?([0-9.,\s]*)$/,
@@ -1347,7 +1350,7 @@ function asnmJobDone(job) {
     asnmHideProgress();
     asnmSetStatus(asnmTrMsg(job.msg) || (ok ? t('done') : t('failed')), !ok);
 
-    if (['apply', 'retry', 'test', 'trace', 'lookup', 'ifaces', 'status'].indexOf(job.action) >= 0) {
+    if (['apply', 'reload', 'retry', 'test', 'trace', 'lookup', 'ifaces', 'status'].indexOf(job.action) >= 0) {
         asnmGet('output.htm', function (txt) { document.getElementById('asnm_output').textContent = txt || t('no_output'); });
     }
     if (job.action === 'lookup') {
@@ -1377,7 +1380,7 @@ function asnmJobDone(job) {
 function asnmSetBusy(on, action) {
     ASNM.busy = on;
     asnmApplyBusy();
-    if (on) asnmSetStatus(action === 'apply' ? t('applying') : (action === 'retry' ? t('retrying') : (action === 'update' ? t('upd_running') : (action === 'speedtest' ? t('sp_running') : t('working')))));
+    if (on) asnmSetStatus(action === 'apply' ? t('applying') : action === 'reload' ? t('reloading') : (action === 'retry' ? t('retrying') : (action === 'update' ? t('upd_running') : (action === 'speedtest' ? t('sp_running') : t('working')))));
 }
 
 function asnmApplyBusy() {
@@ -1541,7 +1544,8 @@ function asnmRemoveSelected() {
 }
 
 function asnmClearAll() { if (confirm(t('c_clear'))) asnmSend('clear', []); }
-function asnmApply() { if (confirm(t('c_apply'))) asnmSend('apply', []); }
+function asnmApply() { asnmSend('apply', []); }
+function asnmApplyFull() { if (confirm(t('c_full'))) asnmSend('reload', []); }
 function asnmRetry() { asnmSend('retry', []); }
 
 function asnmSaveSchedule() {
@@ -2878,6 +2882,7 @@ function initial() {
       <span class="asnm-link" style="margin-left: 8px;" data-i18n="rc_now" onclick="asnmRcCheck();"></span></div>
     <div class="asnm-row">
       <input type="button" class="button_gen asnm-btn asnm-primary" data-i18n-value="btn_apply" onclick="asnmApply();"/>
+      <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_full" data-i18n-title="btn_full_tip" onclick="asnmApplyFull();"/>
       <input type="button" id="asnm_btn_retry" class="button_gen asnm-btn asnm-danger" style="display:none;" value="" onclick="asnmRetry();"/>
       <span class="asnm-spacer"></span>
       <input type="button" class="button_gen asnm-btn asnm-ghost" data-i18n-value="btn_reload" onclick="asnmSend('refresh', []);"/>
