@@ -1,3 +1,7 @@
+## v3.1.14
+
+- WebUI: no empty strip and no extra line between the sections of the ASN list any more; the header bar of each section separates them
+
 ## v3.1.13
 
 - WebUI: the three sections of the ASN list stand out more - a header bar with an icon, a larger title and the number of entries as a badge (grey when empty), and a dividing line between the sections

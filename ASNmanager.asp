@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.1.13 -->
+<!-- ASNmanager-WebUI v3.1.14 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -190,8 +190,8 @@
 .asnm-gsum .asnm-badge { margin-left: 6px; }
 .asnm-table-wrap { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 #asnm_list { padding: 0; }
-.asnm-lsec + .asnm-lsec { margin-top: 22px; padding-top: 18px; border-top: 2px solid var(--line); }
-.asnm-lsec-head { display: flex; align-items: center; gap: 9px; margin: 4px 0 8px; padding: 8px 12px; background: var(--card2); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; }
+.asnm-lsec + .asnm-lsec { margin-top: 0; padding-top: 0; border-top: 0; }
+.asnm-lsec-head { display: flex; align-items: center; gap: 9px; margin: 0 0 4px; padding: 8px 12px; background: var(--card2); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; }
 .asnm-lsec-ico { width: 18px; height: 18px; color: var(--accent2); flex: none; }
 .asnm-lsec-title { font-size: 15px; font-weight: 700; color: var(--strong); letter-spacing: .01em; }
 .asnm-lsec-cnt { min-width: 20px; padding: 0 8px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; line-height: 20px; text-align: center; }
@@ -398,7 +398,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.1.13';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.1.14';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
