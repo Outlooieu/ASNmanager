@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.1.10 -->
+<!-- ASNmanager-WebUI v3.1.11 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -190,6 +190,9 @@
 .asnm-gsum .asnm-badge { margin-left: 6px; }
 .asnm-table-wrap { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 #asnm_list { padding: 0; }
+.asnm-lsec + .asnm-lsec { margin-top: 18px; }
+.asnm-lsec-head { padding: 8px 10px 6px; font-size: 13px; font-weight: 700; letter-spacing: .02em; }
+.asnm-cid { font-size: 11px; margin-left: 4px; }
 .asnm-flag { vertical-align: -2px; border-radius: 2px; margin-right: 5px; width: 20px; height: 14px; box-shadow: 0 0 0 1px rgba(0,0,0,.3); }
 .asnm-flag.asnm-flag-round { width: 18px; height: 18px; border-radius: 50%; vertical-align: -4px; margin-right: 6px; box-shadow: 0 0 0 1.5px var(--card), 0 0 0 2.5px var(--line); }
 .asnm-cc { display: inline-block; padding: 0 5px; margin-right: 5px; border-radius: 4px; background: var(--card2); border: 1px solid var(--line); font-size: 10px; font-weight: 700; color: var(--text2); }
@@ -391,7 +394,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.1.10';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.1.11';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -483,6 +486,9 @@ var ASNM_I18N = {
     th_pubip: 'External IP', btn_pubip_refresh: 'Refresh IPs', pubip_loading: 'checking...', pubip_none: '-',
     expand_all: 'expand all', collapse_all: 'collapse all', group_sum: '{n} ASN(s), {s} subnets', group_failed: '{f} failed',
     list_title: 'ASN list', btn_remove_sel: 'Remove selected', btn_remove_all: 'Remove all',
+    ls_asn: 'ASNs', ls_ip: 'IP / CIDR ranges', ls_dom: 'Domains', ls_th_asn: 'ASN', ls_th_ip: 'IP / range', ls_th_dom: 'Domain', ls_th_learned: 'Learned',
+    ls_empty_asn: 'No ASNs configured yet.', ls_empty_ip: 'No IP addresses or ranges yet - add them like ASNs, e.g. 181.209.202.0/24.', ls_empty_dom: 'No domains yet - add them like ASNs, e.g. *.googlevideo.com.',
+    ls_gsum_asn: '{n} ASN(s), {s} subnets', ls_gsum_ip: '{n} range(s)', ls_gsum_dom: '{n} domain(s), {l} addresses learned',
     th_asn: 'ASN', th_src: 'Source device', th_subnets: 'Subnets', th_state: 'State', th_target: 'Target', th_device: 'Device', th_asns: 'ASNs',
     ifaces_title: 'Target interfaces', schedule_title: 'Auto-refresh schedule', refresh_every: 'Refresh every', days: 'day(s)', days_range: '(1-30)',
     at_time: 'At time', time_fmt: '(HH:MM, 24h)', btn_save_schedule: 'Save schedule',
@@ -600,6 +606,9 @@ var ASNM_I18N = {
     th_pubip: 'Externe IP', btn_pubip_refresh: 'IPs aktualisieren', pubip_loading: 'wird ermittelt...', pubip_none: '-',
     expand_all: 'alle aufklappen', collapse_all: 'alle zuklappen', group_sum: '{n} ASN(s), {s} Subnetze', group_failed: '{f} fehlgeschlagen',
     list_title: 'ASN-Liste', btn_remove_sel: 'Auswahl entfernen', btn_remove_all: 'Alle entfernen',
+    ls_asn: 'ASNs', ls_ip: 'IP / CIDR-Bereiche', ls_dom: 'Domains', ls_th_asn: 'ASN', ls_th_ip: 'IP / Bereich', ls_th_dom: 'Domain', ls_th_learned: 'Gelernt',
+    ls_empty_asn: 'Noch keine ASNs eingetragen.', ls_empty_ip: 'Noch keine IP-Adressen oder Bereiche - sie werden wie ASNs hinzugefügt, z. B. 181.209.202.0/24.', ls_empty_dom: 'Noch keine Domains - sie werden wie ASNs hinzugefügt, z. B. *.googlevideo.com.',
+    ls_gsum_asn: '{n} ASN(s), {s} Subnetze', ls_gsum_ip: '{n} Bereich(e)', ls_gsum_dom: '{n} Domain(s), {l} Adressen gelernt',
     th_asn: 'ASN', th_src: 'Quellgerät', th_subnets: 'Subnetze', th_state: 'Status', th_target: 'Ziel', th_device: 'Gerät', th_asns: 'ASNs',
     ifaces_title: 'Ziel-Interfaces', schedule_title: 'Zeitplan für Aktualisierung', refresh_every: 'Aktualisieren alle', days: 'Tag(e)', days_range: '(1-30)',
     at_time: 'Um', time_fmt: '(HH:MM, 24h)', btn_save_schedule: 'Zeitplan speichern',
@@ -980,38 +989,59 @@ function asnmSrcCell(src) {
     return '<div class="asnm-src-list">' + out.join('<br/>') + '</div>';
 }
 
+// the list in three sections: ASNs, IP / CIDR ranges, domains - each grouped by target
+var ASNM_SECS = [
+    { k: 'asn', test: function (e) { return !e.kind; } },
+    { k: 'ip',  test: function (e) { return e.kind === 'ip'; } },
+    { k: 'dom', test: function (e) { return e.kind === 'dom'; } }
+];
+
 function asnmRenderList() {
-    var entries = ASNM.data.entries.slice(0);
-    entries.sort(function (a, b) {
+    var all = ASNM.data.entries.slice(0);
+    all.sort(function (a, b) {
         var o = ASNM.order.indexOf(a.dest) - ASNM.order.indexOf(b.dest);
         return o !== 0 ? o : (asnmEntryNum(a.asn) - asnmEntryNum(b.asn));
     });
+    var rcMap = asnmRcMap(), html = '', total = 0, nAsn = 0;
+    for (var q = 0; q < ASNM_SECS.length; q++) {
+        var sec = ASNM_SECS[q], list = all.filter(sec.test);
+        if (sec.k === 'asn') nAsn = list.length;
+        html += asnmListSection(sec.k, list, rcMap);
+        for (var z = 0; z < list.length; z++) if (!list[z].kind && list[z].subnets > 0) total += list[z].subnets;
+    }
+    document.getElementById('asnm_list').innerHTML = html;
+    document.getElementById('asnm_list_summary').textContent = t('summary', { n: nAsn, s: total });
+    // while a row is edited the list's frame must not clip the device picker
+    document.getElementById('asnm_list').parentNode.style.overflow = ASNM.editing ? 'visible' : '';
+    if (ASNM.editing) asnmDevMsRender('asnm_edit_ms', 'asnm_edit_src');
+    asnmApplyBusy();
+}
 
-    var rcMap = asnmRcMap();
-    var html = '<table class="asnm-table"><tr><th style="width:24px;"><input type="checkbox" onclick="asnmToggleAll(this.checked)"/></th>' +
-               '<th>' + t('th_asn') + '</th><th>' + t('th_src') + '</th><th style="text-align:right;">' + t('th_subnets') + '</th>' +
+function asnmListSection(sec, entries, rcMap) {
+    var html = '<div class="asnm-lsec"><div class="asnm-lsec-head">' + asnmEsc(t('ls_' + sec)) + ' <span class="asnm-muted">(' + entries.length + ')</span></div>' +
+               '<table class="asnm-table"><tr><th style="width:24px;"><input type="checkbox" onclick="asnmToggleAll(this.checked, \'' + sec + '\')"/></th>' +
+               '<th>' + t('ls_th_' + sec) + '</th><th>' + t('th_src') + '</th><th style="text-align:right;">' + t(sec === 'dom' ? 'ls_th_learned' : 'th_subnets') + '</th>' +
                '<th>' + t('th_state') + '</th><th>' + t('rc_th') + '</th><th></th></tr>';
-    if (!entries.length) html += '<tr><td colspan="7" class="asnm-muted" style="text-align:center;padding:12px;">' + asnmEsc(t('no_asns')) + '</td></tr>';
+    if (!entries.length) html += '<tr><td colspan="7" class="asnm-muted" style="text-align:center;padding:12px;">' + asnmEsc(t('ls_empty_' + sec)) + '</td></tr>';
 
     // per-target totals for the group headers
     var groups = {};
     for (var g = 0; g < entries.length; g++) {
-        var ge = entries[g], gs = groups[ge.dest] || (groups[ge.dest] = { n: 0, s: 0, f: 0 });
-        gs.n++; if (ge.subnets > 0) gs.s += ge.subnets; if (ge.failed) gs.f++;
+        var ge = entries[g], gs = groups[ge.dest] || (groups[ge.dest] = { n: 0, s: 0, f: 0, l: 0 });
+        gs.n++; if (ge.subnets > 0) gs.s += ge.subnets; if (ge.failed) gs.f++; gs.l += ge.learned || 0;
     }
 
-    var lastDest = null, total = 0;
+    var lastDest = null;
     for (var i = 0; i < entries.length; i++) {
-        var e = entries[i], a = asnmEsc(e.asn);
-        if (e.subnets > 0) total += e.subnets;
-        var closed = asnmIsClosed(e.dest, groups[e.dest]);
+        var e = entries[i], a = asnmEsc(e.asn), gk = (sec === 'asn' ? '' : sec + '|') + e.dest;
+        var closed = asnmIsClosed(gk, groups[e.dest]);
         if (e.dest !== lastDest) {
             var f = asnmIface(e.dest), gi = groups[e.dest];
             var st = f ? (f.up ? '<span class="asnm-badge asnm-ok">' + t('online') + '</span>' : '<span class="asnm-badge asnm-bad">' + t('offline') + '</span>') : '';
-            html += '<tr class="asnm-group" onclick="asnmToggleGroup(\'' + asnmEsc(e.dest) + '\')"><td colspan="7">' +
+            html += '<tr class="asnm-group" onclick="asnmToggleGroup(\'' + asnmEsc(gk) + '\')"><td colspan="7">' +
                     '<span class="asnm-arrow' + (closed ? '' : ' asnm-open') + '"></span>' +
                     asnmEsc(asnmDestLabel(e.dest)) + (f && f.dev ? ' - ' + asnmEsc(f.dev) : '') + ' &nbsp; ' + st + asnmFoBadge(e.dest) +
-                    '<span class="asnm-gsum">' + asnmEsc(t('group_sum', { n: gi.n, s: gi.s })) +
+                    '<span class="asnm-gsum">' + asnmEsc(t('ls_gsum_' + sec, { n: gi.n, s: gi.s, l: gi.l })) +
                     (gi.f ? '<span class="asnm-badge asnm-bad">' + asnmEsc(t('group_failed', { f: gi.f })) + '</span>' : '') + '</span></td></tr>';
             lastDest = e.dest;
         }
@@ -1030,26 +1060,24 @@ function asnmRenderList() {
         var iface = asnmIface(e.dest), state, rowCls = '';
         if (e.failed) { state = '<span class="asnm-badge asnm-bad">' + t('st_failed') + '</span>'; rowCls = ' class="asnm-failed"'; }
         else if (e['new'] && !e.loaded) state = '<span class="asnm-badge asnm-warn">' + t('st_new') + '</span>';
-        else if (e.loaded && iface && iface.up) state = '<span class="asnm-badge asnm-ok">' + t('st_active') + '</span>' + (e.kind === 'dom' ? ' <span class="asnm-link asnm-muted" id="asnm_lr_' + a + '" title="' + asnmEsc(t('lr_tip')) + '" onclick="asnmLrToggle(\'' + a + '\');">' + asnmEsc(t('st_learned', { n: e.learned || 0 })) + '</span>' : '');
+        else if (e.loaded && iface && iface.up) state = '<span class="asnm-badge asnm-ok">' + t('st_active') + '</span>';
         else if (e.loaded) state = '<span class="asnm-badge asnm-warn">' + t('st_down') + '</span>';
         else state = '<span class="asnm-muted">' + t('st_not_applied') + '</span>';
 
-        html += '<tr' + rowCls + '><td><input type="checkbox" class="asnm-chk" value="' + a + '"/></td>' +
-                '<td>' + asnmEntryCell(e) + '</td><td>' + asnmSrcCell(e.src) + '</td>' +
-                '<td class="num">' + (e.subnets >= 0 ? e.subnets : '<span class="asnm-muted">-</span>') + '</td>' +
+        var num;
+        if (sec === 'dom') num = '<span class="asnm-link" id="asnm_lr_' + a + '" title="' + asnmEsc(t('lr_tip')) + '" onclick="asnmLrToggle(\'' + a + '\');">' + (e.learned || 0) + '</span>';
+        else num = e.subnets >= 0 ? e.subnets : '<span class="asnm-muted">-</span>';
+
+        html += '<tr' + rowCls + '><td><input type="checkbox" class="asnm-chk asnm-chk-' + sec + '" value="' + a + '"/></td>' +
+                '<td>' + (sec === 'asn' ? asnmEntryCell(e) : asnmEsc(sec === 'dom' ? '*.' + e.value : e.value) + ' <span class="asnm-muted asnm-cid">' + a + '</span>') + '</td><td>' + asnmSrcCell(e.src) + '</td>' +
+                '<td class="num">' + num + '</td>' +
                 '<td>' + state + '</td>' +
                 '<td id="asnm_rc_' + a + '">' + asnmRcBadge(e, rcMap) + '</td>' +
                 '<td class="asnm-actions"><input type="button" class="button_gen asnm-small-btn asnm-btn" value="' + asnmEsc(t('btn_edit')) + '" onclick="asnmEdit(\'' + a + '\')"/> ' +
                 '<input type="button" class="button_gen asnm-small-btn asnm-btn" value="' + asnmEsc(t('btn_remove')) + '" onclick="asnmRemove([\'' + a + '\'])"/></td></tr>';
-        if (e.kind === 'dom' && ASNM.lrOpen === e.asn) html += asnmLrRow(e);
+        if (sec === 'dom' && ASNM.lrOpen === e.asn) html += asnmLrRow(e);
     }
-    html += '</table>';
-    document.getElementById('asnm_list').innerHTML = html;
-    document.getElementById('asnm_list_summary').textContent = t('summary', { n: entries.length, s: total });
-    // while a row is edited the list's frame must not clip the device picker
-    document.getElementById('asnm_list').parentNode.style.overflow = ASNM.editing ? 'visible' : '';
-    if (ASNM.editing) asnmDevMsRender('asnm_edit_ms', 'asnm_edit_src');
-    asnmApplyBusy();
+    return html + '</table></div>';
 }
 
 /* ---------- speed test ---------- */
@@ -1165,18 +1193,21 @@ function asnmIsClosed(dest, gi) {
     return !(gi && gi.f > 0);
 }
 
-function asnmToggleGroup(dest) {
+function asnmSecOf(e) { return e.kind === 'ip' ? 'ip' : (e.kind === 'dom' ? 'dom' : 'asn'); }
+function asnmGroupKey(e) { var s = asnmSecOf(e); return (s === 'asn' ? '' : s + '|') + e.dest; }
+
+function asnmToggleGroup(key) {
     var gi = { f: 0 };
     if (ASNM.data) for (var i = 0; i < ASNM.data.entries.length; i++)
-        if (ASNM.data.entries[i].dest === dest && ASNM.data.entries[i].failed) gi.f++;
-    ASNM.collapsed[dest] = !asnmIsClosed(dest, gi);
+        if (asnmGroupKey(ASNM.data.entries[i]) === key && ASNM.data.entries[i].failed) gi.f++;
+    ASNM.collapsed[key] = !asnmIsClosed(key, gi);
     asnmSaveCollapsed();
     asnmRenderList();
 }
 
 function asnmCollapseAll(on) {
     if (!ASNM.data) return;
-    for (var i = 0; i < ASNM.data.entries.length; i++) ASNM.collapsed[ASNM.data.entries[i].dest] = on;
+    for (var i = 0; i < ASNM.data.entries.length; i++) ASNM.collapsed[asnmGroupKey(ASNM.data.entries[i])] = on;
     asnmSaveCollapsed();
     asnmRenderList();
 }
@@ -1184,8 +1215,8 @@ function asnmCollapseAll(on) {
 function asnmSaveCollapsed() { try { localStorage.setItem('asnm_collapsed_' + ASNM_NS, JSON.stringify(ASNM.collapsed)); } catch (e) {} }
 function asnmLoadCollapsed() { try { ASNM.collapsed = JSON.parse(localStorage.getItem('asnm_collapsed_' + ASNM_NS) || '{}') || {}; } catch (e) { ASNM.collapsed = {}; } }
 
-function asnmToggleAll(on) {
-    var c = document.getElementsByClassName('asnm-chk');
+function asnmToggleAll(on, sec) {
+    var c = document.getElementsByClassName(sec ? 'asnm-chk-' + sec : 'asnm-chk');
     for (var i = 0; i < c.length; i++) c[i].checked = on;
 }
 
@@ -1443,7 +1474,7 @@ function asnmLrLoad() {
             if (e.kind !== 'dom' || d.c[e.asn] === undefined || d.c[e.asn] === e.learned) continue;
             e.learned = d.c[e.asn];
             var el = document.getElementById('asnm_lr_' + e.asn);
-            if (el) el.textContent = t('st_learned', { n: e.learned });
+            if (el) el.textContent = e.learned;
         }
     });
 }
@@ -1474,7 +1505,7 @@ function asnmEdit(asn) {
     if (ASNM.busy) return;
     ASNM.editing = asn;
     if (asn && ASNM.data) for (var i = 0; i < ASNM.data.entries.length; i++)
-        if (ASNM.data.entries[i].asn === asn) ASNM.collapsed[ASNM.data.entries[i].dest] = false;
+        if (ASNM.data.entries[i].asn === asn) ASNM.collapsed[asnmGroupKey(ASNM.data.entries[i])] = false;
     asnmRenderList();
 }
 

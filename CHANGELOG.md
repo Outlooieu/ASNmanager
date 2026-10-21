@@ -1,3 +1,8 @@
+## v3.1.11
+
+- WebUI: the ASN list has three sections - **ASNs**, **IP / CIDR ranges** and **Domains** - each with the columns entry, source device, subnets (for domains: learned addresses), state and routing, grouped by target. IP and domain entries no longer get lost between the ASNs; the sections are shown even when empty, with a hint how to add entries
+- Domains: the "learned" number is its own column; a click shows the learned addresses. Every section has its own "select all" box; each target group opens and closes per section
+
 ## v3.1.10
 
 - `stats diag`: the counting loop was reported as a "hanging" run once it had been running for more than 15 minutes. It is meant to run all the time and is now listed as the counting loop; the clean-up of hanging runs already left it alone
