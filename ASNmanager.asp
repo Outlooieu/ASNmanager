@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.1.11 -->
+<!-- ASNmanager-WebUI v3.1.12 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -394,7 +394,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.1.11';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.1.12';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */

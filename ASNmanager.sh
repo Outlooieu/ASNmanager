@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.1.11
+version=3.1.12
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.1.11"
+SCRIPT_VERSION="3.1.12"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -1573,6 +1573,17 @@ route_test() {
     fi
     for test_ip in $ips; do
         matched=0
+        # custom entries first (their marking rules come first): every entry has its own set ASNC_<id>
+        if [ -s "$CUSTOM_FILE" ]; then
+            while IFS=: read -r rt_id rt_d rt_s rt_k rt_v; do
+                case "$rt_id" in C[0-9]*) ;; *) continue ;; esac
+                ipset test "ASNC_$rt_id" "$test_ip" 2>/dev/null || continue
+                [ "$rt_k" = "dom" ] && rt_v="*.$rt_v"
+                echo -e "${GREEN}MATCHED:${NC} $test_ip -> Routes to ${rt_d} (custom entry $rt_id: $rt_v${rt_s:+, only for $rt_s})"
+                matched=1; break
+            done < "$CUSTOM_FILE"
+        fi
+        [ $matched -eq 1 ] && continue
         for s in $(ipset list -n 2>/dev/null | grep "^ASN_"); do
             if ipset test "$s" "$test_ip" 2>/dev/null; then
                 dest_name=$(echo "$s" | sed -E 's/ASN_([^_]+).*/\1/')

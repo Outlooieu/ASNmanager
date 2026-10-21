@@ -1,3 +1,7 @@
+## v3.1.12
+
+- Fixed: the routing test (menu [12], `test <IP|domain>`, WebUI) only looked at the ASN sets, so an address of an IP / CIDR or domain entry was shown as "DEFAULT ROUTE" although it is routed. It now checks the custom entries first and names the entry (e.g. "custom entry C3: 181.209.202.0/24")
+
 ## v3.1.11
 
 - WebUI: the ASN list has three sections - **ASNs**, **IP / CIDR ranges** and **Domains** - each with the columns entry, source device, subnets (for domains: learned addresses), state and routing, grouped by target. IP and domain entries no longer get lost between the ASNs; the sections are shown even when empty, with a hint how to add entries
