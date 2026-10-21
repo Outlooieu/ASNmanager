@@ -1,3 +1,9 @@
+## v3.1.5
+
+- Fixed: hanging processes piled up on the router (dozens of "check run" and "stats loop" processes, constant CPU load, statistics buttons without answer). Cause: BusyBox `nslookup` has no time limit and can wait for ever (the routing check resolves the names of the VPN servers, the suggestions look up addresses). Now every name lookup is limited to 6 seconds and every `curl` has a maximum time (public IP, update check, WebUI page)
+- New: the routing check (cron, every 5 minutes) first stops runs of the periodic jobs that are older than 15 minutes, together with what they wait for, and writes it to the syslog ("hanging run ... killed"); `rescue` now also stops the helper processes of old counting loops (never the loop itself)
+- `stats diag` lists every ASN Manager process with its running time and warns about hanging ones
+
 ## v3.1.4
 
 - Fixed: after an update the notice "A new version is available ... (installed: vOLD)" stayed, because the stored check result is only renewed every 6 hours. The update now writes the result itself, and the page ignores a check result that names another installed version and checks again

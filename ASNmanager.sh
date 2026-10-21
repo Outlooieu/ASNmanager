@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.1.4
+version=3.1.5
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.1.4"
+SCRIPT_VERSION="3.1.5"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -198,12 +198,12 @@ iface_ips_report() {
         dev_name="$2"
         color_code="$3"
         if [ -n "$dev_name" ]; then
-            pub_ip=$(curl -s -k --interface "$dev_name" --connect-timeout 3 https://api.ipify.org 2>/dev/null)
+            pub_ip=$(curl -s -k --interface "$dev_name" --connect-timeout 3 -m 8 https://api.ipify.org 2>/dev/null)
         else
-            pub_ip=$(curl -s -k --connect-timeout 3 https://api.ipify.org 2>/dev/null)
+            pub_ip=$(curl -s -k --connect-timeout 3 -m 8 https://api.ipify.org 2>/dev/null)
         fi
         if [ -n "$pub_ip" ]; then
-            geo_json=$(curl -s -k --connect-timeout 3 "http://ip-api.com/json/$pub_ip?fields=status,country,countryCode" 2>/dev/null)
+            geo_json=$(curl -s -k --connect-timeout 3 -m 8 "http://ip-api.com/json/$pub_ip?fields=status,country,countryCode" 2>/dev/null)
             country=$(echo "$geo_json" | grep -oE '"country":"[^"]+' | cut -d'"' -f4)
             ccode=$(echo "$geo_json" | grep -oE '"countryCode":"[^"]+' | cut -d'"' -f4)
             [ -z "$country" ] && country="Unknown"
@@ -251,6 +251,47 @@ rules_set_mode() {
     esac
     echo "Marking rules: $(rules_mode). Apply the rules once to switch."
     [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1
+    return 0
+}
+
+# =====================================================================
+#  Nothing may block for ever: time limit for commands, and a clean-up of runaway runs
+# =====================================================================
+# run_to SECONDS command ... : like the command, but it is killed after SECONDS (BusyBox nslookup has no time limit)
+run_to() {
+    rt_s=$1; shift
+    "$@" &
+    rt_p=$!
+    ( sleep "$rt_s"; kill "$rt_p" 2>/dev/null; sleep 1; kill -9 "$rt_p" 2>/dev/null ) >/dev/null 2>&1 &
+    rt_w=$!
+    wait "$rt_p" 2>/dev/null; rt_r=$?
+    kill "$rt_w" 2>/dev/null
+    return $rt_r
+}
+nsl() { run_to 6 nslookup "$@"; }
+
+# seconds since a process was started
+proc_age() {
+    pa_st=$(awk '{ print $22 }' "/proc/$1/stat" 2>/dev/null); pa_up=$(awk '{ print int($1) }' /proc/uptime 2>/dev/null)
+    case "$pa_st$pa_up" in ''|*[!0-9]*) echo 0; return ;; esac
+    echo $(( pa_up - pa_st / 100 ))
+}
+proc_kids() { for pk_d in /proc/[0-9]*; do [ "$(awk '{ print $4 }' "$pk_d/stat" 2>/dev/null)" = "$1" ] && echo "${pk_d#/proc/}"; done; }
+
+# periodic runs (routing check, failover, helpers of the counting loop) that run longer than REAP_AGE (15 minutes) hang: kill them and what they wait for
+proc_reap() {
+    pr_loop=$(cat "$TS_RT/loop.pid" 2>/dev/null); pr_max=${REAP_AGE:-900}
+    for pr_p in $(ps w 2>/dev/null | grep -E 'ASNmanager\.sh (check run|failover run|stats loop|stats export)' | grep -v grep | awk '{ print $1 }'); do
+        [ "$pr_p" = "$$" ] && continue
+        [ "$pr_p" = "$pr_loop" ] && continue                         # the counting loop itself keeps running
+        [ "$(proc_age "$pr_p")" -gt "$pr_max" ] || continue
+        for pr_k in $(proc_kids "$pr_p"); do
+            logger -t ASNmanager "hanging run: child $pr_k ($(tr '\0' ' ' 2>/dev/null < /proc/$pr_k/cmdline | cut -c1-70)) of $pr_p killed"
+            kill -9 "$pr_k" 2>/dev/null
+        done
+        logger -t ASNmanager "hanging run: process $pr_p ($(tr '\0' ' ' 2>/dev/null < /proc/$pr_p/cmdline | cut -c1-70)) older than ${pr_max}s killed"
+        kill -9 "$pr_p" 2>/dev/null
+    done
     return 0
 }
 
@@ -986,7 +1027,7 @@ check_menu_update() {
     rm -f "$TMP_CHECK" 2>/dev/null
     FETCH_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/ASNmanager.sh"
 
-    if curl -s -S -k --connect-timeout 1 "$FETCH_URL" -o "$TMP_CHECK" && [ -s "$TMP_CHECK" ]; then
+    if curl -s -S -k --connect-timeout 1 -m 10 "$FETCH_URL" -o "$TMP_CHECK" && [ -s "$TMP_CHECK" ]; then
         sed -i 's/\r$//' "$TMP_CHECK" 2>/dev/null
         REMOTE_VERSION=$(grep -m 1 "^SCRIPT_VERSION=" "$TMP_CHECK" | cut -d'"' -f2 | tr -d '\r')
         if [ -n "$REMOTE_VERSION" ] && is_remote_newer "$SCRIPT_VERSION" "$REMOTE_VERSION"; then
@@ -1006,7 +1047,7 @@ update_self() {
     rm -f "$TMP_SCRIPT" 2>/dev/null
     FETCH_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/ASNmanager.sh"
 
-    if curl -s -S -k --connect-timeout 10 "$FETCH_URL" -o "$TMP_SCRIPT" && [ -s "$TMP_SCRIPT" ]; then
+    if curl -s -S -k --connect-timeout 10 -m 60 "$FETCH_URL" -o "$TMP_SCRIPT" && [ -s "$TMP_SCRIPT" ]; then
         sed -i 's/\r$//' "$TMP_SCRIPT" 2>/dev/null
         REMOTE_VERSION=$(grep -m 1 "^SCRIPT_VERSION=" "$TMP_SCRIPT" | cut -d'"' -f2 | tr -d '\r')
         if [ "$SCRIPT_VERSION" = "$REMOTE_VERSION" ]; then
@@ -1412,7 +1453,7 @@ route_test() {
     if is_valid_ip "$target"; then
         ips="$target"
     else
-        ips=$(nslookup "$target" 2>/dev/null | grep -A 20 "Name:" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}')
+        ips=$(nsl "$target" 2>/dev/null | grep -A 20 "Name:" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}')
         [ -z "$ips" ] && { echo -e "${RED}Could not resolve ${target}${NC}"; return 1; }
     fi
     for test_ip in $ips; do
@@ -1635,7 +1676,7 @@ cli_schedule() {
 resolve_ipv4() {
     if is_valid_ip "$1"; then echo "$1"; return 0; fi
     for srv in "" 1.1.1.1 8.8.8.8; do
-        r=$(nslookup "$1" $srv 2>/dev/null | awk '/^Name:/ { f = 1; next } f && /Address/' \
+        r=$(nsl "$1" $srv 2>/dev/null | awk '/^Name:/ { f = 1; next } f && /Address/' \
             | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | grep -vE '^(0\.|127\.)' | awk '!s[$0]++' | head -n 4)
         [ -n "$r" ] && { echo "$r"; return 0; }
     done
@@ -2791,8 +2832,14 @@ ts_diag() {
     if ts_worker_running; then echo "[INFO] rule rebuild:     running right now (counting waits for it)"; else echo "[OK]   rule rebuild:     not running"; fi
     echo "[INFO] counting rules:   $(iptables -t mangle -S 2>/dev/null | grep -c '^-A ASC_') (chains in FORWARD: $(iptables -t mangle -S FORWARD 2>/dev/null | grep -c 'ASC_[UD]_'))"
     if grep -q "asnmanager" /jffs/scripts/service-event 2>/dev/null; then echo "[OK]   service-event:    hook present"; else echo "[FAIL] service-event:    hook for the WebUI buttons is missing (try: webui install)"; fi
-    echo "[INFO] processes:        $(ps w 2>/dev/null | grep -E 'ASNmanager|asn-bypass' | grep -v grep | wc -l) ASN Manager process(es)"
-    ps w 2>/dev/null | grep -E 'ASNmanager|asn-bypass' | grep -v grep | cut -c1-110 | sed 's/^/                        /'
+    td_old=0; td_all=0
+    for td_p in $(ps w 2>/dev/null | grep -E 'ASNmanager\.sh|asn-bypass' | grep -v grep | awk '{ print $1 }'); do
+        [ "$td_p" = "$$" ] && continue
+        td_a=$(proc_age "$td_p"); td_all=$((td_all + 1)); [ "$td_a" -gt 900 ] && td_old=$((td_old + 1))
+        echo "                        pid $td_p, running $td_a s: $(tr '\0' ' ' 2>/dev/null < /proc/$td_p/cmdline | cut -c1-70)"
+    done
+    if [ $td_old -gt 0 ]; then echo "[WARN] processes:        $td_old of $td_all ASN Manager processes run for more than 15 minutes (hanging) - cleaned up by the next routing check, or now with: rescue"
+    else echo "[OK]   processes:        $td_all ASN Manager process(es), none hanging"; fi
     echo "[INFO] timing:           the next line shows how long one export of the page data takes"
     td_t0=$(date +%s); ts_export >/dev/null 2>&1; echo "                         $(( $(date +%s) - td_t0 )) s"
 }
@@ -3101,7 +3148,8 @@ cli_rescue() {
     for rd in /proc/[0-9]*; do
         rp=${rd#/proc/}; [ "$rp" = "$$" ] && continue
         rcl=$(cat "$rd/cmdline" 2>/dev/null | tr '\000' ' ')
-        case "$rcl" in *"stats loop"*|*" rescue"*|"") continue ;; esac
+        case "$rcl" in *" rescue"*|"") continue ;; esac
+        [ "$rp" = "$(cat "$TS_RT/loop.pid" 2>/dev/null)" ] && continue          # the counting loop itself keeps running
         case "$rcl" in */jffs/scripts/ASNmanager.sh\ ) continue ;; esac            # an interactive menu (no arguments)
         case "$rcl" in
             /jffs/scripts/ASNmanager.sh*|/jffs/scripts/asn-bypass-worker.sh*) ;;
@@ -3288,7 +3336,7 @@ ep_list() {
         [ -n "$ep_h" ] || continue
         if is_valid_ip "$ep_h"; then echo "$ep_h $ep_who"
         else
-            nslookup "$ep_h" 2>/dev/null | awk -v w="$ep_who" '/^Name:/ { n = 1 }
+            nsl "$ep_h" 2>/dev/null | awk -v w="$ep_who" '/^Name:/ { n = 1 }
                 n && /^Address/ { for (i = 2; i <= NF; i++) if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) print $i, w }'
         fi
     done | sort -u > "$EP_CACHE.tmp" && mv -f "$EP_CACHE.tmp" "$EP_CACHE"
@@ -3822,7 +3870,7 @@ webui_install() {
     mkdir -p "$ADDON_DIR"
     if [ "$1" != "local" ]; then
         echo "Downloading WebUI page..."
-        if curl -fsSk --connect-timeout 10 "$ASP_URL" -o "$WEBUI_SRC.new" && grep -q "$WEBUI_MARK" "$WEBUI_SRC.new"; then
+        if curl -fsSk --connect-timeout 10 -m 60 "$ASP_URL" -o "$WEBUI_SRC.new" && grep -q "$WEBUI_MARK" "$WEBUI_SRC.new"; then
             sed -i 's/\r$//' "$WEBUI_SRC.new"
             mv -f "$WEBUI_SRC.new" "$WEBUI_SRC"
         else
@@ -4025,7 +4073,7 @@ cli_main() {
             esac ;;
         check)
             case "$1" in
-                run) rc_check ;;
+                run) proc_reap; rc_check ;;
                 *)   rc_print ;;
             esac ;;
         update)
@@ -4153,9 +4201,9 @@ while true; do
             if [ -n "$target" ]; then
                 clean_target=$(echo "$target" | sed -E 's#https?://##' | cut -d'/' -f1)
                 lookup_ip="$clean_target"
-                echo "$clean_target" | grep -q '[^0-9.]' && lookup_ip=$(nslookup "$clean_target" 2>/dev/null | grep -A 20 "Name:" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
+                echo "$clean_target" | grep -q '[^0-9.]' && lookup_ip=$(nsl "$clean_target" 2>/dev/null | grep -A 20 "Name:" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
                 if [ -n "$lookup_ip" ]; then
-                    asn_info=$(curl -fsSk --connect-timeout 5 "http://ip-api.com/line/$lookup_ip?fields=as")
+                    asn_info=$(curl -fsSk --connect-timeout 5 -m 10 "http://ip-api.com/line/$lookup_ip?fields=as")
                     echo -e "Result: ${GREEN}$asn_info${NC}"
                     asn_num=$(echo "$asn_info" | grep -oE '[Aa][Ss][0-9]+|[0-9]+' | head -n 1 | sed -E 's/[Aa][Ss]//g')
                     if [ -n "$asn_num" ]; then
