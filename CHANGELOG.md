@@ -1,3 +1,7 @@
+## v3.1.13
+
+- WebUI: the three sections of the ASN list stand out more - a header bar with an icon, a larger title and the number of entries as a badge (grey when empty), and a dividing line between the sections
+
 ## v3.1.12
 
 - Fixed: the routing test (menu [12], `test <IP|domain>`, WebUI) only looked at the ASN sets, so an address of an IP / CIDR or domain entry was shown as "DEFAULT ROUTE" although it is routed. It now checks the custom entries first and names the entry (e.g. "custom entry C3: 181.209.202.0/24")

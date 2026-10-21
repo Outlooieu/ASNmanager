@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.1.12 -->
+<!-- ASNmanager-WebUI v3.1.13 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -190,8 +190,12 @@
 .asnm-gsum .asnm-badge { margin-left: 6px; }
 .asnm-table-wrap { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 #asnm_list { padding: 0; }
-.asnm-lsec + .asnm-lsec { margin-top: 18px; }
-.asnm-lsec-head { padding: 8px 10px 6px; font-size: 13px; font-weight: 700; letter-spacing: .02em; }
+.asnm-lsec + .asnm-lsec { margin-top: 22px; padding-top: 18px; border-top: 2px solid var(--line); }
+.asnm-lsec-head { display: flex; align-items: center; gap: 9px; margin: 4px 0 8px; padding: 8px 12px; background: var(--card2); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; }
+.asnm-lsec-ico { width: 18px; height: 18px; color: var(--accent2); flex: none; }
+.asnm-lsec-title { font-size: 15px; font-weight: 700; color: var(--strong); letter-spacing: .01em; }
+.asnm-lsec-cnt { min-width: 20px; padding: 0 8px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; line-height: 20px; text-align: center; }
+.asnm-lsec-cnt.asnm-zero { background: var(--btn); color: var(--muted); border: 1px solid var(--line); line-height: 18px; }
 .asnm-cid { font-size: 11px; margin-left: 4px; }
 .asnm-flag { vertical-align: -2px; border-radius: 2px; margin-right: 5px; width: 20px; height: 14px; box-shadow: 0 0 0 1px rgba(0,0,0,.3); }
 .asnm-flag.asnm-flag-round { width: 18px; height: 18px; border-radius: 50%; vertical-align: -4px; margin-right: 6px; box-shadow: 0 0 0 1.5px var(--card), 0 0 0 2.5px var(--line); }
@@ -394,7 +398,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.1.12';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.1.13';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -1018,7 +1022,15 @@ function asnmRenderList() {
 }
 
 function asnmListSection(sec, entries, rcMap) {
-    var html = '<div class="asnm-lsec"><div class="asnm-lsec-head">' + asnmEsc(t('ls_' + sec)) + ' <span class="asnm-muted">(' + entries.length + ')</span></div>' +
+    var ico = {
+        asn: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+        ip:  '<rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/>',
+        dom: '<path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/>'
+    }[sec];
+    var html = '<div class="asnm-lsec"><div class="asnm-lsec-head">' +
+               '<svg class="asnm-lsec-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ico + '</svg>' +
+               '<span class="asnm-lsec-title">' + asnmEsc(t('ls_' + sec)) + '</span>' +
+               '<span class="asnm-lsec-cnt' + (entries.length ? '' : ' asnm-zero') + '">' + entries.length + '</span></div>' +
                '<table class="asnm-table"><tr><th style="width:24px;"><input type="checkbox" onclick="asnmToggleAll(this.checked, \'' + sec + '\')"/></th>' +
                '<th>' + t('ls_th_' + sec) + '</th><th>' + t('th_src') + '</th><th style="text-align:right;">' + t(sec === 'dom' ? 'ls_th_learned' : 'th_subnets') + '</th>' +
                '<th>' + t('th_state') + '</th><th>' + t('rc_th') + '</th><th></th></tr>';
