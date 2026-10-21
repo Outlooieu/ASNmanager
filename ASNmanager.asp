@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.1.7 -->
+<!-- ASNmanager-WebUI v3.1.8 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -388,7 +388,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.1.7';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.1.8';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -467,7 +467,7 @@ var ASNM_I18N = {
     rs_s_smode: 'Statistics detail', rs_s_rules: 'Marking rules', rs_v_asn: 'per ASN', rs_v_iface: 'per interface', rs_v_comb: 'combined', rs_v_single: 'one per ASN',
     back_router: '← Router', add_entries: 'Entries', kind_ip: 'IP', kind_dom: 'Domain', st_learned: '{n} learned',
     add_domnote: 'A domain also covers all its subdomains. It only works for devices that use the router as their DNS server (not with DoH or fixed DNS servers; IPv4 only). The router learns the addresses when a device looks the name up.',
-    rc_nolearned: 'none learned', rc_tip_nolearned: 'No address has been learned for this domain yet. A device has to look the name up through the router (devices with another DNS server or DoH are not covered).',
+    rc_nolearned: 'none learned', rc_tip_nolearned: 'No address has been learned for this domain yet. A device has to look the name up through the router\'s DNS server (dnsmasq). Not covered: devices with another DNS server or DoH, and names that an AdGuard Home in front answers without passing through dnsmasq.',
     lang_label: 'Language', lang_default: 'Default', lang_en: 'English', theme_label: 'Theme', theme_dark: 'Dark', theme_light: 'Light', theme_blue: 'Blue',
     stat_asns: 'ASNs', stat_subnets: 'Subnets', stat_ifaces: 'Interfaces online', stat_last: 'Last applied',
     card_add_sub: 'Route an Autonomous System, an IP range or a domain through a WAN or VPN interface', card_list_sub: 'Click a group to expand or collapse it',
@@ -584,7 +584,7 @@ var ASNM_I18N = {
     rs_s_smode: 'Statistik-Detail', rs_s_rules: 'Marker-Regeln', rs_v_asn: 'pro ASN', rs_v_iface: 'pro Interface', rs_v_comb: 'zusammengefasst', rs_v_single: 'einzeln pro ASN',
     back_router: '← Router', add_entries: 'Einträge', kind_ip: 'IP', kind_dom: 'Domain', st_learned: '{n} gelernt',
     add_domnote: 'Eine Domain gilt auch für alle Subdomains. Sie wirkt nur für Geräte, die den Router als DNS-Server nutzen (nicht bei DoH oder fest eingestelltem DNS; nur IPv4). Der Router lernt die Adressen, wenn ein Gerät den Namen auflöst.',
-    rc_nolearned: 'nichts gelernt', rc_tip_nolearned: 'Für diese Domain wurde noch keine Adresse gelernt. Ein Gerät muss den Namen über den Router auflösen (Geräte mit anderem DNS-Server oder DoH werden nicht erfasst).',
+    rc_nolearned: 'nichts gelernt', rc_tip_nolearned: 'Für diese Domain wurde noch keine Adresse gelernt. Ein Gerät muss den Namen über den DNS-Server des Routers (dnsmasq) auflösen. Nicht erfasst werden Geräte mit anderem DNS-Server oder DoH und Namen, die ein davorgeschalteter AdGuard Home beantwortet, ohne dass sie über dnsmasq laufen.',
     lang_label: 'Sprache', lang_default: 'Standard', lang_en: 'English', theme_label: 'Design', theme_dark: 'Dunkel', theme_light: 'Hell', theme_blue: 'Blau',
     stat_asns: 'ASNs', stat_subnets: 'Subnetze', stat_ifaces: 'Interfaces online', stat_last: 'Zuletzt angewendet',
     card_add_sub: 'Ein Autonomes System, einen IP-Bereich oder eine Domain über ein WAN- oder VPN-Interface leiten', card_list_sub: 'Gruppe anklicken zum Auf- oder Zuklappen',
@@ -2468,7 +2468,7 @@ function asnmFoSave(tg) {
 }
 
 /* ============================ routing check ============================ */
-var ASNM_RC = { data: null, checking: false };
+var ASNM_RC = { recheck: false, data: null, checking: false };
 
 function asnmRcMap() {
     var m = {}, d = ASNM_RC.data;
@@ -2488,6 +2488,7 @@ function asnmRcBadge(e, map) {
         case 'norule':   cls = 'asnm-warn'; txt = '! ' + t('rc_norule');  tip = t('rc_tip_norule'); break;
         case 'failover': cls = 'asnm-warn'; txt = '↪ ' + r.got;           tip = t('rc_tip_fo', { dev: r.dev, ip: r.sample, got: r.got }); break;
         case 'blocked':  cls = 'asnm-warn'; txt = '⛔ ' + t('rc_blocked'); tip = t('rc_tip_blocked', { d: r.dest }); break;
+        case 'pending':  cls = '';          txt = '… ' + t('rc_checking'); tip = t('rc_checking'); break;
         case 'nolearned': cls = 'asnm-warn'; txt = '! ' + t('rc_nolearned'); tip = t('rc_tip_nolearned'); break;
         default:         cls = 'asnm-warn'; txt = '! ' + t('rc_nosub');   tip = t('rc_tip_nosub');
     }
@@ -2498,7 +2499,7 @@ function asnmRcBadge(e, map) {
 function asnmRcRender() {
     var d = ASNM_RC.data, st = document.getElementById('asnm_rc_state'), ban = document.getElementById('asnm_banner_rc');
     var ok = 0, warn = 0, fail = 0, i;
-    if (d && d.results) for (i = 0; i < d.results.length; i++) { var x = d.results[i].state; if (x === 'ok') ok++; else if (x === 'warn') warn++; else fail++; }
+    if (d && d.results) for (i = 0; i < d.results.length; i++) { var x = d.results[i].state; if (x === 'ok') ok++; else if (x === 'warn') warn++; else if (x !== 'pending') fail++; }
     st.className = '';
     if (ASNM_RC.checking) st.textContent = t('rc_checking');
     else if (!d) st.textContent = '-';
@@ -2520,11 +2521,26 @@ function asnmRcRender() {
 }
 
 // reads the last result; asks the router for a new check if it is missing or older than 5 minutes
+// "none learned" in an older check, but the list says addresses were learned since: not a warning (any more) - check again, once a minute at most
+function asnmRcStale(d) {
+    if (!d || !d.results || !ASNM.data || !ASNM.data.entries) return;
+    var stale = false, q, z;
+    for (q = 0; q < d.results.length; q++) {
+        if (d.results[q].code !== 'nolearned') continue;
+        for (z = 0; z < ASNM.data.entries.length; z++)
+            if (ASNM.data.entries[z].asn === d.results[q].asn && ASNM.data.entries[z].learned > 0) { d.results[q].code = 'pending'; d.results[q].state = 'pending'; stale = true; }
+    }
+    if (stale && !ASNM_RC.checking && !ASNM_RC.recheck) {
+        ASNM_RC.recheck = true; setTimeout(function () { ASNM_RC.recheck = false; }, 60000);
+        setTimeout(asnmRcCheck, 300);
+    }
+}
+
 function asnmRcLoad(auto) {
     asnmGet('check.js', function (txt) {
         var d = null;
         try { d = JSON.parse(txt); } catch (e) {}
-        if (d) ASNM_RC.data = d;
+        if (d) { asnmRcStale(d); ASNM_RC.data = d; }
         asnmRcRender();
         if (auto && (!d || Date.now() / 1000 - d.ts > 300)) asnmRcCheck();
     }, function () { asnmRcRender(); if (auto) asnmRcCheck(); });
@@ -2545,7 +2561,7 @@ function asnmRcCheck() {
         asnmGet('check.js', function (txt) {
             var d = null;
             try { d = JSON.parse(txt); } catch (e) {}
-            if (d && d.ts !== prev) { ASNM_RC.data = d; done(); return; }
+            if (d && d.ts !== prev) { asnmRcStale(d); ASNM_RC.data = d; done(); return; }
             again();
         }, again);
     }

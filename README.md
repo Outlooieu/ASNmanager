@@ -9,7 +9,7 @@ ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to eas
  /_\ / __| \| | |  \/  | /_\ | \| | /_\ / __| __|| _ \
 / _ \__ \ .' | | |\/| |/ _ \| .' |/ _ \ (_ | _| |   /
 /_/ \_\___/_|\_| |_|  |_/_/ \_\_|\_/_/ \_\___|___||_|_\
-              === ASN MANAGER v3.1.7 ===
+              === ASN MANAGER v3.1.8 ===
 ================================================================
  ASNs
  [1]  Show ASN list & routing targets
@@ -209,6 +209,7 @@ Besides ASNs the list takes **single IP addresses, CIDR ranges and domains** - f
 
 What to know about domains:
 - It only works for devices that use the **router as their DNS server**. A browser with "Secure DNS" (DoH), or a device with a fixed DNS server (many TV boxes and streaming devices use 8.8.8.8), asks someone else and the router never sees the answer.
+- If **AdGuard Home** (or another DNS server) answers the devices directly and only forwards to dnsmasq for some names, only the names that pass through the router's dnsmasq are learned. AdGuard Home has an ipset option of its own, which ASN Manager does not use yet.
 - IPv4 only. What was learned is kept until the router restarts (no expiry, so a running stream is never cut); it is not lost by applying the rules. Connections that were already open before the address was learned stay where they are.
 - Traffic of these entries is counted under "Not assigned to an ASN" (or "All traffic" in the light statistics mode), not per entry.
 - The routing check shows them too (a domain says "none learned" until a device has looked the name up); backups and the restore dialog include them as part of the list; "Remove all" removes them too.

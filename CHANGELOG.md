@@ -1,3 +1,8 @@
+## v3.1.8
+
+- Fixed: a domain entry could show "none learned" (and count as a warning) although the list already said "4 learned": the routing check only runs every 5 minutes. The page now treats such an outdated "none learned" as "being checked" and starts a new check (once a minute at most); if really nothing was learned the warning stays
+- The hint for "none learned" names the cases that are not covered (other DNS server, DoH, AdGuard Home answering without dnsmasq)
+
 ## v3.1.7
 
 - Fixed: the routing check (cron, every 5 minutes) could run for 15 minutes and more, so several runs piled up. On a real router most of the hanging runs were found inside `nvram get wan0_ifname`: the check asked for the WAN interface for every ASN (about 340 calls per run, each one a process of its own). The WAN values from nvram are now read once per run (routing check, failover run, applying the rules; in the counting loop once a minute): 130 -> 14 nvram calls for the routing check and 230 -> 38 for applying the rules in a lab with 60 ASNs
