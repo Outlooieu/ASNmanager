@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.1.6
+version=3.1.7
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.1.6"
+SCRIPT_VERSION="3.1.7"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -76,8 +76,8 @@ ensure_script() {
 
 get_ifname() {
     case "$1" in
-        WAN|WAN1) echo "$(nvram get wan0_ifname 2>/dev/null)" ;;
-        WAN2)     echo "$(nvram get wan1_ifname 2>/dev/null)" ;;
+        WAN|WAN1) if [ -n "$NV_OK" ]; then echo "$NV_W0"; else echo "$(nvram get wan0_ifname 2>/dev/null)"; fi ;;
+        WAN2)     if [ -n "$NV_OK" ]; then echo "$NV_W1"; else echo "$(nvram get wan1_ifname 2>/dev/null)"; fi ;;
         OVPN1)    echo "tun11" ;; OVPN2) echo "tun12" ;; OVPN3) echo "tun13" ;; OVPN4) echo "tun14" ;; OVPN5) echo "tun15" ;;
         WGC1)     echo "wgc1" ;; WGC2) echo "wgc2" ;; WGC3) echo "wgc3" ;; WGC4) echo "wgc4" ;; WGC5) echo "wgc5" ;;
         *)        echo "" ;;
@@ -87,16 +87,16 @@ get_ifname() {
 check_iface_up() {
     case "$1" in
         WAN|WAN1)
-            wan_unit=$(nvram get wan0_ifname 2>/dev/null)
+            if [ -n "$NV_OK" ]; then wan_unit=$NV_W0; else wan_unit=$(nvram get wan0_ifname 2>/dev/null); fi
             [ -n "$wan_unit" ] && ip addr show dev "$wan_unit" 2>/dev/null | grep -q "inet " && return 0
-            wan_ip=$(nvram get wan0_ipaddr 2>/dev/null)
+            if [ -n "$NV_OK" ]; then wan_ip=$NV_I0; else wan_ip=$(nvram get wan0_ipaddr 2>/dev/null); fi
             [ -n "$wan_ip" ] && [ "$wan_ip" != "0.0.0.0" ] && return 0
             return 1
             ;;
         WAN2)
-            wan_unit=$(nvram get wan1_ifname 2>/dev/null)
+            if [ -n "$NV_OK" ]; then wan_unit=$NV_W1; else wan_unit=$(nvram get wan1_ifname 2>/dev/null); fi
             [ -n "$wan_unit" ] && ip addr show dev "$wan_unit" 2>/dev/null | grep -q "inet " && return 0
-            wan_ip=$(nvram get wan1_ipaddr 2>/dev/null)
+            if [ -n "$NV_OK" ]; then wan_ip=$NV_I1; else wan_ip=$(nvram get wan1_ipaddr 2>/dev/null); fi
             [ -n "$wan_ip" ] && [ "$wan_ip" != "0.0.0.0" ] && return 0
             return 1
             ;;
@@ -270,13 +270,35 @@ run_to() {
 }
 nsl() { run_to 6 nslookup "$@"; }
 
+# nvram is read ONCE per run: every "nvram get" is a process of its own and takes long on a busy router, the routing check used to ask for the
+# WAN interface for every ASN (hundreds of calls per run). get_ifname / check_iface_up use these values when they are set.
+nv_refresh() {
+    NV_W0=$(nvram get wan0_ifname 2>/dev/null); NV_W1=$(nvram get wan1_ifname 2>/dev/null)
+    NV_I0=$(nvram get wan0_ipaddr 2>/dev/null);  NV_I1=$(nvram get wan1_ipaddr 2>/dev/null)
+    NV_OK=1
+}
+
 # seconds since a process was started
 proc_age() {
+    [ -r "/proc/$1/stat" ] || { echo 0; return; }
     pa_st=$(awk '{ print $22 }' "/proc/$1/stat" 2>/dev/null); pa_up=$(awk '{ print int($1) }' /proc/uptime 2>/dev/null)
     case "$pa_st$pa_up" in ''|*[!0-9]*) echo 0; return ;; esac
     echo $(( pa_up - pa_st / 100 ))
 }
 proc_kids() { for pk_d in /proc/[0-9]*; do [ "$(awk '{ print $4 }' "$pk_d/stat" 2>/dev/null)" = "$1" ] && echo "${pk_d#/proc/}"; done; }
+
+# the cron run of the routing check: not while the previous one still works, and never longer than 4 minutes
+rc_run_once() {
+    rr_d=/tmp/asnmanager-check.lock
+    if ! mkdir "$rr_d" 2>/dev/null; then
+        rr_o=$(cat "$rr_d/pid" 2>/dev/null)
+        if [ -n "$rr_o" ] && [ -d "/proc/$rr_o" ] && [ "$(proc_age "$rr_o")" -lt 600 ]; then return 0; fi
+        rm -rf "$rr_d"; mkdir "$rr_d" 2>/dev/null || return 0
+    fi
+    echo $$ > "$rr_d/pid"
+    run_to "${RC_LIMIT:-240}" rc_check
+    rm -rf "$rr_d"
+}
 
 # periodic runs (routing check, failover, helpers of the counting loop) that run longer than REAP_AGE (15 minutes) hang: kill them and what they wait for
 proc_reap() {
@@ -284,6 +306,7 @@ proc_reap() {
     for pr_p in $(ps w 2>/dev/null | grep -E 'ASNmanager\.sh (check run|failover run|stats loop|stats export)' | grep -v grep | awk '{ print $1 }'); do
         [ "$pr_p" = "$$" ] && continue
         [ "$pr_p" = "$pr_loop" ] && continue                         # the counting loop itself keeps running
+        [ -d "/proc/$pr_p" ] || continue                             # gone in the meantime
         [ "$(proc_age "$pr_p")" -gt "$pr_max" ] || continue
         for pr_k in $(proc_kids "$pr_p"); do
             logger -t ASNmanager "hanging run: child $pr_k ($(tr '\0' ' ' 2>/dev/null < /proc/$pr_k/cmdline | cut -c1-70)) of $pr_p killed"
@@ -1152,6 +1175,8 @@ CACHE_DIR="/jffs/scripts/asn_cache"
 EXEC_MODE="$1"
 
 mkdir -p "$CACHE_DIR"
+# the WAN values from nvram once (not once per ASN)
+NV_W0=$(nvram get wan0_ifname 2>/dev/null); NV_W1=$(nvram get wan1_ifname 2>/dev/null); NV_I0=$(nvram get wan0_ipaddr 2>/dev/null); NV_I1=$(nvram get wan1_ipaddr 2>/dev/null); NV_OK=1
 # 1 = one combined set + one marking rule per target / source group (cheap per packet), 0 = one set + one rule per ASN
 UNION=1; [ -f /jffs/addons/asnmanager/rules.single ] && UNION=0
 UGROUPS=/tmp/asn_groups.txt; : > "$UGROUPS"; UGN=0; DONE_DESTS=" "
@@ -1180,8 +1205,8 @@ ASN_TOTAL=$(grep -c ':' "$ASN_FILE")
 ASN_NUM=0
 get_ifname() {
     case "$1" in
-        WAN|WAN1) echo "$(nvram get wan0_ifname 2>/dev/null)" ;;
-        WAN2)     echo "$(nvram get wan1_ifname 2>/dev/null)" ;;
+        WAN|WAN1) if [ -n "$NV_OK" ]; then echo "$NV_W0"; else echo "$(nvram get wan0_ifname 2>/dev/null)"; fi ;;
+        WAN2)     if [ -n "$NV_OK" ]; then echo "$NV_W1"; else echo "$(nvram get wan1_ifname 2>/dev/null)"; fi ;;
         OVPN1)    echo "tun11" ;; OVPN2) echo "tun12" ;; OVPN3) echo "tun13" ;; OVPN4) echo "tun14" ;; OVPN5) echo "tun15" ;;
         WGC1)     echo "wgc1" ;; WGC2) echo "wgc2" ;; WGC3) echo "wgc3" ;; WGC4) echo "wgc4" ;; WGC5) echo "wgc5" ;;
         *)        echo "" ;;
@@ -1190,16 +1215,16 @@ get_ifname() {
 check_iface_up() {
     case "$1" in
         WAN|WAN1)
-            wan_unit=$(nvram get wan0_ifname 2>/dev/null)
+            if [ -n "$NV_OK" ]; then wan_unit=$NV_W0; else wan_unit=$(nvram get wan0_ifname 2>/dev/null); fi
             [ -n "$wan_unit" ] && ip addr show dev "$wan_unit" 2>/dev/null | grep -q "inet " && return 0
-            wan_ip=$(nvram get wan0_ipaddr 2>/dev/null)
+            if [ -n "$NV_OK" ]; then wan_ip=$NV_I0; else wan_ip=$(nvram get wan0_ipaddr 2>/dev/null); fi
             [ -n "$wan_ip" ] && [ "$wan_ip" != "0.0.0.0" ] && return 0
             return 1
             ;;
         WAN2)
-            wan_unit=$(nvram get wan1_ifname 2>/dev/null)
+            if [ -n "$NV_OK" ]; then wan_unit=$NV_W1; else wan_unit=$(nvram get wan1_ifname 2>/dev/null); fi
             [ -n "$wan_unit" ] && ip addr show dev "$wan_unit" 2>/dev/null | grep -q "inet " && return 0
-            wan_ip=$(nvram get wan1_ipaddr 2>/dev/null)
+            if [ -n "$NV_OK" ]; then wan_ip=$NV_I1; else wan_ip=$(nvram get wan1_ipaddr 2>/dev/null); fi
             [ -n "$wan_ip" ] && [ "$wan_ip" != "0.0.0.0" ] && return 0
             return 1
             ;;
@@ -2692,6 +2717,7 @@ ts_loop() {
     echo $$ > "$TS_RT/loop.pid"
     last_save=$(date +%s)
     while [ "$(ts_state)" = "enabled" ] && [ "$(cat "$TS_RT/loop.pid" 2>/dev/null)" = "$$" ]; do
+        nvc=$((nvc + 1)); [ $((nvc % 6)) -eq 1 ] && nv_refresh        # the WAN values: now and then a minute (they hardly ever change)
         sig=$(ts_signature)
         if [ "$sig" != "$(cat "$TS_RT/sig" 2>/dev/null)" ]; then
             ts_lock; ts_sync >/dev/null 2>&1 && echo "$sig" > "$TS_RT/sig"; ts_unlock
@@ -2835,6 +2861,7 @@ ts_diag() {
     td_old=0; td_all=0
     for td_p in $(ps w 2>/dev/null | grep -E 'ASNmanager\.sh|asn-bypass' | grep -v grep | awk '{ print $1 }'); do
         [ "$td_p" = "$$" ] && continue
+        [ -d "/proc/$td_p" ] || continue                              # a helper of this command that is already gone
         td_c=$(tr '\0' ' ' 2>/dev/null < /proc/$td_p/cmdline)
         td_a=$(proc_age "$td_p")
         if [ -z "$td_c" ]; then                                        # finished, its parent has not collected it yet
@@ -3482,6 +3509,7 @@ fo_round() {
 # cron (every minute): two rounds, FO_INTERVAL seconds apart
 fo_run_cron() {
     [ -s "$FO_CONF" ] || return 0
+    nv_refresh
     fo_round_safe; sleep "$FO_INTERVAL"; fo_round_safe
 }
 
@@ -3608,6 +3636,7 @@ rc_rule_active() {
 }
 
 rc_check() {
+    nv_refresh
     ep_guard_sync >/dev/null 2>&1
     [ -d "$(dirname "$WEB_DIR")" ] || return 0
     mkdir -p "$WEB_DIR" 2>/dev/null || return 0
@@ -4080,7 +4109,7 @@ cli_main() {
             esac ;;
         check)
             case "$1" in
-                run) proc_reap; rc_check ;;
+                run) proc_reap; rc_run_once ;;
                 *)   rc_print ;;
             esac ;;
         update)

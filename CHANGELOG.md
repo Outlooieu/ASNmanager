@@ -1,3 +1,9 @@
+## v3.1.7
+
+- Fixed: the routing check (cron, every 5 minutes) could run for 15 minutes and more, so several runs piled up. On a real router most of the hanging runs were found inside `nvram get wan0_ifname`: the check asked for the WAN interface for every ASN (about 340 calls per run, each one a process of its own). The WAN values from nvram are now read once per run (routing check, failover run, applying the rules; in the counting loop once a minute): 130 -> 14 nvram calls for the routing check and 230 -> 38 for applying the rules in a lab with 60 ASNs
+- The routing check never runs twice at the same time (a second start while the first one works does nothing) and is stopped after 4 minutes; a lock left behind by a killed run is ignored
+- `stats diag` and the clean-up of hanging runs ignore processes that are already gone (they showed up as "running 786000 s")
+
 ## v3.1.6
 
 - `stats diag`: a finished process that its parent has not collected yet and the menu open in an SSH window were reported as "hanging"; now they are shown as what they are, and only real runs are counted
