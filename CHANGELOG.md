@@ -1,3 +1,7 @@
+## v3.2.6
+
+- Fewer dnsmasq restarts: a restart is only done when the `ipset=` lines in `dnsmasq.conf.add` change (dnsmasq reads them only at start). When just a domain set is new (new entry with the same lines, or the sets after a reboot), the DNS cache is emptied with SIGHUP instead - dnsmasq keeps running, DNS does not drop out. With the cache off (`cache-size=0`, e.g. when AdGuard Home answers in front of dnsmasq) nothing is done at all. Each restart also sets off the start-up of other DNS add-ons (AdGuard Home moves dnsmasq to port 553), which is now avoided where possible
+
 ## v3.2.5
 
 - "Apply rules" is much faster: the rules are rebuilt from the saved subnets and only ASNs that are not cached yet are downloaded. If the ASN list has not changed since the last build and no IP range was removed or changed, only the IP / domain entries are applied (a few seconds, the ASN rules stay as they are). No confirmation needed any more

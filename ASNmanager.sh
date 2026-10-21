@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.2.5
+version=3.2.6
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.2.5"
+SCRIPT_VERSION="3.2.6"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -498,9 +498,14 @@ cu_apply_ip() {
     done < "$CUSTOM_FILE"
 }
 
-# writes (or removes) our block in dnsmasq.conf.add; dnsmasq is restarted when the block changed, or with $2 = force
-# (a domain set was just created: dnsmasq adds an address only when it fetches the answer from its upstream, not
-# when it answers from its cache - the restart empties the cache, so names already looked up are learned again)
+# dnsmasq keeps a DNS cache?  (cache-size=0 = off, e.g. when AdGuard Home answers in front of it)
+cu_dnsmasq_cache_on() { ! grep -qE '^cache-size=0[[:space:]]*$' /etc/dnsmasq.conf 2>/dev/null; }
+
+# writes (or removes) our block in dnsmasq.conf.add; dnsmasq is restarted only when the block changed.
+# $2 = force: a domain set was just created. dnsmasq adds an address only when it fetches the answer from its
+# upstream, not when it answers from its cache - so the cache is emptied with SIGHUP (no restart, DNS keeps
+# running); with the cache off there is nothing to do. A restart is avoided where it can be: it also sets off the
+# start-up of other DNS add-ons (AdGuard Home moves dnsmasq to another port, Unbound ...).
 cu_dnsmasq_write() {
     cdw_new=/tmp/asnmanager-dnsmasq.new
     if [ -f "$DNSMASQ_ADD" ]; then sed "/^${CU_BEGIN}\$/,/^${CU_END}\$/d" "$DNSMASQ_ADD" > "$cdw_new"; else : > "$cdw_new"; fi
@@ -509,8 +514,12 @@ cu_dnsmasq_write() {
     if cmp -s "$cdw_new" "$cdw_cur"; then
         rm -f "$cdw_new"
         [ "$2" = "force" ] || return 0
-        service restart_dnsmasq >/dev/null 2>&1
-        logger -t ASNmanager "Domain routing: new domain set, dnsmasq restarted (cache emptied)"
+        if ! pidof dnsmasq >/dev/null 2>&1; then
+            logger -t ASNmanager "Domain routing: new domain set - dnsmasq is not running, nothing to empty"
+        elif cu_dnsmasq_cache_on; then
+            killall -HUP dnsmasq 2>/dev/null
+            logger -t ASNmanager "Domain routing: new domain set, dnsmasq cache emptied (SIGHUP, no restart)"
+        fi
         return 0
     fi
     if [ -s "$cdw_new" ]; then mkdir -p "$(dirname "$DNSMASQ_ADD")" && cp "$cdw_new" "$DNSMASQ_ADD"; else rm -f "$DNSMASQ_ADD"; fi
