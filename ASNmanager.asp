@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.1.0 -->
+<!-- ASNmanager-WebUI v3.1.1 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -381,6 +381,7 @@
 .asnm-back:hover { border-color: var(--accent); color: var(--text); }
 .asnm-kind { display: inline-block; padding: 0 7px; margin-right: 4px; border: 1px solid var(--line); border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
 #asnm_add_domnote { color: var(--warn); }
+#asnm_add_ms .asnm-ms-btn { width: 165px; }
 .asnm-tr-dest { color: var(--muted); font-size: 11px; margin-left: 6px; }
 .asnm-tr-gone { color: var(--muted); font-size: 11px; margin-left: 6px; font-style: italic; }
 </style>
@@ -826,7 +827,7 @@ function asnmRender() {
 
     asnmFillTargets(document.getElementById('asnm_add_dest'));
     asnmFillTargets(document.getElementById('asnm_preset_dest'));
-    asnmFillDevices(document.getElementById('asnm_add_dev'));
+    asnmDevMsRender('asnm_add_ms', 'asnm_add_src');
     asnmFillDevices(document.getElementById('asnm_preset_dev'));
     asnmRenderPresets();
     asnmRenderList();
@@ -878,6 +879,66 @@ function asnmDevLabel(dv) {
 }
 
 function asnmFillDevices(sel) { sel.innerHTML = asnmDeviceOptions(''); }
+
+/* ---------- device picker with checkboxes (several devices), writes the IPs into a text field ---------- */
+function asnmDevMsIps(inputId) {
+    var v = asnmNormSrc(document.getElementById(inputId).value);
+    return v ? v.split(',') : [];
+}
+
+function asnmDevMsLabel(inputId) {
+    var s = asnmDevMsIps(inputId);
+    if (!s.length) return t('sg_all');
+    if (s.length === 1) return asnmDeviceName(s[0]) || s[0];
+    return t('sg_n_dev', { n: s.length });
+}
+
+function asnmDevMsRender(boxId, inputId) {
+    var box = document.getElementById(boxId);
+    if (!box || !ASNM.data) return;
+    var wasOpen = / open/.test(' ' + box.className), pop = box.querySelector('.asnm-ms-pop'), top = pop ? pop.scrollTop : 0;
+    var s = asnmDevMsIps(inputId), on = {}, i, h, args = "'" + boxId + "','" + inputId + "'";
+    for (i = 0; i < s.length; i++) on[s[i]] = 1;
+    function item(ip, label) {
+        return '<label class="asnm-ms-item"><input type="checkbox" value="' + asnmEsc(ip) + '"' + (on[ip] ? ' checked="checked"' : '') +
+               ' onchange="asnmDevMsChange(this, ' + args + ');"/>' + asnmEsc(label) + '</label>';
+    }
+    h = '<button type="button" class="asnm-ms-btn" onclick="asnmDevMsToggle(event, \'' + boxId + '\');"><span>' + asnmEsc(asnmDevMsLabel(inputId)) + '</span><i></i></button>' +
+        '<div class="asnm-ms-pop" onclick="event.stopPropagation();">' +
+        '<label class="asnm-ms-item asnm-ms-all"><input type="checkbox"' + (s.length ? '' : ' checked="checked"') + ' onchange="asnmDevMsAll(' + args + ');"/>' + asnmEsc(t('sg_all')) + '</label>';
+    var devs = ASNM.data.devices || [], groups = [['lan', t('dev_lan')], ['wg', t('dev_wg')], ['ovpn', t('dev_ovpn')]];
+    for (var g = 0; g < groups.length; g++) {
+        var part = '';
+        for (i = 0; i < devs.length; i++) {
+            if ((devs[i].kind || 'lan') !== groups[g][0]) continue;
+            var nm = asnmDevLabel(devs[i]);
+            part += item(devs[i].ip, (nm ? nm + ' - ' : '') + devs[i].ip);
+        }
+        if (part) h += '<div class="asnm-ms-grp">' + asnmEsc(groups[g][1]) + '</div>' + part;
+    }
+    box.innerHTML = h + '</div>';
+    box.className = 'asnm-ms' + (wasOpen ? ' open' : '');
+    pop = box.querySelector('.asnm-ms-pop'); if (pop) pop.scrollTop = top;
+}
+
+function asnmDevMsToggle(ev, boxId) {
+    if (ev) ev.stopPropagation();
+    var b = document.getElementById(boxId);
+    b.className = / open/.test(' ' + b.className) ? 'asnm-ms' : 'asnm-ms open';
+}
+
+function asnmDevMsChange(cb, boxId, inputId) {
+    var s = asnmDevMsIps(inputId), k = s.indexOf(cb.value);
+    if (cb.checked && k < 0) s.push(cb.value);
+    if (!cb.checked && k >= 0) s.splice(k, 1);
+    document.getElementById(inputId).value = asnmNormSrc(s.join(','));
+    asnmDevMsRender(boxId, inputId);
+}
+
+function asnmDevMsAll(boxId, inputId) {
+    document.getElementById(inputId).value = '';
+    asnmDevMsRender(boxId, inputId);
+}
 
 function asnmPickDevice(sel, inputId) {
     var inp = document.getElementById(inputId);
@@ -2579,6 +2640,10 @@ function asnmTabBadges() {
 }
 
 function initial() {
+    document.addEventListener('click', function () {
+        var b = document.getElementById('asnm_add_ms');
+        if (b) b.className = 'asnm-ms';
+    });
     try { ASNM_TR.unit = localStorage.getItem('asnm_rate_unit') === 'mbyte' ? 'mbyte' : 'mbit'; } catch (e) { ASNM_TR.unit = 'mbit'; }
     asnmUnitMark();
     var page = window.location.pathname.substring(1);
@@ -2728,8 +2793,8 @@ function initial() {
         <span class="asnm-help" id="asnm_add_domnote" data-i18n="add_domnote" style="display:none;"></span></div>
       <div class="asnm-field"><span class="asnm-label" data-i18n="target"></span><select id="asnm_add_dest"></select></div>
       <div class="asnm-field"><span class="asnm-label" data-i18n="src_ip"></span>
-        <div class="asnm-inline"><input type="text" id="asnm_add_src" maxlength="600" data-i18n-ph="ph_ip" autocomplete="off" style="flex:0 0 150px;"/>
-          <select id="asnm_add_dev" class="asnm-devsel" onchange="asnmPickDevice(this,'asnm_add_src')"></select></div>
+        <div class="asnm-inline"><input type="text" id="asnm_add_src" maxlength="600" data-i18n-ph="ph_ip" autocomplete="off" style="flex:1 1 150px; min-width:0;" oninput="asnmDevMsRender('asnm_add_ms','asnm_add_src');"/>
+          <div class="asnm-ms" id="asnm_add_ms"></div></div>
         <span class="asnm-help" data-i18n="src_empty"></span></div>
     </div>
     <div class="asnm-row" style="margin-top:14px;"><input type="button" class="button_gen asnm-btn asnm-primary" data-i18n-value="btn_add" onclick="asnmAdd();"/></div>

@@ -9,7 +9,7 @@ ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to eas
  /_\ / __| \| | |  \/  | /_\ | \| | /_\ / __| __|| _ \
 / _ \__ \ .' | | |\/| |/ _ \| .' |/ _ \ (_ | _| |   /
 /_/ \_\___/_|\_| |_|  |_/_/ \_\_|\_/_/ \_\___|___||_|_\
-              === ASN MANAGER v3.1.0 ===
+              === ASN MANAGER v3.1.1 ===
 ================================================================
  ASNs
  [1]  Show ASN list & routing targets
@@ -250,7 +250,7 @@ In the card "Target interfaces", section **Failover**, every target that has ASN
 
 ## One rule for several devices
 
-The source of a rule can be empty (all devices), one IP or a **comma separated list** of IPs, for example `192.168.1.50,192.168.1.60` (up to 32). It works everywhere: "Add ASNs" (the device picker adds a device to the list instead of replacing it), editing a row, the suggestions (tick several devices), backup / restore and the command line (`ASNmanager.sh add WGC1 2906 --src 192.168.1.50,192.168.1.60`). The router creates one marking rule per device; the traffic statistics count each device separately. Each ASN is still on the list only once - adding it again replaces the earlier rule, so to add a device later, edit the row or add the ASN again with the full device list.
+The source of a rule can be empty (all devices), one IP or a **comma separated list** of IPs, for example `192.168.1.50,192.168.1.60` (up to 32). It works everywhere: "Add ASNs, IPs or domains" (a device picker with checkboxes, like in the suggestions: tick as many devices as you like, "All devices" clears the choice; you can also type the IPs), editing a row, the suggestions (tick several devices), backup / restore and the command line (`ASNmanager.sh add WGC1 2906 --src 192.168.1.50,192.168.1.60`). The router creates one marking rule per device; the traffic statistics count each device separately. Each ASN is still on the list only once - adding it again replaces the earlier rule, so to add a device later, edit the row or add the ASN again with the full device list.
 
 ## Suggestions from the traffic without a rule
 

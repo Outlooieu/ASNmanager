@@ -1,3 +1,7 @@
+## v3.1.1
+
+- WebUI: "Add ASNs, IPs or domains" has a device picker with checkboxes like the suggestions - several devices can be ticked, "All devices" clears the choice; the chosen IPs appear in the source field, which can still be typed by hand (the picker follows)
+
 ## v3.1.0
 
 - **Custom entries: single IPs, CIDR ranges and domains** (`/8` to `/32` for ranges). Typed in the same field as ASNs ("Add ASNs, IPs or domains", SSH menu [2], `add`), mixed in one go; target interface and source devices as for ASNs; they get an ID (`C1` ...) for edit / remove, which also work by value (`remove googlevideo.com`). Stored in `/jffs/scripts/custom_list.txt`, shown in the list with an "IP" / "Domain" tag, part of backups (new `[CUSTOM]` section; the restore dialog counts them as part of the ASN list), the routing check and `list`; `custom list|apply|early|purge` on the command line
