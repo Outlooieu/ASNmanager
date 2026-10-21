@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.1.3 -->
+<!-- ASNmanager-WebUI v3.1.4 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -388,7 +388,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.1.3';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.1.4';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -409,7 +409,7 @@ var ASNM_I18N = {
     tr_broken: 'Counting is not running properly ({why}). Live values, new devices and suggestions are not updated.', tr_why_loop: 'background process stopped', tr_why_rules: 'counting rules missing',
     tr_repair: 'Repair', tr_repairing: 'Repairing - the numbers are kept...',
     tr_save_off: 'Saving to the USB device is turned off - the numbers are only kept in RAM and start over after a reboot.', tr_save_turn_off: 'Turn saving off', tr_save_turn_on: 'Turn saving on',
-    tr_save_confirm: 'Turn off saving to the USB device?\nThe numbers are then only kept in RAM and start over after a reboot. Nothing is written to the USB device any more.', net_lan: 'LAN / Wi-Fi', net_g24: 'Guest 2.4 GHz', net_g5: 'Guest 5 GHz', net_g6: 'Guest 6 GHz', net_wgs: 'WireGuard server', net_ovs: 'OpenVPN server', tr_timeout: 'No answer from the statistics module.',
+    tr_save_confirm: 'Turn off saving to the USB device?\nThe numbers are then only kept in RAM and start over after a reboot. Nothing is written to the USB device any more.', net_lan: 'LAN / Wi-Fi', net_g24: 'Guest 2.4 GHz', net_g5: 'Guest 5 GHz', net_g6: 'Guest 6 GHz', net_wgs: 'WireGuard server', net_ovs: 'OpenVPN server', tr_timeout: 'No answer from the statistics module. If this repeats, run "/jffs/scripts/ASNmanager.sh stats diag" on the router (SSH).',
     dev_lan: 'LAN / Wi-Fi devices', dev_wg: 'WireGuard server peers', dev_ovpn: 'OpenVPN server clients', wg_peer: 'WireGuard peer', ovpn_client: 'OpenVPN client',
     upd_label: 'Update', upd_check: 'Check for updates', upd_checking: 'Checking GitHub...', upd_current: 'Up to date (v{v})', upd_checked: 'checked {t}',
     upd_available: 'v{r} available', upd_error: 'GitHub not reachable', upd_install: 'Update now', upd_notes: 'What is new?', upd_running: 'Updating - please wait, the page reloads afterwards...',
@@ -526,7 +526,7 @@ var ASNM_I18N = {
     tr_broken: 'Die Zählung läuft nicht richtig ({why}). Live-Werte, neue Geräte und Vorschläge werden nicht aktualisiert.', tr_why_loop: 'Hintergrundprozess gestoppt', tr_why_rules: 'Zähl-Regeln fehlen',
     tr_repair: 'Reparieren', tr_repairing: 'Reparatur läuft - die Zahlen bleiben erhalten...',
     tr_save_off: 'Die Sicherung auf dem USB-Gerät ist ausgeschaltet - die Zahlen liegen nur im Arbeitsspeicher und beginnen nach einem Neustart von vorn.', tr_save_turn_off: 'Sicherung ausschalten', tr_save_turn_on: 'Sicherung einschalten',
-    tr_save_confirm: 'Sicherung auf dem USB-Gerät ausschalten?\nDie Zahlen liegen dann nur im Arbeitsspeicher und beginnen nach einem Neustart von vorn. Auf das USB-Gerät wird nichts mehr geschrieben.', net_lan: 'LAN / WLAN', net_g24: 'Gast 2,4 GHz', net_g5: 'Gast 5 GHz', net_g6: 'Gast 6 GHz', net_wgs: 'WireGuard-Server', net_ovs: 'OpenVPN-Server', tr_timeout: 'Keine Antwort vom Statistik-Modul.',
+    tr_save_confirm: 'Sicherung auf dem USB-Gerät ausschalten?\nDie Zahlen liegen dann nur im Arbeitsspeicher und beginnen nach einem Neustart von vorn. Auf das USB-Gerät wird nichts mehr geschrieben.', net_lan: 'LAN / WLAN', net_g24: 'Gast 2,4 GHz', net_g5: 'Gast 5 GHz', net_g6: 'Gast 6 GHz', net_wgs: 'WireGuard-Server', net_ovs: 'OpenVPN-Server', tr_timeout: 'Keine Antwort vom Statistik-Modul. Wenn das wiederholt auftritt: auf dem Router per SSH "/jffs/scripts/ASNmanager.sh stats diag" ausführen.',
     dev_lan: 'LAN- / WLAN-Geräte', dev_wg: 'WireGuard-Server-Peers', dev_ovpn: 'OpenVPN-Server-Clients', wg_peer: 'WireGuard-Peer', ovpn_client: 'OpenVPN-Client',
     upd_label: 'Update', upd_check: 'Nach Updates suchen', upd_checking: 'GitHub wird geprüft...', upd_current: 'Aktuell (v{v})', upd_checked: 'geprüft {t}',
     upd_available: 'v{r} verfügbar', upd_error: 'GitHub nicht erreichbar', upd_install: 'Jetzt aktualisieren', upd_notes: 'Was ist neu?', upd_running: 'Update läuft - bitte warten, danach lädt die Seite neu...',
@@ -1828,14 +1828,14 @@ function asnmTrCmd(act) {
     f.elements['next_page'].value = page;
     f.elements['action_script'].value = 'start_asnmanagerstats' + act;
     asnmPost(f);
-    ASNM_TR.pending = { act: act, since: Math.floor(Date.now() / 1000) - 2, start: Date.now() };
+    ASNM_TR.pending = { act: act, since: Math.floor(Date.now() / 1000) - 2, start: Date.now(), ts0: ASNM_TR.data ? ASNM_TR.data.ts : 0 };
     asnmTrRender();
     var want = (act === 'disable' || act === 'reset') ? 'disabled' : 'enabled';
     (function poll() {
         asnmTrLoad(function (d) {
             var p = ASNM_TR.pending;
             if (!p) return;
-            if (d && d.ts >= p.since && d.state === want && (act !== 'repair' || d.loop === 1)) { ASNM_TR.pending = null; asnmTrRender(); asnmTrSchedule(); return; }
+            if (d && (d.ts >= p.since || d.ts !== p.ts0) && d.state === want && (act !== 'repair' || d.loop === 1)) { ASNM_TR.pending = null; asnmTrRender(); asnmTrSchedule(); return; }
             if (Date.now() - p.start > 90000) { ASNM_TR.pending = null; asnmTrRender(); alert(t('tr_timeout')); return; }
             setTimeout(poll, 1500);
         });
@@ -2553,7 +2553,7 @@ function asnmRcCheck() {
 }
 
 /* ============================ updates ============================ */
-var ASNM_UPD = { data: null, checking: false, reload: function () { window.location.reload(); } };
+var ASNM_UPD = { data: null, checking: false, stale: false, reload: function () { window.location.reload(); } };
 
 function asnmUpdRender() {
     var d = ASNM_UPD.data, st = document.getElementById('asnm_upd_state'), ban = document.getElementById('asnm_banner_update');
@@ -2576,6 +2576,10 @@ function asnmUpdRender() {
 function asnmUpdLoad(auto) {
     asnmGet('update.js', function (txt) {
         try { ASNM_UPD.data = JSON.parse(txt); } catch (e) { ASNM_UPD.data = null; }
+        // the stored check result names another installed version (it is from before an update): do not show it, check again
+        if (ASNM_UPD.data && ASNM_UPD.data.local && ASNM_UPD.data.local !== ASNM_PAGE_VER && !ASNM_UPD.stale) {
+            ASNM_UPD.stale = true; ASNM_UPD.data = null; asnmUpdRender(); asnmUpdCheck(false); return;
+        }
         asnmUpdRender();
         var age = ASNM_UPD.data ? Date.now() / 1000 - ASNM_UPD.data.ts : 1e9;
         if (auto && age > 21600) asnmUpdCheck(false);

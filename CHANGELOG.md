@@ -1,3 +1,9 @@
+## v3.1.4
+
+- Fixed: after an update the notice "A new version is available ... (installed: vOLD)" stayed, because the stored check result is only renewed every 6 hours. The update now writes the result itself, and the page ignores a check result that names another installed version and checks again
+- New: `stats diag` - one command that shows where the traffic statistics hang (counting loop, lock and its owner, age of stats.js, running rebuild, service-event hook, processes, how long one export takes)
+- The page no longer depends on the router clock matching the PC clock when it waits for the statistics to answer (it also accepts a changed time stamp); the timeout message now says to run `stats diag`
+
 ## v3.1.3
 
 - Fixed: after "Update now" in the WebUI the header kept showing the old version (and "Data refreshed" the old time) although the update was installed. The script that is still running at the end of the update is the OLD one and wrote the page data with its own version number. Now the new script writes the data after an update; in addition the page notices data from an older script and asks for fresh data once per session (so it also works when the update is done by an older version)

@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.1.3
+version=3.1.4
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.1.3"
+SCRIPT_VERSION="3.1.4"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -2770,6 +2770,33 @@ ts_boot() {
     ts_start_loop
 }
 
+# stats diag: where does the statistics module hang? (one command, no changes)
+ts_diag() {
+    echo "== ASN Manager traffic statistics - diagnosis"
+    td_now=$(date +%s)
+    echo "[INFO] router time:      $(date '+%Y-%m-%d %H:%M:%S') (epoch $td_now)"
+    echo "[INFO] state / mode:     $(ts_state) / $(ts_mode)"
+    td_lp=$(cat "$TS_RT/loop.pid" 2>/dev/null)
+    if ts_pid_alive "$td_lp"; then echo "[OK]   counting loop:    running (pid $td_lp)"
+    elif [ "$(ts_state)" = "enabled" ]; then echo "[WARN] counting loop:    NOT running although the statistics are on (try: stats repair)"
+    else echo "[INFO] counting loop:    not running (statistics are off)"; fi
+    if [ -d "$TS_RT/lock" ]; then
+        td_lo=$(cat "$TS_RT/lock/pid" 2>/dev/null)
+        if ts_pid_alive "$td_lo"; then echo "[WARN] lock:             held by process $td_lo (running) - a step may be stuck: $(tr '\0' ' ' < /proc/$td_lo/cmdline 2>/dev/null | cut -c1-80)"
+        else echo "[WARN] lock:             left over (owner ${td_lo:-unknown} is gone) - is removed by the next action (or: rescue)"; fi
+    else echo "[OK]   lock:             none"; fi
+    td_ts=$(sed -n 's/.*"ts":\([0-9][0-9]*\).*/\1/p' "$WEB_DIR/stats.js" 2>/dev/null | head -n 1)
+    if [ -n "$td_ts" ]; then echo "[INFO] stats.js:         written $((td_now - td_ts)) s ago (the page reads this file)"
+    else echo "[WARN] stats.js:         missing - the page has nothing to show (try: stats enable / refresh)"; fi
+    if ts_worker_running; then echo "[INFO] rule rebuild:     running right now (counting waits for it)"; else echo "[OK]   rule rebuild:     not running"; fi
+    echo "[INFO] counting rules:   $(iptables -t mangle -S 2>/dev/null | grep -c '^-A ASC_') (chains in FORWARD: $(iptables -t mangle -S FORWARD 2>/dev/null | grep -c 'ASC_[UD]_'))"
+    if grep -q "asnmanager" /jffs/scripts/service-event 2>/dev/null; then echo "[OK]   service-event:    hook present"; else echo "[FAIL] service-event:    hook for the WebUI buttons is missing (try: webui install)"; fi
+    echo "[INFO] processes:        $(ps w 2>/dev/null | grep -E 'ASNmanager|asn-bypass' | grep -v grep | wc -l) ASN Manager process(es)"
+    ps w 2>/dev/null | grep -E 'ASNmanager|asn-bypass' | grep -v grep | cut -c1-110 | sed 's/^/                        /'
+    echo "[INFO] timing:           the next line shows how long one export of the page data takes"
+    td_t0=$(date +%s); ts_export >/dev/null 2>&1; echo "                         $(( $(date +%s) - td_t0 )) s"
+}
+
 # Repair: keeps the numbers, throws away every temporary file and set-up of the counting and builds it again
 ts_repair() {
     ts_ensure_rt
@@ -2912,11 +2939,12 @@ ts_cli() {
         export)  ts_export ;;
         save)    ts_save ;;
         saving)  ts_save_mode "$2" ;;
+        diag)    ts_diag ;;
         mode)    ts_set_mode "$2" ;;
         repair)  ts_repair ;;
         boot)    ts_boot ;;
         loop)    ts_loop ;;
-        *)       echo "Usage: stats enable | disable | reset | show | unknown | probe | saving on|off | mode asn|iface | repair"; return 1 ;;
+        *)       echo "Usage: stats enable | disable | reset | show | unknown | probe | diag | saving on|off | mode asn|iface | repair"; return 1 ;;
     esac
 }
 
@@ -3665,6 +3693,8 @@ cli_update() {
     fi
     webui_enabled && "$SCRIPT_PATH" webui update >/dev/null 2>&1        # fetch the matching WebUI page
     "$SCRIPT_PATH" stats boot >/dev/null 2>&1                           # restart the statistics loop with the new code
+    # the notice "a new version is available" must go: the stored check result still names the old version
+    [ -d "$WEB_DIR" ] && printf '{"ts":%s,"local":"%s","remote":"%s","newer":0,"error":"","notes":"%s"}\n' "$(date +%s)" "$u_rv" "$u_rv" "$UPD_NOTES" > "$WEB_DIR/update.js"
     echo "Updated to v${u_rv}. The page reloads."
 }
 
@@ -3913,6 +3943,7 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   stats saving on | off              save the numbers hourly on the USB device (default) / keep them in RAM only
   stats mode asn | iface             statistics per ASN (exact) / per interface and device only (cheaper for the CPU)
   rulemode combined | single         marking rules: one combined set per target (fast) / one rule per ASN (apply the rules afterwards)
+  stats diag                         where do the statistics hang? (loop, lock, hook, timing)
   stats repair                       statistics do not count: clean temporary files, set up the counting again (numbers are kept)
   update check | install             look for a new version on GitHub / install it (the WebUI offers this as well)
   check                              routing check: does every ASN leave through its target interface? (also every 5 min)
