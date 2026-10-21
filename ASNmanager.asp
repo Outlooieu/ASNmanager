@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.3.0 -->
+<!-- ASNmanager-WebUI v3.3.1 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -309,7 +309,9 @@
 .asnm-sg-title { font-weight: 700; font-size: 13px; color: var(--strong); }
 .asnm-sg-name { display: block; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .asnm-sg-on { font-size: 11px; color: var(--warn); max-width: 170px; line-height: 1.35; margin-top: 2px; }
-.asnm-sg-cl { font-size: 12px; color: var(--text2); max-width: 125px; }
+.asnm-sg-cl { font-size: 12px; color: var(--text2); max-width: 170px; }
+.asnm-sg-clrow { display: flex; justify-content: space-between; gap: 8px; line-height: 18px; }
+.asnm-sg-clrow span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #asnm_sg .asnm-table th:not(:first-child), #asnm_sg .asnm-table td:not(:first-child) { padding-left: 6px; padding-right: 6px; }
 .asnm-sg-sel { width: 150px; }
 .asnm-sg-foot { margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.5; }
@@ -398,7 +400,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.3.0';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.3.1';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -436,7 +438,7 @@ var ASNM_I18N = {
     sg_wait: 'Collecting data - the first evaluation appears after about a minute.', sg_empty: 'No destinations without a rule found yet.',
     sg_pending: '{n} destination address(es) with {b} of traffic are still being looked up...', sg_fails: 'Look-ups for {n} network(s) failed (ip-api.com, ipinfo.io and RIPEstat not reachable from the router?) - they are retried after an hour.',
     sg_on_list: 'on the list for: {d} ({t}) - Add extends the devices of this rule', sg_noacct: 'The byte counters for connections could not be switched on - no suggestions possible.',
-    sg_th_asn: 'ASN', sg_th_b: 'Traffic', sg_th_cl: 'Used by', sg_th_t: 'Target', sg_th_dev: 'Device', sg_all: 'All devices', sg_grp_used: 'Uses this ASN', sg_add: 'Add', sg_more: '+{n} more',
+    sg_th_asn: 'ASN', sg_th_b: 'Traffic', sg_th_cl: 'Used by', sg_th_t: 'Target', sg_th_dev: 'Device', sg_all: 'All devices', sg_grp_used: 'Uses this ASN', sg_add: 'Add', sg_more: '+{n} more', sg_less: 'show less',
     sg_note: 'Estimate from the connection table of the router, evaluated every minute (very short connections can be missed). Destination addresses are looked up via ip-api.com (at most 10 per minute). ASNs that are already in the list are hidden. "Add" puts the ASN on the list - then apply the rules.',
     sec_tbl: 'Traffic per ASN / target', sec_cnt: '{n} entry(ies)', sg_f_show: 'Show', sg_f_dev: 'Device', sg_f_q: 'Search ASN or name',
     sg_f_count: '{x} of {y} ASN(s)', sg_f_total: ' - {n} found in total, the 100 largest are listed', sg_n_dev: '{n} devices', sg_nomatch: 'No ASN matches the filter.',
@@ -556,7 +558,7 @@ var ASNM_I18N = {
     sg_wait: 'Daten werden gesammelt - die erste Auswertung erscheint nach etwa einer Minute.', sg_empty: 'Noch keine Ziele ohne Regel gefunden.',
     sg_pending: '{n} Ziel-Adresse(n) mit {b} Traffic werden noch zugeordnet...', sg_fails: 'Zuordnung für {n} Netz(e) fehlgeschlagen (ip-api.com, ipinfo.io und RIPEstat vom Router aus nicht erreichbar?) - neuer Versuch nach einer Stunde.',
     sg_on_list: 'auf der Liste für: {d} ({t}) - Hinzufügen ergänzt die Geräte dieser Regel', sg_noacct: 'Die Byte-Zähler für Verbindungen ließen sich nicht einschalten - keine Vorschläge möglich.',
-    sg_th_asn: 'ASN', sg_th_b: 'Traffic', sg_th_cl: 'Genutzt von', sg_th_t: 'Ziel', sg_th_dev: 'Gerät', sg_all: 'Alle Geräte', sg_grp_used: 'Nutzt dieses ASN', sg_add: 'Hinzufügen', sg_more: '+{n} weitere',
+    sg_th_asn: 'ASN', sg_th_b: 'Traffic', sg_th_cl: 'Genutzt von', sg_th_t: 'Ziel', sg_th_dev: 'Gerät', sg_all: 'Alle Geräte', sg_grp_used: 'Nutzt dieses ASN', sg_add: 'Hinzufügen', sg_more: '+{n} weitere', sg_less: 'weniger anzeigen',
     sg_note: 'Schätzung aus der Verbindungstabelle des Routers, jede Minute ausgewertet (sehr kurze Verbindungen können fehlen). Die Ziel-Adressen werden über ip-api.com zugeordnet (höchstens 10 pro Minute). ASNs, die schon in der Liste stehen, sind ausgeblendet. "Hinzufügen" setzt das ASN auf die Liste - danach die Regeln anwenden.',
     sec_tbl: 'Traffic nach ASN / Ziel', sec_cnt: '{n} Einträge', sg_f_show: 'Anzeigen', sg_f_dev: 'Gerät', sg_f_q: 'ASN oder Name suchen',
     sg_f_count: '{x} von {y} ASN(s)', sg_f_total: ' - insgesamt {n} gefunden, die 100 größten sind aufgeführt', sg_n_dev: '{n} Geräte', sg_nomatch: 'Kein ASN passt zum Filter.',
@@ -2222,7 +2224,13 @@ function asnmTrSaveMode(mode) {
 }
 
 /* ---------- suggestions from the traffic without a rule ---------- */
-var ASNM_SG = { data: null, added: {}, sel: {}, auto: {}, tgt: {}, f: { n: 10, dev: '', q: '' }, sig: '', fsig: '', open: '', dirty: false };
+var ASNM_SG = { data: null, added: {}, sel: {}, auto: {}, tgt: {}, f: { n: 10, dev: '', q: '' }, sig: '', fsig: '', open: '', dirty: false, clOpen: {} };
+
+// "+N more" in the "Used by" column: show every device of this ASN (with its traffic), or fold the list again
+function asnmSgClToggle(asn) {
+    if (ASNM_SG.clOpen[asn]) delete ASNM_SG.clOpen[asn]; else ASNM_SG.clOpen[asn] = 1;
+    asnmSgRender(true);
+}
 
 function asnmSgSetDev(ip) {
     for (var a in ASNM_SG.auto) { delete ASNM_SG.sel[a]; }
@@ -2423,8 +2431,17 @@ function asnmSgRender(force) {
         for (i = 0; i < shown.length; i++) {
             var r = shown[i].r, a = asnmEsc(r.asn), who = [];
             if (ASNM_SG.f.dev && ASNM_SG.sel[r.asn] === undefined) { ASNM_SG.sel[r.asn] = [ASNM_SG.f.dev]; ASNM_SG.auto[r.asn] = 1; }   // filter by device -> preselect it
-            for (var c = 0; c < r.cl.length && c < 2; c++) who.push(asnmEsc(asnmDeviceName(r.cl[c][0]) || r.cl[c][0]));
-            if (r.cl.length > 2) who.push('<span class="asnm-muted">' + asnmEsc(t('sg_more', { n: r.cl.length - 2 })) + '</span>');
+            var clOpen = !!ASNM_SG.clOpen[r.asn], allNames = [];
+            for (var c = 0; c < r.cl.length; c++) allNames.push((asnmDeviceName(r.cl[c][0]) || r.cl[c][0]) + ' (' + asnmFmtBytes(r.cl[c][1]) + ')');
+            if (clOpen) {
+                // every device on its own line with its traffic, a click closes the list again
+                for (c = 0; c < r.cl.length; c++)
+                    who.push('<div class="asnm-sg-clrow"><span>' + asnmEsc(asnmDeviceName(r.cl[c][0]) || r.cl[c][0]) + '</span><span class="asnm-muted">' + asnmFmtBytes(r.cl[c][1]) + '</span></div>');
+                if (r.cl.length > 2) who.push('<span class="asnm-link" onclick="asnmSgClToggle(\'' + a + '\');">' + asnmEsc(t('sg_less')) + '</span>');
+            } else {
+                for (c = 0; c < r.cl.length && c < 2; c++) who.push(asnmEsc(asnmDeviceName(r.cl[c][0]) || r.cl[c][0]));
+                if (r.cl.length > 2) who.push('<span class="asnm-link" title="' + asnmEsc(allNames.join('\n')) + '" onclick="asnmSgClToggle(\'' + a + '\');">' + asnmEsc(t('sg_more', { n: r.cl.length - 2 })) + '</span>');
+            }
             var onTxt = '';
             if (r.on) {
                 var od = String(r.osrc).split(','), on = [];
@@ -2433,7 +2450,7 @@ function asnmSgRender(force) {
                 if (!ASNM_SG.tgt[r.asn]) ASNM_SG.tgt[r.asn] = r.on;
             }
             html += '<tr><td><b>AS' + a + '</b><span class="asnm-sg-name asnm-dev" title="' + asnmEsc(r.name) + '">' + asnmEsc(r.name || '-') + '</span>' + onTxt + '</td>' +
-                    '<td class="num">' + asnmFmtBytes(shown[i].b) + '</td><td class="asnm-sg-cl">' + who.join(', ') + '</td>' +
+                    '<td class="num">' + asnmFmtBytes(shown[i].b) + '</td><td class="asnm-sg-cl" title="' + asnmEsc(allNames.join('\n')) + '">' + (clOpen ? who.join('') : who.join(', ')) + '</td>' +
                     '<td><select id="asnm_sg_t_' + a + '" class="input_option asnm-sg-sel" onchange="ASNM_SG.tgt[\'' + a + '\'] = this.value;" onblur="asnmSgFlush();">' +
                     asnmSgTargetOptions(ASNM_SG.tgt[r.asn] || def) + '</select></td>' +
                     '<td>' + asnmMsHtml(r) + '</td>' +

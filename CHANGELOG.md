@@ -1,3 +1,7 @@
+## v3.3.1
+
+- Suggestions: "+N more" in the "Used by" column can be clicked - it shows every device with the traffic it caused to this ASN, one per line; "show less" folds the list again. Hovering over the column lists all devices too
+
 ## v3.3.0
 
 - New: learned domain addresses expire **7 days after their last lookup**. Every time a device looks the name up again, dnsmasq adds the address anew and the time starts again, so addresses in use stay; servers a service no longer uses drop out. Existing sets are rebuilt with their addresses kept (no gap in the routing)
