@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.5.3 -->
+<!-- ASNmanager-WebUI v3.6.0 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -340,6 +340,17 @@
 #asnm .asnm-sg-filter input.asnm-sg-q { width: 180px; flex: 0 0 180px; }
 .asnm-sg-count { margin-left: auto; color: var(--muted); }
 .asnm-ms { position: relative; display: inline-block; }
+.asnm-sentence { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 10px; font-size: 15px; color: var(--text); }
+.asnm-sentence .asnm-sw { color: var(--text2); white-space: nowrap; }
+.asnm-sentence .asnm-s-entries { flex: 1 1 260px; min-width: 200px; }
+.asnm-sentence .asnm-s-sel { width: auto; max-width: 100%; }
+.asnm-sentence .asnm-ms-btn { width: 150px; }
+.asnm-s-help { margin-top: 8px; font-size: 12px; color: var(--muted); }
+.asnm-s-src { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; max-width: 420px; }
+.asnm-s-foot { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
+.asnm-s-foot input[type="text"] { flex: 1 1 auto; min-width: 0; }
+.asnm-s-foot .button_gen { flex: none; }
+#asnm_add_domnote { display: block; margin-top: 8px; }
 .asnm-ms-btn { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: 132px; padding: 6px 10px; border-radius: 8px; cursor: pointer;
                background: var(--input); border: 1px solid var(--input-line); color: var(--text); font: inherit; font-size: 12px; text-align: left; }
 .asnm-ms-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -406,7 +417,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.5.3';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.6.0';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -488,7 +499,7 @@ var ASNM_I18N = {
     rc_nolearned: 'none learned', rc_tip_nolearned: 'No address has been learned for this domain yet. A device has to look the name up through the router\'s DNS server (dnsmasq). Not covered: devices with another DNS server or DoH, and names that an AdGuard Home in front answers without passing through dnsmasq.',
     lang_label: 'Language', lang_default: 'Default', lang_en: 'English', theme_label: 'Theme', theme_dark: 'Dark', theme_light: 'Light', theme_blue: 'Blue',
     stat_asns: 'ASNs', stat_more: '+ {i} IP · {d} domains',
-    note_ph: 'Note, e.g. ZDF Mediathek', note_lbl: 'Note', add_note_lbl: 'Note (optional)', add_note_help: 'Shown under the entry - with several entries in one go, under each of them',
+    note_ph: 'Note, e.g. ZDF Mediathek', note_lbl: 'Note', add_note_lbl: 'Note (optional)', add_s1: 'Route', add_s2: 'via', add_s3: 'for', add_note_ph: 'Note (optional), e.g. ZDF Mediathek', add_src_type: 'type IP addresses', add_src_hide: 'hide IP field', add_note_help: 'Shown under the entry - with several entries in one go, under each of them',
     c_clear_type: 'Remove ALL entries ({a} ASNs, {i} IP ranges, {d} domains) from the list?\nActive routing stays until you click "Apply rules".\n\nType {w} to confirm:', clear_word: 'DELETE', clear_wrong: 'Not removed - the word did not match.',
     dns_lbl: 'DNS / DHCP', dns_ok: 'dnsmasq OK', dns_ok_agh: 'dnsmasq OK (port 553, behind {p})', dns_dhcp_ok: 'DHCP OK', dns_dhcp_off: 'DHCP off in the router',
     dns_bad_nodnsmasq: 'dnsmasq is not running: devices get no new addresses (DHCP) and the domain entries learn nothing. Fix (SSH): service restart_dnsmasq - with AdGuard Home in front: /opt/etc/init.d/S99AdGuardHome restart',
@@ -615,7 +626,7 @@ var ASNM_I18N = {
     rc_nolearned: 'nichts gelernt', rc_tip_nolearned: 'Für diese Domain wurde noch keine Adresse gelernt. Ein Gerät muss den Namen über den DNS-Server des Routers (dnsmasq) auflösen. Nicht erfasst werden Geräte mit anderem DNS-Server oder DoH und Namen, die ein davorgeschalteter AdGuard Home beantwortet, ohne dass sie über dnsmasq laufen.',
     lang_label: 'Sprache', lang_default: 'Standard', lang_en: 'English', theme_label: 'Design', theme_dark: 'Dunkel', theme_light: 'Hell', theme_blue: 'Blau',
     stat_asns: 'ASNs', stat_more: '+ {i} IP · {d} Domains',
-    note_ph: 'Notiz, z. B. ZDF Mediathek', note_lbl: 'Notiz', add_note_lbl: 'Notiz (optional)', add_note_help: 'Steht unter dem Eintrag - bei mehreren Einträgen auf einmal unter jedem davon',
+    note_ph: 'Notiz, z. B. ZDF Mediathek', note_lbl: 'Notiz', add_note_lbl: 'Notiz (optional)', add_s1: 'Leite', add_s2: 'über', add_s3: 'für', add_note_ph: 'Notiz (optional), z. B. ZDF Mediathek', add_src_type: 'IP-Adressen eintippen', add_src_hide: 'IP-Feld ausblenden', add_note_help: 'Steht unter dem Eintrag - bei mehreren Einträgen auf einmal unter jedem davon',
     c_clear_type: 'ALLE Einträge ({a} ASNs, {i} IP-Bereiche, {d} Domains) aus der Liste entfernen?\nDas aktive Routing bleibt bestehen, bis du "Regeln anwenden" klickst.\n\nZum Bestätigen {w} eintippen:', clear_word: 'LÖSCHEN', clear_wrong: 'Nicht entfernt - das Wort stimmte nicht.',
     dns_lbl: 'DNS / DHCP', dns_ok: 'dnsmasq OK', dns_ok_agh: 'dnsmasq OK (Port 553, hinter {p})', dns_dhcp_ok: 'DHCP OK', dns_dhcp_off: 'DHCP im Router aus',
     dns_bad_nodnsmasq: 'dnsmasq läuft nicht: Geräte bekommen keine neuen Adressen (DHCP), und die Domain-Einträge lernen nichts. Abhilfe (SSH): service restart_dnsmasq - mit AdGuard Home davor: /opt/etc/init.d/S99AdGuardHome restart',
@@ -1467,6 +1478,13 @@ function asnmParseEntries(str) {
 function asnmAddHint() {
     var el = document.getElementById('asnm_add_domnote');
     if (el) el.style.display = asnmParseEntries(document.getElementById('asnm_add_asns').value).dom ? 'block' : 'none';
+}
+
+// sentence form: the device picker covers known devices; typing IPs is behind a link
+function asnmAddSrcToggle(force) {
+    var box = document.getElementById('asnm_add_srcbox'), on = force !== undefined ? force : box.style.display === 'none';
+    box.style.display = on ? 'flex' : 'none';
+    document.getElementById('asnm_add_srclink').textContent = t(on ? 'add_src_hide' : 'add_src_type');
 }
 
 function asnmAdd() {
@@ -3039,21 +3057,23 @@ function initial() {
       <button type="button" class="asnm-subtab" id="asnm_subbtn_presets" onclick="asnmSubTab('presets');" data-i18n="sub_presets"></button>
     </div>
     <div class="asnm-subpanel" id="asnm_sub_manual">
-    <div class="asnm-form">
-      <div class="asnm-field asnm-full"><span class="asnm-label" data-i18n="add_entries"></span>
-        <input type="text" id="asnm_add_asns" maxlength="400" data-i18n-ph="ph_asns" autocomplete="off" oninput="asnmAddHint();"/>
-        <span class="asnm-help" data-i18n="hint_multi"></span>
-        <span class="asnm-help" id="asnm_add_domnote" data-i18n="add_domnote" style="display:none;"></span></div>
-      <div class="asnm-field"><span class="asnm-label" data-i18n="add_note_lbl"></span>
-        <input type="text" id="asnm_add_note" maxlength="60" data-i18n-ph="note_ph" autocomplete="off"/>
-        <span class="asnm-help" data-i18n="add_note_help"></span></div>
-      <div class="asnm-field"><span class="asnm-label" data-i18n="target"></span><select id="asnm_add_dest"></select></div>
-      <div class="asnm-field"><span class="asnm-label" data-i18n="src_ip"></span>
-        <div class="asnm-inline"><input type="text" id="asnm_add_src" maxlength="600" data-i18n-ph="ph_ip" autocomplete="off" style="flex:1 1 150px; min-width:0;" oninput="asnmDevMsRender('asnm_add_ms','asnm_add_src');"/>
-          <div class="asnm-ms" id="asnm_add_ms"></div></div>
-        <span class="asnm-help" data-i18n="src_empty"></span></div>
+    <div class="asnm-sentence">
+      <span class="asnm-sw" data-i18n="add_s1"></span>
+      <input type="text" id="asnm_add_asns" class="asnm-s-entries" maxlength="400" data-i18n-ph="ph_asns" autocomplete="off" oninput="asnmAddHint();" onkeydown="if (event.keyCode === 13) { asnmAdd(); return false; }"/>
+      <span class="asnm-sw" data-i18n="add_s2"></span>
+      <select id="asnm_add_dest" class="asnm-s-sel"></select>
+      <span class="asnm-sw" data-i18n="add_s3"></span>
+      <div class="asnm-ms" id="asnm_add_ms"></div>
     </div>
-    <div class="asnm-row" style="margin-top:14px;"><input type="button" class="button_gen asnm-btn asnm-primary" data-i18n-value="btn_add" onclick="asnmAdd();"/></div>
+    <div class="asnm-s-help"><span data-i18n="hint_multi"></span> · <span class="asnm-link" id="asnm_add_srclink" data-i18n="add_src_type" onclick="asnmAddSrcToggle();"></span></div>
+    <div class="asnm-s-src" id="asnm_add_srcbox" style="display:none;">
+      <input type="text" id="asnm_add_src" maxlength="600" data-i18n-ph="ph_ip" autocomplete="off" oninput="asnmDevMsRender('asnm_add_ms','asnm_add_src');"/>
+      <span class="asnm-help" data-i18n="src_empty"></span></div>
+    <span class="asnm-help" id="asnm_add_domnote" data-i18n="add_domnote" style="display:none;"></span>
+    <div class="asnm-s-foot">
+      <input type="text" id="asnm_add_note" maxlength="60" data-i18n-ph="add_note_ph" autocomplete="off" onkeydown="if (event.keyCode === 13) { asnmAdd(); return false; }"/>
+      <input type="button" class="button_gen asnm-btn asnm-primary" data-i18n-value="btn_add" onclick="asnmAdd();"/>
+    </div>
   </div>
     <div class="asnm-subpanel" id="asnm_sub_lookup" style="display:none;">
     <div class="asnm-field"><span class="asnm-label" data-i18n="domain_ip"></span>

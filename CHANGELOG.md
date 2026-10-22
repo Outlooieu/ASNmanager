@@ -1,3 +1,7 @@
+## v3.6.0
+
+- WebUI: new layout of "Enter ASNs" - it reads like a sentence: "Route [entries] via [target] for [devices]", with the note and the Add button in one line below. Enter in the entries or note field adds right away. Known devices are picked from the list; typing IP addresses is behind the link "type IP addresses" below the sentence. On narrow screens the parts wrap
+
 ## v3.5.3
 
 - ASN list: a note is shown as "Note: ..." so it can not be mistaken for a name
