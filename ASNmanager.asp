@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.6.8 -->
+<!-- ASNmanager-WebUI v3.7.0 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -320,7 +320,7 @@
 .asnm-sg-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .asnm-sg-title { font-weight: 700; font-size: 13px; color: var(--strong); }
 .asnm-sg-name { display: block; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.asnm-sg-on { font-size: 11px; color: var(--warn); max-width: 170px; line-height: 1.35; margin-top: 2px; }
+.asnm-sg-on { font-size: 11px; color: var(--warn); max-width: 130px; line-height: 1.35; margin-top: 2px; }
 .asnm-sg-cl { font-size: 12px; color: var(--text2); max-width: 170px; }
 .asnm-sg-clrow { display: flex; justify-content: space-between; gap: 8px; line-height: 18px; }
 .asnm-sg-clrow span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -344,6 +344,10 @@
 .asnm-sec-body { padding: 2px 0 8px; }
 /* suggestions: filter bar and multi-device selection */
 .asnm-sg-since { font-size: 11px; color: var(--muted); margin: 0 0 8px; }
+.asnm-sg-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 10px; }
+.asnm-sg-top .asnm-sg-since { margin: 0 0 0 auto; }
+.asnm-sg-domoff { font-size: 12px; color: var(--text2); line-height: 1.55; max-width: 720px; }
+.asnm-sg-domoff div { margin-top: 10px; }
 .asnm-sg-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 10px; font-size: 12px; color: var(--text2); }
 .asnm-sg-filter label { display: inline-flex; align-items: center; gap: 6px; }
 .asnm-sg-filter select { width: auto; }
@@ -435,7 +439,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.6.8';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.7.0';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -474,9 +478,17 @@ var ASNM_I18N = {
     sg_pending: '{n} destination address(es) with {b} of traffic are still being looked up...', sg_fails: 'Look-ups for {n} network(s) failed (ip-api.com, ipinfo.io and RIPEstat not reachable from the router?) - they are retried after an hour.',
     sg_on_list: 'on the list for: {d} ({t}) - Add extends the devices of this rule', sg_noacct: 'The byte counters for connections could not be switched on - no suggestions possible.',
     sg_th_asn: 'ASN', sg_th_b: 'Traffic', sg_th_cl: 'Used by', sg_th_t: 'Target', sg_th_dev: 'Device', sg_all: 'All devices', sg_grp_used: 'Uses this ASN', sg_add: 'Add', sg_more: '+{n} more', sg_less: 'show less',
+    sgv_label: 'View', sgv_asn: 'by ASN', sgv_dom: 'by domain', sgd_th_dom: 'Domain', sgd_f_q: 'Search domain', sgd_subs_more: '+{n} more',
+    sgd_off_text: 'Suggestions by domain are off. When turned on, dnsmasq writes every lookup it answers into a file in the RAM of the router. ASN Manager reads it once a minute, notes which name belongs to which address and empties the file again - nothing is written to the flash memory and nothing is looked up on the internet. Turning it on or off restarts dnsmasq once (DNS pauses for a few seconds).',
+    sgd_turn_on: 'Turn on suggestions by domain', sgd_turn_off: 'Turn off suggestions by domain',
+    sgd_off_confirm: 'Turn off suggestions by domain?\ndnsmasq is restarted once and the collected names are deleted.',
+    sgd_empty: 'No names collected yet - domains show up about a minute after a device looked them up.',
+    sgd_none: '{b} of traffic went to {n} address(es) without a known name (looked up before the collection started, answered from a cache, or not through the router - e.g. "secure DNS" in a browser).',
+    sgd_ext: 'The lookup log of another add-on (e.g. Diversion) is read, dnsmasq is left as it is.',
+    sgd_note: 'Names from the lookups dnsmasq answered, evaluated every minute. Suggested is the main domain (zdf.de) - it covers every subdomain; the names below it were looked up. Large networks (CDNs) serve many names from one address: the latest lookup counts. Domains and ASNs already in the list are hidden. "Add" puts the domain on the list - then apply the rules.',
     sg_note: 'Estimate from the connection table of the router, evaluated every minute (very short connections can be missed). Destination addresses are looked up via ip-api.com (at most 10 per minute). ASNs that are already in the list are hidden. "Add" puts the ASN on the list - then apply the rules.',
     sec_tbl: 'Traffic per ASN / target', sec_cnt: '{n} entry(ies)', sg_f_show: 'Show', sg_f_dev: 'Device', sg_f_q: 'Search ASN or name',
-    sg_f_count: '{x} of {y} ASN(s)', sg_f_total: ' - {n} found in total, the 100 largest are listed', sg_n_dev: '{n} devices', sg_nomatch: 'No ASN matches the filter.',
+    sg_f_count: '{x} of {y} ASN(s)', sgd_f_count: '{x} of {y} domain(s)', sgd_nomatch: 'No domain matches the filter.', sg_f_total: ' - {n} found in total, the 100 largest are listed', sg_n_dev: '{n} devices', sg_nomatch: 'No ASN matches the filter.',
     sg_all_dev_f: 'All devices', sg_th_b_dev: 'Traffic of this device',
     fo_title: 'Failover', fo_sub: 'If a target fails, its ASNs use the next working fallback.', fo_th_t: 'Target', fo_th_1: '1st fallback', fo_th_2: '2nd fallback',
     fo_th_state: 'State', fo_none: '- none -', fo_block_opt: 'Block (kill switch)', fo_block_s: 'Block', fo_save: 'Save', fo_off: 'no failover',
@@ -601,9 +613,17 @@ var ASNM_I18N = {
     sg_pending: '{n} Ziel-Adresse(n) mit {b} Traffic werden noch zugeordnet...', sg_fails: 'Zuordnung für {n} Netz(e) fehlgeschlagen (ip-api.com, ipinfo.io und RIPEstat vom Router aus nicht erreichbar?) - neuer Versuch nach einer Stunde.',
     sg_on_list: 'auf der Liste für: {d} ({t}) - Hinzufügen ergänzt die Geräte dieser Regel', sg_noacct: 'Die Byte-Zähler für Verbindungen ließen sich nicht einschalten - keine Vorschläge möglich.',
     sg_th_asn: 'ASN', sg_th_b: 'Traffic', sg_th_cl: 'Genutzt von', sg_th_t: 'Ziel', sg_th_dev: 'Gerät', sg_all: 'Alle Geräte', sg_grp_used: 'Nutzt dieses ASN', sg_add: 'Hinzufügen', sg_more: '+{n} weitere', sg_less: 'weniger anzeigen',
+    sgv_label: 'Ansicht', sgv_asn: 'nach ASN', sgv_dom: 'nach Domain', sgd_th_dom: 'Domain', sgd_f_q: 'Domain suchen', sgd_subs_more: '+{n} weitere',
+    sgd_off_text: 'Vorschläge nach Domain sind aus. Eingeschaltet schreibt dnsmasq jede beantwortete Anfrage in eine Datei im Arbeitsspeicher des Routers. ASN Manager liest sie jede Minute, merkt sich, welcher Name zu welcher Adresse gehört, und leert die Datei wieder - es wird nichts in den Flash-Speicher geschrieben und nichts im Internet abgefragt. Ein- und Ausschalten startet dnsmasq einmal neu (DNS pausiert ein paar Sekunden).',
+    sgd_turn_on: 'Vorschläge nach Domain einschalten', sgd_turn_off: 'Vorschläge nach Domain ausschalten',
+    sgd_off_confirm: 'Vorschläge nach Domain ausschalten?\ndnsmasq wird einmal neu gestartet, die gesammelten Namen werden gelöscht.',
+    sgd_empty: 'Noch keine Namen gesammelt - Domains erscheinen etwa eine Minute, nachdem ein Gerät sie abgefragt hat.',
+    sgd_none: '{b} Traffic gingen an {n} Adresse(n) ohne bekannten Namen (vor Beginn der Erfassung abgefragt, aus einem Zwischenspeicher beantwortet oder nicht über den Router - z. B. "Sicheres DNS" im Browser).',
+    sgd_ext: 'Gelesen wird das Abfrage-Protokoll eines anderen Add-ons (z. B. Diversion), dnsmasq bleibt unverändert.',
+    sgd_note: 'Namen aus den Anfragen, die dnsmasq beantwortet hat, jede Minute ausgewertet. Vorgeschlagen wird die Hauptdomain (zdf.de) - sie deckt alle Unterdomains ab; darunter die abgefragten Namen. Große Netze (CDNs) liefern viele Namen von einer Adresse: es zählt die letzte Abfrage. Domains und ASNs, die schon in der Liste stehen, sind ausgeblendet. "Hinzufügen" setzt die Domain auf die Liste - danach die Regeln anwenden.',
     sg_note: 'Schätzung aus der Verbindungstabelle des Routers, jede Minute ausgewertet (sehr kurze Verbindungen können fehlen). Die Ziel-Adressen werden über ip-api.com zugeordnet (höchstens 10 pro Minute). ASNs, die schon in der Liste stehen, sind ausgeblendet. "Hinzufügen" setzt das ASN auf die Liste - danach die Regeln anwenden.',
     sec_tbl: 'Traffic nach ASN / Ziel', sec_cnt: '{n} Einträge', sg_f_show: 'Anzeigen', sg_f_dev: 'Gerät', sg_f_q: 'ASN oder Name suchen',
-    sg_f_count: '{x} von {y} ASN(s)', sg_f_total: ' - insgesamt {n} gefunden, die 100 größten sind aufgeführt', sg_n_dev: '{n} Geräte', sg_nomatch: 'Kein ASN passt zum Filter.',
+    sg_f_count: '{x} von {y} ASN(s)', sgd_f_count: '{x} von {y} Domain(s)', sgd_nomatch: 'Keine Domain passt zum Filter.', sg_f_total: ' - insgesamt {n} gefunden, die 100 größten sind aufgeführt', sg_n_dev: '{n} Geräte', sg_nomatch: 'Kein ASN passt zum Filter.',
     sg_all_dev_f: 'Alle Geräte', sg_th_b_dev: 'Traffic dieses Geräts',
     fo_title: 'Ausweich-Ziele (Failover)', fo_sub: 'Fällt ein Ziel aus, nutzen seine ASNs das nächste funktionierende Ausweich-Ziel.', fo_th_t: 'Ziel', fo_th_1: '1. Ausweich', fo_th_2: '2. Ausweich',
     fo_th_state: 'Zustand', fo_none: '- keines -', fo_block_opt: 'Sperren (Kill-Switch)', fo_block_s: 'Sperren', fo_save: 'Speichern', fo_off: 'kein Ausweich',
@@ -1417,7 +1437,7 @@ function asnmJobDone(job) {
     if ((job.action === 'edit' || job.action === 'note') && ok) ASNM.editing = null;
     if (job.action === 'speedtest') asnmSpLoad();
     asnmDnsLoad();
-    if (job.action === 'setting') { asnmTrLoad(); setTimeout(asnmPerfMark, 1500); }
+    if (job.action === 'setting') { asnmTrLoad(); asnmSgLoad(); setTimeout(asnmPerfMark, 1500); }
     if (job.action === 'update') {
         if (ok && /^Updated to/.test(job.msg || '')) { setTimeout(function () { ASNM_UPD.reload(); }, 2500); return; }   // new script + page are in place
         asnmUpdCheck(false);                                                                                          // refresh the notice
@@ -1794,7 +1814,7 @@ function asnmExportDone(txt, note) {
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.parentNode.removeChild(a); }, 1000);
 }
-var ASNM_SET_OK = { STATS: /^(enabled|disabled)$/, STATS_SAVING: /^(on|off)$/, STATS_MODE: /^(asn|iface)$/, RULES_MODE: /^(combined|single)$/, WEBUI_LOCATION: /^(vpn|addons)$/ };
+var ASNM_SET_OK = { STATS: /^(enabled|disabled)$/, STATS_SAVING: /^(on|off)$/, STATS_MODE: /^(asn|iface)$/, RULES_MODE: /^(combined|single)$/, WEBUI_LOCATION: /^(vpn|addons)$/, SG_DOMAINS: /^(on|off)$/ };
 
 function asnmParseBackup(txt) {
     var lines = txt.replace(/\r/g, '').split('\n'), section = null, hasSections = /^\[(ASN_LIST|CUSTOM)\]/m.test(txt);
@@ -1933,7 +1953,7 @@ function asnmImportRun() {
         for (i = 0; i < r.failover.length; i++) { var p = r.failover[i][1].split(','); jobs.push(['failover', [r.failover[i][0], p[0] || '', p[1] || '']]); }
     }
     if (chk('asnm_rs_set')) {
-        var order = ['STATS_SAVING', 'STATS_MODE', 'RULES_MODE', 'WEBUI_LOCATION', 'STATS'];
+        var order = ['STATS_SAVING', 'STATS_MODE', 'RULES_MODE', 'WEBUI_LOCATION', 'SG_DOMAINS', 'STATS'];
         for (i = 0; i < order.length; i++) if (r.settings[order[i]]) jobs.push(['setting', [order[i], r.settings[order[i]]]]);
     }
     if (!jobs.length) { alert(t('rs_nosel')); return; }
@@ -2346,7 +2366,29 @@ function asnmTrSaveMode(mode) {
 }
 
 /* ---------- suggestions from the traffic without a rule ---------- */
-var ASNM_SG = { data: null, added: {}, sel: {}, auto: {}, tgt: {}, f: { n: 10, dev: '', q: '' }, sig: '', fsig: '', open: '', dirty: false, clOpen: {}, note: {} };
+var ASNM_SG = { data: null, added: {}, sel: {}, auto: {}, tgt: {}, f: { n: 10, dev: '', q: '' }, sig: '', fsig: '', open: '', dirty: false, clOpen: {}, note: {}, view: 'asn' };
+try { if (localStorage.getItem('asnm_sgview_' + ASNM_NS) === 'dom') ASNM_SG.view = 'dom'; } catch (e) {}
+
+// suggestions by ASN or by domain; a domain row is keyed "d:<domain>" (selection, target, note, "added")
+function asnmSgSetView(v) {
+    ASNM_SG.view = v === 'dom' ? 'dom' : 'asn';
+    try { localStorage.setItem('asnm_sgview_' + ASNM_NS, ASNM_SG.view); } catch (e) {}
+    ASNM_SG.f.dev = ''; ASNM_SG.f.q = ''; ASNM_SG.fsig = ''; ASNM_SG.open = '';
+    asnmSgRender(true);
+}
+function asnmSgDomSet(on) {
+    if (!on && !confirm(t('sgd_off_confirm'))) return;
+    asnmSend('setting', ['SG_DOMAINS', on ? 'on' : 'off']);
+}
+function asnmSgList(d) { return !d ? [] : (ASNM_SG.view === 'dom' ? (d.dlist || []) : (d.list || [])); }
+function asnmSgKey(r) { return r.d !== undefined ? 'd:' + r.d : r.asn; }
+function asnmSgHidden(r, listed) { return r.d !== undefined ? !!ASNM_SG.added['d:' + r.d] : !!((listed[r.asn] && !r.on) || ASNM_SG.added[r.asn]); }
+function asnmSgViewSeg() {
+    var v = ASNM_SG.view;
+    return '<span class="asnm-seg-label">' + asnmEsc(t('sgv_label')) + '</span><div class="asnm-seg">' +
+           '<span class="' + (v === 'asn' ? 'asnm-on' : '') + '" onclick="asnmSgSetView(\'asn\');">' + asnmEsc(t('sgv_asn')) + '</span>' +
+           '<span class="' + (v === 'dom' ? 'asnm-on' : '') + '" onclick="asnmSgSetView(\'dom\');">' + asnmEsc(t('sgv_dom')) + '</span></div>';
+}
 
 // "+N more" in the "Used by" column: show every device of this ASN (with its traffic), or fold the list again
 function asnmSgClToggle(asn) {
@@ -2401,12 +2443,14 @@ function asnmSgListed() {
 
 // suggestions after the device and text filter, sorted by traffic (of the chosen device)
 function asnmSgRows() {
-    var d = ASNM_SG.data, f = ASNM_SG.f, listed = asnmSgListed(), q = f.q.replace(/^\s+|\s+$/g, '').toLowerCase(), out = [];
-    for (var i = 0; i < d.list.length; i++) {
-        var r = d.list[i], b = r.b;
-        if ((listed[r.asn] && !r.on) || ASNM_SG.added[r.asn]) continue;
+    var d = ASNM_SG.data, f = ASNM_SG.f, listed = asnmSgListed(), q = f.q.replace(/^\s+|\s+$/g, '').toLowerCase(), out = [], list = asnmSgList(d);
+    for (var i = 0; i < list.length; i++) {
+        var r = list[i], b = r.b, txt;
+        if (asnmSgHidden(r, listed)) continue;
         if (f.dev) { b = 0; for (var c = 0; c < r.cl.length; c++) if (r.cl[c][0] === f.dev) b = r.cl[c][1]; if (!b) continue; }
-        if (q && ('as' + r.asn + ' ' + (r.name || '')).toLowerCase().indexOf(q) < 0) continue;
+        if (r.d !== undefined) { txt = r.d; for (var k = 0; k < (r.subs || []).length; k++) txt += ' ' + r.subs[k][0]; }
+        else txt = 'as' + r.asn + ' ' + (r.name || '');
+        if (q && txt.toLowerCase().indexOf(q) < 0) continue;
         out.push({ r: r, b: b });
     }
     out.sort(function (x, y) { return y.b - x.b; });
@@ -2427,11 +2471,11 @@ function asnmSgTargetOptions(selected) {
 function asnmSgDevLabel(ip) { var n = asnmDeviceName(ip); return (n ? n + ' - ' : '') + ip; }
 
 function asnmSgFilterBar(d) {
-    var f = ASNM_SG.f, tot = {}, ips = [], i, c, h;
-    for (i = 0; i < d.list.length; i++) for (c = 0; c < d.list[i].cl.length; c++) {
-        var ip = d.list[i].cl[c][0];
+    var f = ASNM_SG.f, tot = {}, ips = [], i, c, h, list = asnmSgList(d);
+    for (i = 0; i < list.length; i++) for (c = 0; c < list[i].cl.length; c++) {
+        var ip = list[i].cl[c][0];
         if (!(ip in tot)) { tot[ip] = 0; ips.push(ip); }
-        tot[ip] += d.list[i].cl[c][1];
+        tot[ip] += list[i].cl[c][1];
     }
     ips.sort(function (x, y) { return tot[y] - tot[x]; });
     h = '<label>' + asnmEsc(t('sg_f_show')) + ' <select class="input_option" style="width:72px;" onchange="ASNM_SG.f.n = +this.value; asnmSgRender(true);">';
@@ -2440,9 +2484,9 @@ function asnmSgFilterBar(d) {
     h += '</select></label><label>' + asnmEsc(t('sg_f_dev')) + ' <select class="input_option" style="width:200px;" onchange="asnmSgSetDev(this.value);">' +
          '<option value="">' + asnmEsc(t('sg_all_dev_f')) + '</option>';
     for (i = 0; i < ips.length; i++) h += '<option value="' + asnmEsc(ips[i]) + '"' + (f.dev === ips[i] ? ' selected="selected"' : '') + '>' + asnmEsc(asnmSgDevLabel(ips[i])) + '</option>';
-    h += '</select></label><input type="text" class="asnm-sg-q" autocomplete="off" placeholder="' + asnmEsc(t('sg_f_q')) + '" value="' + asnmEsc(f.q) + '" ' +
+    h += '</select></label><input type="text" class="asnm-sg-q" autocomplete="off" placeholder="' + asnmEsc(t(ASNM_SG.view === 'dom' ? 'sgd_f_q' : 'sg_f_q')) + '" value="' + asnmEsc(f.q) + '" ' +
          'oninput="ASNM_SG.f.q = this.value; asnmSgRender(true);"/><span class="asnm-sg-count" id="asnm_sg_count"></span>';
-    return { html: h, sig: ips.join(',') + '|' + ASNM_LANG };
+    return { html: h, sig: ips.join(',') + '|' + ASNM_LANG + '|' + ASNM_SG.view };
 }
 
 function asnmMsLabel(asn) {
@@ -2515,16 +2559,16 @@ function asnmSgFlush() { if (ASNM_SG.dirty) setTimeout(function () { asnmSgRende
 function asnmSgRender(force) {
     var box = document.getElementById('asnm_sg'), cnt = document.getElementById('asnm_sec_sg_cnt');
     if (!box) return;
-    var tr = ASNM_TR.data, d = ASNM_SG.data, listed = asnmSgListed(), n = 0, i;
-    if (d && d.list) for (i = 0; i < d.list.length; i++) if ((!listed[d.list[i].asn] || d.list[i].on) && !ASNM_SG.added[d.list[i].asn]) n++;
+    var tr = ASNM_TR.data, d = ASNM_SG.data, listed = asnmSgListed(), n = 0, i, dom = ASNM_SG.view === 'dom', list = asnmSgList(d);
+    for (i = 0; i < list.length; i++) if (!asnmSgHidden(list[i], listed)) n++;
     cnt.textContent = (tr && tr.state === 'enabled' && d && d.acct) ? t('sec_cnt', { n: n }) : '';
     cnt.style.display = cnt.textContent ? '' : 'none';
     if (!ASNM_TR.open || !(ASNM_TR.sec && ASNM_TR.sec.sg)) return;
     // do not disturb while a dropdown, the search field or a device list is in use
     var ae = document.activeElement;
     if (!force && (ASNM_SG.open || (ae && box.contains(ae) && (ae.tagName === 'SELECT' || ae.tagName === 'INPUT')))) { ASNM_SG.dirty = true; return; }
-    var sig = JSON.stringify(d ? [d.list, d.pending, d.acct, d.since] : null) + '|' + (tr ? tr.state : '') + '|' + JSON.stringify(ASNM_SG.f) + '|' +
-              JSON.stringify(ASNM_SG.added) + '|' + JSON.stringify(listed) + '|' + ASNM_LANG;
+    var sig = JSON.stringify(d ? [d.list, d.dlist, d.dlog, d.dnone, d.pending, d.acct, d.since] : null) + '|' + (tr ? tr.state : '') + '|' + JSON.stringify(ASNM_SG.f) + '|' +
+              JSON.stringify(ASNM_SG.added) + '|' + JSON.stringify(listed) + '|' + ASNM_LANG + '|' + ASNM_SG.view;
     if (!force && sig === ASNM_SG.sig) return;
     ASNM_SG.sig = sig; ASNM_SG.dirty = false;
     var msg = '';
@@ -2533,27 +2577,42 @@ function asnmSgRender(force) {
     else if (!d.acct) msg = '<div class="asnm-tr-warn">' + asnmEsc(t('sg_noacct')) + '</div>';
     if (msg) { ASNM_SG.fsig = ''; box.innerHTML = msg; return; }
 
-    // filter bar: built once (and when the device list changes), so the search field keeps the focus
+    var top = '<div class="asnm-sg-top">' + asnmSgViewSeg() + '<span class="asnm-sg-since" id="asnm_sg_since"></span></div>';
+    // by domain, but the lookup log is off: what it does, and the switch
+    if (dom && (!d.dlog || d.dlog === 'off')) {
+        ASNM_SG.fsig = '';
+        box.innerHTML = top + '<div class="asnm-sg-domoff">' + asnmEsc(t('sgd_off_text')) + '<div><input type="button" class="button_gen asnm-btn asnm-primary" value="' +
+                        asnmEsc(t('sgd_turn_on')) + '" onclick="asnmSgDomSet(true);"/></div></div>';
+        asnmApplyBusy();
+        return;
+    }
+    // filter bar: built once (and when the device list or the view changes), so the search field keeps the focus
     var fb = asnmSgFilterBar(d);
     if (ASNM_SG.fsig !== fb.sig || !document.getElementById('asnm_sg_tbl')) {
-        box.innerHTML = '<div class="asnm-sg-since" id="asnm_sg_since"></div><div class="asnm-sg-filter">' + fb.html + '</div>' +
-                        '<div id="asnm_sg_tbl"></div><div class="asnm-sg-foot">' + asnmEsc(t('sg_note')) + '</div>';
+        var foot = dom ? asnmEsc(t('sgd_note')) + (d.dlog === 'ext' ? ' ' + asnmEsc(t('sgd_ext')) : '') +
+                         ' <span class="asnm-link" onclick="asnmSgDomSet(false);">' + asnmEsc(t('sgd_turn_off')) + '</span>'
+                       : asnmEsc(t('sg_note'));
+        box.innerHTML = top + '<div class="asnm-sg-filter">' + fb.html + '</div>' +
+                        '<div id="asnm_sg_tbl"></div><div class="asnm-sg-foot">' + foot + '</div>';
         ASNM_SG.fsig = fb.sig;
     }
     document.getElementById('asnm_sg_since').textContent = d.since ? t('sg_since', { t: asnmFmtTime(d.since) }) : '';
 
-    var rows = asnmSgRows(), shown = rows.slice(0, ASNM_SG.f.n), def = asnmSgDefaultTarget(), html = '';
-    document.getElementById('asnm_sg_count').textContent = t('sg_f_count', { x: shown.length, y: rows.length }) +
-        (d.total > d.list.length ? t('sg_f_total', { n: d.total }) : '');
+    var rows = asnmSgRows(), shown = rows.slice(0, ASNM_SG.f.n), def = asnmSgDefaultTarget(), html = '', tot = dom ? d.dtotal : d.total;
+    document.getElementById('asnm_sg_count').textContent = t(dom ? 'sgd_f_count' : 'sg_f_count', { x: shown.length, y: rows.length }) +
+        (tot > list.length ? t('sg_f_total', { n: tot }) : '');
     if (!shown.length) {
-        html = '<div class="asnm-muted">' + asnmEsc(n ? t('sg_nomatch') : (d.pending ? asnmSgPendingText(d) : t('sg_empty'))) + '</div>';
+        if (n) html = t(dom ? 'sgd_nomatch' : 'sg_nomatch');
+        else if (dom) html = list.length ? t('sg_empty') : t('sgd_empty');
+        else html = d.pending ? asnmSgPendingText(d) : t('sg_empty');
+        html = '<div class="asnm-muted">' + asnmEsc(html) + '</div>';
     } else {
-        html = '<table class="asnm-table"><tr><th>' + t('sg_th_asn') + '</th><th style="text-align:right;">' + (ASNM_SG.f.dev ? t('sg_th_b_dev') : t('sg_th_b')) + '</th>' +
+        html = '<table class="asnm-table"><tr><th>' + t(dom ? 'sgd_th_dom' : 'sg_th_asn') + '</th><th style="text-align:right;">' + (ASNM_SG.f.dev ? t('sg_th_b_dev') : t('sg_th_b')) + '</th>' +
                '<th>' + t('sg_th_cl') + '</th><th>' + t('sg_th_t') + '</th><th>' + t('sg_th_dev') + '</th><th>' + t('note_lbl') + '</th><th></th></tr>';
         for (i = 0; i < shown.length; i++) {
-            var r = shown[i].r, a = asnmEsc(r.asn), who = [];
-            if (ASNM_SG.f.dev && ASNM_SG.sel[r.asn] === undefined) { ASNM_SG.sel[r.asn] = [ASNM_SG.f.dev]; ASNM_SG.auto[r.asn] = 1; }   // filter by device -> preselect it
-            var clOpen = !!ASNM_SG.clOpen[r.asn], allNames = [];
+            var r = shown[i].r, key = asnmSgKey(r), a = asnmEsc(key), who = [];
+            if (ASNM_SG.f.dev && ASNM_SG.sel[key] === undefined) { ASNM_SG.sel[key] = [ASNM_SG.f.dev]; ASNM_SG.auto[key] = 1; }   // filter by device -> preselect it
+            var clOpen = !!ASNM_SG.clOpen[key], allNames = [];
             for (var c = 0; c < r.cl.length; c++) allNames.push((asnmDeviceName(r.cl[c][0]) || r.cl[c][0]) + ' (' + asnmFmtBytes(r.cl[c][1]) + ')');
             if (clOpen) {
                 // every device on its own line with its traffic, a click closes the list again
@@ -2569,19 +2628,31 @@ function asnmSgRender(force) {
                 var od = String(r.osrc).split(','), on = [];
                 for (var k = 0; k < od.length; k++) on.push(asnmDeviceName(od[k]) || od[k]);
                 onTxt = '<div class="asnm-sg-on">' + asnmEsc(t('sg_on_list', { d: on.join(', '), t: r.on })) + '</div>';
-                if (!ASNM_SG.tgt[r.asn]) ASNM_SG.tgt[r.asn] = r.on;
+                if (!ASNM_SG.tgt[key]) ASNM_SG.tgt[key] = r.on;
             }
-            html += '<tr><td><b>AS' + a + '</b><span class="asnm-sg-name asnm-dev" title="' + asnmEsc(r.name) + '">' + asnmEsc(r.name || '-') + '</span>' + onTxt + '</td>' +
+            var first;
+            if (dom) {
+                // the names that were looked up under this domain (busiest first)
+                var subs = r.subs || [], sh = [], tip = [];
+                for (k = 0; k < subs.length; k++) { tip.push(subs[k][0] + ' (' + asnmFmtBytes(subs[k][1]) + ')'); if (sh.length < 2 && subs[k][0] !== r.d) sh.push(subs[k][0]); }
+                var more = (r.nsub || subs.length) - sh.length - (subs.length && subs[0][0] === r.d ? 1 : 0);
+                first = '<b>' + asnmEsc(r.d) + '</b><span class="asnm-sg-name asnm-dev" title="' + asnmEsc(tip.join('\n')) + '">' +
+                        asnmEsc(sh.join(', ') + (more > 0 ? (sh.length ? ' ' : '') + t('sgd_subs_more', { n: more }) : '')) + '</span>';
+            } else {
+                first = '<b>AS' + a + '</b><span class="asnm-sg-name asnm-dev" title="' + asnmEsc(r.name) + '">' + asnmEsc(r.name || '-') + '</span>';
+            }
+            html += '<tr><td>' + first + onTxt + '</td>' +
                     '<td class="num">' + asnmFmtBytes(shown[i].b) + '</td><td class="asnm-sg-cl" title="' + asnmEsc(allNames.join('\n')) + '">' + (clOpen ? who.join('') : who.join(', ')) + '</td>' +
                     '<td><select id="asnm_sg_t_' + a + '" class="input_option asnm-sg-sel" onchange="ASNM_SG.tgt[\'' + a + '\'] = this.value;" onblur="asnmSgFlush();">' +
-                    asnmSgTargetOptions(ASNM_SG.tgt[r.asn] || def) + '</select></td>' +
-                    '<td>' + asnmMsHtml(r) + '</td>' +
-                    '<td><input type="text" id="asnm_sg_n_' + a + '" class="asnm-sg-note" maxlength="60" value="' + asnmEsc(ASNM_SG.note[r.asn] || '') + '" placeholder="' + asnmEsc(t('hint_optional')) + '" oninput="ASNM_SG.note[\'' + a + '\'] = this.value;" onblur="asnmSgFlush();" onkeydown="if (event.keyCode === 13) { asnmSgAdd(\'' + a + '\'); return false; }"/></td>' +
+                    asnmSgTargetOptions(ASNM_SG.tgt[key] || def) + '</select></td>' +
+                    '<td>' + asnmMsHtml({ asn: key, cl: r.cl }) + '</td>' +
+                    '<td><input type="text" id="asnm_sg_n_' + a + '" class="asnm-sg-note" maxlength="60" value="' + asnmEsc(ASNM_SG.note[key] || '') + '" placeholder="' + asnmEsc(t('hint_optional')) + '" oninput="ASNM_SG.note[\'' + a + '\'] = this.value;" onblur="asnmSgFlush();" onkeydown="if (event.keyCode === 13) { asnmSgAdd(\'' + a + '\'); return false; }"/></td>' +
                     '<td><input type="button" class="button_gen asnm-small-btn asnm-btn asnm-primary" value="' + asnmEsc(t('sg_add')) + '" onclick="asnmSgAdd(\'' + a + '\');"/></td></tr>';
         }
         html += '</table>';
-        if (d.pending) html += '<div class="asnm-sg-foot">' + asnmEsc(asnmSgPendingText(d)) + '</div>';
+        if (!dom && d.pending) html += '<div class="asnm-sg-foot">' + asnmEsc(asnmSgPendingText(d)) + '</div>';
     }
+    if (dom && d.dnone > 0) html += '<div class="asnm-sg-foot">' + asnmEsc(t('sgd_none', { b: asnmFmtBytes(d.dnone), n: d.dnoneips || 0 })) + '</div>';
     document.getElementById('asnm_sg_tbl').innerHTML = html;
     asnmApplyBusy();
 }
@@ -2592,9 +2663,11 @@ function asnmSgPendingText(d) {
     return s;
 }
 
-function asnmSgRow(asn) {
-    var d = ASNM_SG.data;
-    if (d && d.list) for (var i = 0; i < d.list.length; i++) if (d.list[i].asn === asn) return d.list[i];
+function asnmSgRow(key) {
+    var d = ASNM_SG.data, i;
+    if (!d) return null;
+    if (key.indexOf('d:') === 0) { for (i = 0; i < (d.dlist || []).length; i++) if ('d:' + d.dlist[i].d === key) return d.dlist[i]; return null; }
+    if (d.list) for (i = 0; i < d.list.length; i++) if (d.list[i].asn === key) return d.list[i];
     return null;
 }
 
@@ -2604,7 +2677,8 @@ function asnmSgAdd(asn) {
     // ASN already on the list for some devices: add the chosen devices to that rule (empty = all devices)
     if (r && r.on && pick.length) src = asnmNormSrc(r.osrc + ',' + src);
     var note = String(ASNM_SG.note[asn] || '').replace(/[\u0000-\u001f"\\|<>]/g, '').trim().slice(0, 60);
-    if (asnmSend('add', [sel.value, src, asn, encodeURIComponent(note)])) { ASNM_SG.added[asn] = 1; ASNM_SG.open = ''; delete ASNM_SG.note[asn]; asnmSgRender(true); }
+    var val = asn.indexOf('d:') === 0 ? asn.slice(2) : asn;
+    if (asnmSend('add', [sel.value, src, val, encodeURIComponent(note)])) { ASNM_SG.added[asn] = 1; ASNM_SG.open = ''; delete ASNM_SG.note[asn]; asnmSgRender(true); }
 }
 
 /* ============================ failover ============================ */

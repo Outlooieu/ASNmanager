@@ -9,7 +9,7 @@ ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to eas
  /_\ / __| \| | |  \/  | /_\ | \| | /_\ / __| __|| _ \
 / _ \__ \ .' | | |\/| |/ _ \| .' |/ _ \ (_ | _| |   /
 /_/ \_\___/_|\_| |_|  |_/_/ \_\_|\_/_/ \_\___|___||_|_\
-              === ASN MANAGER v3.6.3 ===
+              === ASN MANAGER v3.7.0 ===
 ================================================================
  ASNs
  [1]  Show ASN list & routing targets
@@ -157,7 +157,7 @@ Features:
 - **Routing check**: every ASN shows whether its traffic really leaves through the intended interface - see below
 - **Failover**: if a target (e.g. WGC1) fails, its ASNs automatically use a fallback (e.g. WGC2, then WAN1) or are blocked - see below
 - **Live throughput** per ASN, per interface and per device, in Mbit/s or MB/s
-- **Suggestions**: which ASNs the traffic without a rule goes to, with a one-click "Add" - see below
+- **Suggestions**: which ASNs - or, optionally, which domains - the traffic without a rule goes to, with a one-click "Add" - see below
 
 Enable / disable / move the tab: menu option **[16]** or
 
@@ -269,6 +269,14 @@ How it works: every minute the router reads its connection table (`/proc/net/nf_
 
 It is an estimate: very short connections that start and end within the same minute, and the last minute of a connection, can be missed. Only connections from local devices (LAN, guest networks, VPN server clients) to public addresses are taken into account. Traffic of the router itself is left out - also when the router sits behind another router (for example a FritzBox) and its WAN address is a private one.
 
+### Suggestions by domain (optional)
+
+The switch **by ASN | by domain** above the suggestions shows the same traffic grouped by the **domain** a device looked up, for example `zdf.de` with the names below it (`nrodl.zdf.de`, `www.zdf.de` ...). **Add** puts the main domain on the list as a domain entry - it covers every subdomain. Domains and ASNs that are already on the list are hidden; a domain that is on the list only for some devices stays suggested for the others.
+
+It is off by default. When you turn it on (in the domain view, or `ASNmanager.sh suggest domains on`), dnsmasq writes every lookup it answers into a file in RAM (`log-queries=extra`, `log-facility=/tmp/asnmanager-dnsq.log`). Once a minute the counting loop reads the new lines, notes which name belongs to which address (kept 2 days, in RAM) and empties the file again - nothing is written to the flash memory and nothing is looked up on the internet. The CPU cost is very small (a few hundred lines per minute in a normal home). Messages of dnsmasq that are not lookups (DHCP, start-up) are passed on to the system log, so the log looks as before. Turning it on or off restarts dnsmasq once. If another add-on (for example Diversion) already has dnsmasq write such a log, that file is only read and dnsmasq is left as it is.
+
+Limits: traffic to an address whose name was looked up before the collection started, answered from a cache in front of dnsmasq (AdGuard Home), or not through the router at all ("secure DNS" in a browser, a device with a fixed DNS server) has no name - the page shows how much that is. Large networks (CDNs) serve many names from one address; the most recent lookup counts.
+
 ## Traffic statistics
 
 The card **Traffic per ASN** (above "Diagnostics", collapsed by default - click the header or the dashed bar "Show details", which also shows the total and the number of ASNs) shows how much traffic goes through each ASN rule. It is **off by default** - click **Enable** to start counting.
@@ -325,6 +333,7 @@ ASNmanager.sh stats enable
 ASNmanager.sh stats show
 ASNmanager.sh stats mode iface
 ASNmanager.sh rulemode combined
+ASNmanager.sh suggest domains on
 ASNmanager.sh webui location vpn
 ASNmanager.sh names
 ASNmanager.sh dns

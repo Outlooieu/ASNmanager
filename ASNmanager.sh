@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.6.8
+version=3.7.0
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.6.8"
+SCRIPT_VERSION="3.7.0"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -993,6 +993,7 @@ backup_text() {
     echo "STATS_MODE=$(ts_mode)"
     echo "RULES_MODE=$(rules_mode)"
     echo "WEBUI_LOCATION=$(webui_location)"
+    echo "SG_DOMAINS=$(sgd_on && echo on || echo off)"
     return 0
 }
 
@@ -1060,7 +1061,8 @@ rs_setting() {
         STATS_MODE:asn|STATS_MODE:iface)   ts_set_mode "$2" ;;
         RULES_MODE:combined|RULES_MODE:single)  rules_set_mode "$2" ;;
         WEBUI_LOCATION:vpn|WEBUI_LOCATION:addons)  [ "$(webui_location)" = "$2" ] || webui_set_location "$2" ;;
-        STATS:*|STATS_SAVING:*|STATS_MODE:*|RULES_MODE:*|WEBUI_LOCATION:*)   echo "Invalid value '$2' for $1 skipped."; return 0 ;;
+        SG_DOMAINS:on|SG_DOMAINS:off)  sgd_set "$2" ;;
+        STATS:*|STATS_SAVING:*|STATS_MODE:*|RULES_MODE:*|WEBUI_LOCATION:*|SG_DOMAINS:*)   echo "Invalid value '$2' for $1 skipped."; return 0 ;;
         *)                echo "Unknown setting '$1' skipped."; return 0 ;;
     esac
     echo "Setting applied: $1 = $2."
@@ -1244,6 +1246,7 @@ uninstall_menu() {
             fo_purge >/dev/null 2>&1
             ep_purge >/dev/null 2>&1
             st_cleanup >/dev/null 2>&1
+            rm -f "$ADDON_DIR/sg_domains"; sgd_write >/dev/null 2>&1; rm -f "$SGD_LOG"
             cu_purge >/dev/null 2>&1
             rm -f /tmp/asn_groups.txt
 
@@ -2983,7 +2986,8 @@ sg_acct_restore() {
 }
 sg_clear() {
     rm -f "$TS_RT/ct_prev.txt" "$TS_RT/ct_prev.txt.new" "$TS_RT/ct_add.txt" "$TS_RT/sg_pairs.txt" "$TS_RT/sg_pairs.new" \
-          "$TS_RT/sg_asn.txt" "$TS_RT/sg_fail.txt" "$TS_RT/sg_todo.txt" "$TS_RT/sg_since" "$WEB_DIR/suggest.js"
+          "$TS_RT/sg_asn.txt" "$TS_RT/sg_fail.txt" "$TS_RT/sg_todo.txt" "$TS_RT/sg_since" "$WEB_DIR/suggest.js" \
+          "$TS_RT/sg_dns.txt"
     rm -rf "$TS_RT/sg_lock"
 }
 
@@ -3135,8 +3139,214 @@ sg_export() {
                 for (x = 1; x <= m && x <= 40; x++) printf "%s[\"%s\",%.0f]", (x > 1 ? "," : ""), cc[x], cb[a "|" cc[x]]
                 printf "],\"ncl\":%d}", m
             }
-            printf "]}\n"
-        }' "$ASN_FILE" "$TS_RT/sg_asn.txt" "$TS_RT/sg_pairs.txt" > "$WEB_DIR/suggest.js.tmp" 2>/dev/null && mv -f "$WEB_DIR/suggest.js.tmp" "$WEB_DIR/suggest.js"
+            printf "]"
+        }' "$ASN_FILE" "$TS_RT/sg_asn.txt" "$TS_RT/sg_pairs.txt" > "$WEB_DIR/suggest.js.tmp" 2>/dev/null && sgd_export >> "$WEB_DIR/suggest.js.tmp" &&
+        mv -f "$WEB_DIR/suggest.js.tmp" "$WEB_DIR/suggest.js"
+}
+
+# ---------- suggestions by domain: which name did a device look up for the address it talks to? ----------
+# Optional (off by default): dnsmasq writes every answered lookup into a file in RAM ("log-queries=extra",
+# "log-facility"). Once a minute the counting loop reads the new lines, keeps "address -> names" (RAM, 2 days)
+# and empties the file. When another add-on (e.g. Diversion) already has dnsmasq write such a file, that file
+# is only read (never emptied) and nothing is changed in dnsmasq. No look-ups on the internet are needed.
+SGD_LOG=/tmp/asnmanager-dnsq.log
+SGD_BEGIN="# ASNmanager dnslog begin"
+SGD_END="# ASNmanager dnslog end"
+SGD_KEEP=${SGD_KEEP:-172800}       # addresses not looked up again for 2 days are forgotten
+SGD_MAX=${SGD_MAX:-20000}          # at most this many addresses are kept
+
+sgd_on() { [ -f "$ADDON_DIR/sg_domains" ]; }
+# a lookup log of someone else: "log-queries" plus "log-facility=/file" outside our block
+sgd_foreign() {
+    [ -f /etc/dnsmasq.conf ] || return 1
+    sed "/^${SGD_BEGIN}\$/,/^${SGD_END}\$/d" /etc/dnsmasq.conf | grep -q '^log-queries' || return 1
+    sgf_f=$(sed "/^${SGD_BEGIN}\$/,/^${SGD_END}\$/d" /etc/dnsmasq.conf | sed -n 's/^log-facility=\(\/.*\)$/\1/p' | tail -n 1)
+    [ -n "$sgf_f" ] && echo "$sgf_f"
+}
+# off | on (our file) | ext (the file of another add-on)
+sgd_state() {
+    sgd_on || { echo off; return; }
+    if [ -n "$(sgd_foreign)" ]; then echo ext; else echo on; fi
+}
+sgd_file() { case "$(sgd_state)" in on) echo "$SGD_LOG" ;; ext) sgd_foreign ;; esac; }
+
+# writes or removes our two lines in dnsmasq.conf.add; dnsmasq is restarted only when they changed
+sgd_write() {
+    sgw_new=/tmp/asnmanager-dnslog.new
+    if [ -f "$DNSMASQ_ADD" ]; then sed "/^${SGD_BEGIN}\$/,/^${SGD_END}\$/d" "$DNSMASQ_ADD" > "$sgw_new"; else : > "$sgw_new"; fi
+    if sgd_on && [ -z "$(sgd_foreign)" ]; then
+        printf '%s\nlog-queries=extra\nlog-facility=%s\n%s\n' "$SGD_BEGIN" "$SGD_LOG" "$SGD_END" >> "$sgw_new"
+    fi
+    if [ -f "$DNSMASQ_ADD" ]; then sgw_cur="$DNSMASQ_ADD"; else sgw_cur=/dev/null; fi
+    if cmp -s "$sgw_new" "$sgw_cur"; then rm -f "$sgw_new"; return 0; fi
+    if [ -s "$sgw_new" ]; then mkdir -p "$(dirname "$DNSMASQ_ADD")" && cp "$sgw_new" "$DNSMASQ_ADD"; else rm -f "$DNSMASQ_ADD"; fi
+    rm -f "$sgw_new"
+    service restart_dnsmasq >/dev/null 2>&1
+    logger -t ASNmanager "Suggestions by domain: dnsmasq lookup log $(sgd_on && echo 'turned on' || echo 'turned off'), dnsmasq restarted"
+}
+
+sgd_set() {
+    case "$1" in
+        on)  # the 5-minute check (set up with the WebUI) keeps the log file small while counting is off
+             [ -f "$ADDON_DIR/webui_page" ] || { echo "Suggestions by domain need the WebUI (webui install)."; return 1; }
+             mkdir -p "$ADDON_DIR"; : > "$ADDON_DIR/sg_domains"; sgd_write
+             case "$(sgd_state)" in
+                 ext) echo "Suggestions by domain: on - the lookup log of another add-on is read ($(sgd_foreign)), dnsmasq is left as it is." ;;
+                 *)   echo "Suggestions by domain: on - dnsmasq writes its lookups to $SGD_LOG (RAM, emptied every minute)." ;;
+             esac
+             [ "$(ts_state)" = "enabled" ] || echo "Note: the suggestions need the traffic statistics (stats enable)." ;;
+        off) rm -f "$ADDON_DIR/sg_domains"; sgd_write
+             rm -f "$SGD_LOG" "$TS_RT/sg_dns.txt" "$TS_RT/sgd_off"
+             echo "Suggestions by domain: off." ;;
+        *)   echo "Suggestions by domain: $(sgd_state)   (usage: suggest domains on | off)"; return 0 ;;
+    esac
+    [ -d "$WEB_DIR" ] && [ -d "$TS_RT" ] && sg_export
+    return 0
+}
+
+# while counting is off nobody reads our log file: the 5-minute check does (passes the DHCP messages on to
+# the system log and keeps the file small); a file left over from "off" is removed
+sgd_trim() {
+    if ! sgd_on; then rm -f "$SGD_LOG"; return 0; fi
+    [ "$(ts_state)" = "enabled" ] && return 0
+    mkdir -p "$TS_RT" && sgd_collect
+    return 0
+}
+
+# reads the new lines of the lookup log into $TS_RT/sg_dns.txt ("address <TAB> name[,name...] <TAB> last seen")
+sgd_collect() {
+    sgd_on || return 0
+    sgc_f=$(sgd_file); [ -n "$sgc_f" ] && [ -r "$sgc_f" ] || return 0
+    sgc_own=0; [ "$sgc_f" = "$SGD_LOG" ] && sgc_own=1
+    sgc_size=$(wc -c < "$sgc_f" 2>/dev/null); case "$sgc_size" in ''|*[!0-9]*) return 0 ;; esac
+    sgc_off=$(cat "$TS_RT/sgd_off" 2>/dev/null); case "$sgc_off" in ''|*[!0-9]*) sgc_off=0 ;; esac
+    [ "$sgc_size" -lt "$sgc_off" ] && sgc_off=0            # emptied or rotated meanwhile
+    [ "$sgc_off" -eq 0 ] && [ "$sgc_own" -eq 0 ] && [ ! -f "$TS_RT/sgd_off" ] && sgc_off=$sgc_size   # someone else's file: from now on
+    : > "$TS_RT/sgd_new.txt"; : > "$TS_RT/sgd_fwd.txt"
+    if [ "$sgc_size" -gt "$sgc_off" ]; then
+        tail -c +"$((sgc_off + 1))" "$sgc_f" 2>/dev/null | head -c "$((sgc_size - sgc_off))" |
+        awk -v own="$sgc_own" -v mapf="$TS_RT/sgd_new.txt" -v fwdf="$TS_RT/sgd_fwd.txt" '
+            # "Oct 22 18:40:01 dnsmasq[123]: 64 127.0.0.1/35565 query[A] example.com from 127.0.0.1" (log-queries=extra)
+            {
+                t = 0; for (i = 1; i <= NF; i++) if ($i ~ /^dnsmasq(-dhcp)?\[[0-9]+\]:$/ || $i ~ /^dnsmasq(-dhcp)?:$/) { t = i; break }
+                if (!t) next
+                tag = $t; sub(/\[[0-9]+\]:$/, "", tag); sub(/:$/, "", tag)
+                p = t + 1; ser = ""
+                if ($p ~ /^[0-9]+$/ && $(p + 1) ~ /\//) { ser = $p; p += 2 }
+                w = $p
+                if (w ~ /^query\[/) { if (w == "query[A]" && ser != "") root[ser] = tolower($(p + 1)); chain = 0; next }
+                if (w == "reply" || w == "cached") {
+                    nm = tolower($(p + 1)); v = $(p + 3)
+                    if (ser != "" && (ser in root)) r = root[ser]
+                    else if (chain && cur != "") r = cur
+                    else r = nm
+                    if (v == "<CNAME>") { cur = r; chain = 1; next }
+                    if (v ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ && r ~ /\./) print v "\t" r > mapf
+                    next
+                }
+                chain = 0
+                if (w ~ /^(forwarded|config|validation|query|dnssec-query|\/)/ || tag == "dnsmasq" && w ~ /^(reply|cached)$/) next
+                # everything else (DHCP, start-up, errors) went to syslog before the log file took it over
+                if (own && nf++ < 300) { m = ""; for (i = t + 1; i <= NF; i++) m = m (i > t + 1 ? " " : "") $i; print tag "\t" m > fwdf }
+            }'
+        if [ "$sgc_own" -eq 1 ] && [ -s "$TS_RT/sgd_fwd.txt" ]; then
+            while IFS="$(printf '\t')" read -r sgc_tag sgc_msg; do logger -t "$sgc_tag" "$sgc_msg"; done < "$TS_RT/sgd_fwd.txt"
+        fi
+        sgc_off=$sgc_size
+        if [ "$sgc_own" -eq 1 ] && [ "$sgc_size" -gt 524288 ]; then : > "$sgc_f"; sgc_off=0; fi
+    fi
+    echo "$sgc_off" > "$TS_RT/sgd_off"
+    # merge: newest name first, up to 3 names per address; forget what was not seen for SGD_KEEP seconds
+    touch "$TS_RT/sg_dns.txt"
+    awk -F'\t' -v now="$(date +%s)" -v keep="$SGD_KEEP" '
+        FILENAME == ARGV[1] { if (now - $3 > keep) next; nm[$1] = $2; ts[$1] = $3; next }
+        {
+            ip = $1; n = $2; old = (ip in nm) ? nm[ip] : ""
+            k = split(old, o, ","); s = n; c = 1
+            for (i = 1; i <= k && c < 3; i++) if (o[i] != n && o[i] != "") { s = s "," o[i]; c++ }
+            nm[ip] = s; ts[ip] = now
+        }
+        END { for (ip in nm) printf "%s\t%s\t%s\n", ip, nm[ip], ts[ip] }' "$TS_RT/sg_dns.txt" "$TS_RT/sgd_new.txt" |
+        sort -t "$(printf '\t')" -k3,3nr | head -n "$SGD_MAX" > "$TS_RT/sg_dns.new" && mv -f "$TS_RT/sg_dns.new" "$TS_RT/sg_dns.txt"
+    rm -f "$TS_RT/sgd_new.txt" "$TS_RT/sgd_fwd.txt"
+}
+
+# the domain part of suggest.js: ,"dlog":..,"dlist":[...]}  - base domains (zdf.de) by bytes, with their names and devices
+sgd_export() {
+    sge_st=$(sgd_state)
+    if [ "$sge_st" = "off" ] || [ ! -s "$TS_RT/sg_dns.txt" ]; then
+        printf ',"dlog":"%s","dtotal":0,"dnone":0,"dlist":[]}\n' "$sge_st"; return 0
+    fi
+    sge_c="$CUSTOM_FILE"; [ -f "$sge_c" ] || sge_c=/dev/null
+    sge_tab=$(printf '\t')
+    awk -F'\t' -v own="$(sg_own_ips)" -v cf="$sge_c" '
+        function base(n,   p, k, sl) {
+            k = split(n, p, "."); if (k <= 2) return n
+            sl = p[k - 1] "." p[k]
+            if (sl in two) return p[k - 2] "." sl
+            return sl
+        }
+        BEGIN {
+            split("co.uk org.uk ac.uk gov.uk me.uk co.at or.at gv.at ac.at com.au net.au org.au co.nz co.jp ne.jp or.jp com.br com.tr com.cn com.tw com.hk com.sg co.za com.mx co.in co.kr com.ar com.pl co.il", tl, " ")
+            for (i in tl) two[tl[i]] = 1
+            n = split(own, o, " "); for (i = 1; i <= n; i++) self[o[i]] = 1
+            # domain entries: for all devices = covered; with devices = covered for those devices only
+            while ((getline l < cf) > 0) {
+                m = split(l, a, ":"); if (m < 5 || a[4] != "dom") continue
+                if (a[3] == "") { dall[a[5]] = 1; continue }
+                don[a[5]] = a[2]; dsrc[a[5]] = a[3]
+                ms = split(a[3], ss, ","); for (j = 1; j <= ms; j++) dcov[a[5] "|" ss[j]] = 1
+            }
+        }
+        FILENAME == ARGV[1] { n3 = split($0, a, ":"); if (a[1] !~ /^[0-9]+$/) next
+                              if (n3 < 3 || a[3] == "") { listed[a[1]] = 1; next }
+                              m3 = split(a[3], ss, ","); for (j = 1; j <= m3; j++) acov[a[1] "|" ss[j]] = 1; next }
+        FILENAME == ARGV[2] { asn[$1] = $2; next }
+        FILENAME == ARGV[3] { names[$1] = $2; next }
+        {
+            split($1, k, "|"); ip = k[1]; cl = k[2]; b = $2
+            if (cl in self) next
+            split(ip, q, "."); net = q[1] "." q[2] "." q[3]
+            if (net in asn) { an = asn[net]; if (an in listed) next; if ((an "|" cl) in acov) next }
+            if (!(ip in names)) { none += b; nonen[ip] = 1; next }
+            split(names[ip], nn, ","); fn = nn[1]
+            # covered by a domain entry (the name itself or one of its parents)?
+            kk = split(fn, p, "."); cv = 0; ond = ""
+            for (i = 1; i < kk; i++) {
+                s = p[i]; for (j = i + 1; j <= kk; j++) s = s "." p[j]
+                if (s in dall) { cv = 1; break }
+                if ((s "|" cl) in dcov) { cv = 1; break }
+                if (s in don && ond == "") ond = s
+            }
+            if (cv) next
+            bd = base(fn)
+            tot[bd] += b; if (ond != "" && !(bd in on)) { on[bd] = don[ond]; osrc[bd] = dsrc[ond] }
+            if (!((bd "|" ip) in sip)) { sip[bd "|" ip] = 1; nip[bd]++ }
+            if (!((bd "|" fn) in ssub)) { ssub[bd "|" fn] = 1; subs[bd] = subs[bd] " " fn; nsub[bd]++ }
+            sb[bd "|" fn] += b
+            if (!((bd "|" cl) in scl)) { scl[bd "|" cl] = 1; cls[bd] = cls[bd] " " cl; ncl[bd]++ }
+            cb[bd "|" cl] += b
+        }
+        END {
+            for (d in tot) {
+                # names and devices: busiest first (short lists)
+                m = split(subs[d], ss, " ")
+                for (x = 1; x <= m; x++) for (y = x + 1; y <= m; y++) if (sb[d "|" ss[y]] > sb[d "|" ss[x]]) { t = ss[x]; ss[x] = ss[y]; ss[y] = t }
+                js = ""; for (x = 1; x <= m && x <= 8; x++) js = js (x > 1 ? "," : "") "[\"" ss[x] "\"," sprintf("%.0f", sb[d "|" ss[x]]) "]"
+                m2 = split(cls[d], cc, " ")
+                for (x = 1; x <= m2; x++) for (y = x + 1; y <= m2; y++) if (cb[d "|" cc[y]] > cb[d "|" cc[x]]) { t = cc[x]; cc[x] = cc[y]; cc[y] = t }
+                jc = ""; for (x = 1; x <= m2 && x <= 40; x++) jc = jc (x > 1 ? "," : "") "[\"" cc[x] "\"," sprintf("%.0f", cb[d "|" cc[x]]) "]"
+                printf "%.0f\t{\"d\":\"%s\",\"b\":%.0f,\"ips\":%d,\"on\":\"%s\",\"osrc\":\"%s\",\"subs\":[%s],\"nsub\":%d,\"cl\":[%s],\"ncl\":%d}\n", tot[d], d, tot[d], nip[d], on[d], osrc[d], js, m, jc, m2
+            }
+            nn2 = 0; for (i in nonen) nn2++
+            printf "N\t%.0f\t%d\n", none, nn2
+        }' "$ASN_FILE" "$TS_RT/sg_asn.txt" "$TS_RT/sg_dns.txt" "$TS_RT/sg_pairs.txt" > "$TS_RT/sgd_rows.txt" 2>/dev/null
+    sge_none=$(awk -F'\t' '$1 == "N" { print $2; exit }' "$TS_RT/sgd_rows.txt"); sge_nonen=$(awk -F'\t' '$1 == "N" { print $3; exit }' "$TS_RT/sgd_rows.txt")
+    sge_tot=$(grep -vc '^N' "$TS_RT/sgd_rows.txt")
+    printf ',"dlog":"%s","dtotal":%d,"dnone":%.0f,"dnoneips":%d,"dlist":[' "$sge_st" "${sge_tot:-0}" "${sge_none:-0}" "${sge_nonen:-0}"
+    grep -v '^N' "$TS_RT/sgd_rows.txt" | sort -t "$sge_tab" -k1,1nr | head -n 100 | cut -f2- | awk '{ printf "%s%s", (NR > 1 ? "," : ""), $0 }'
+    printf ']}\n'
+    rm -f "$TS_RT/sgd_rows.txt"
 }
 
 # ---------- live throughput: bytes/s per counter between two loop cycles (uptime has 1/100 s resolution) ----------
@@ -3176,7 +3386,7 @@ ts_loop() {
         now=$(date +%s)
         if [ $((now - last_save)) -ge "$TS_SAVE_EVERY" ]; then ts_save; last_save=$now; fi
         if [ $((now - last_sg)) -ge "$SG_EVERY" ]; then
-            sg_sample; sg_export
+            sg_sample; sgd_collect; sg_export
             ( sg_resolve ) >/dev/null 2>&1 &
             last_sg=$now
         fi
@@ -4440,6 +4650,7 @@ webui_menu() {
 
 webui_uninstall() {
     ts_purge >/dev/null 2>&1
+    rm -f "$ADDON_DIR/sg_domains"; sgd_write >/dev/null 2>&1; rm -f "$SGD_LOG"     # its 5-minute check goes away
     webui_unmount >/dev/null 2>&1
     sed -i "/# ${WEBUI_MARK}\$/d" "$SERVICE_EVENT" 2>/dev/null
     sed -i "/# ${WEBUI_MARK}\$/d" "$SERVICES_START" 2>/dev/null
@@ -4484,6 +4695,7 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   stats show | unknown | probe       print numbers / list addresses without counter rule / self-check
   stats saving on | off              save the numbers hourly on the USB device (default) / keep them in RAM only
   stats mode asn | iface             statistics per ASN (exact) / per interface and device only (cheaper for the CPU)
+  suggest domains on | off           suggestions by domain as well (dnsmasq writes its lookups to a file in RAM)
   rulemode combined | single         marking rules: one combined set per target (fast) / one rule per ASN (apply the rules afterwards)
   stats diag                         where do the statistics hang? (loop, lock, hook, timing)
   stats repair                       statistics do not count: clean temporary files, set up the counting again (numbers are kept)
@@ -4551,6 +4763,7 @@ cli_main() {
         job)      cli_job "$1" ;;
         speedtest) st_cli "$1" ;;
         rulemode) rules_set_mode "$1" ;;
+        suggest)  case "$1" in domains) sgd_set "$2" ;; *) echo "Usage: suggest domains on | off"; false ;; esac ;;
         custom)   cli_custom "$@" ;;
         backup)
             case "$1" in
@@ -4575,7 +4788,7 @@ cli_main() {
             esac ;;
         check)
             case "$1" in
-                run) proc_reap; cu_learned_save >/dev/null 2>&1; dns_export >/dev/null 2>&1; rc_run_once
+                run) proc_reap; cu_learned_save >/dev/null 2>&1; dns_export >/dev/null 2>&1; sgd_trim; rc_run_once
                      # new ASN names: write the page data again so they show up without a manual refresh
                      nm_before=$(md5sum "$NAMES_FILE" 2>/dev/null | cut -c1-32)
                      names_fill 12 >/dev/null 2>&1

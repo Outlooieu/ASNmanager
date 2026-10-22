@@ -1,3 +1,10 @@
+## v3.7.0
+
+- New: suggestions **by domain**. A switch above the suggestions changes between "by ASN" and "by domain". The domain view groups the traffic without a rule by the domain the devices looked up (e.g. `zdf.de`, with the names below it such as `nrodl.zdf.de`), with traffic, devices, target, device choice, note and a one-click "Add" (puts the main domain on the list - it covers every subdomain). Domains and ASNs already on the list are hidden
+- How it works: when turned on (off by default; in the domain view or `ASNmanager.sh suggest domains on|off`), dnsmasq writes the lookups it answers into a file in RAM; the counting loop reads it once a minute, keeps "address -> name" for 2 days and empties the file. No flash writes, no look-ups on the internet, very little CPU. Other dnsmasq messages (DHCP ...) are passed on to the system log. If another add-on already has dnsmasq write a lookup log (e.g. Diversion), that file is read instead and dnsmasq is left unchanged
+- The setting is part of the backup (SG_DOMAINS); uninstalling removes the dnsmasq lines again
+- The note "on the list for ..." in the suggestions is a bit narrower, so the table fits better
+
 ## v3.6.8
 
 - Fixed: after a VPN client was stopped and started again (e.g. WGC1 switched off and on), its ASNs went out via WAN until "Apply rules" was clicked. Stopping the client removes the route from ASN Manager's table for that target (211 for WGC1 ...) and nothing put it back. The routing check (every 5 minutes, and "Check now") and the failover round now add the route again as soon as the interface is up, and note it in the system log
