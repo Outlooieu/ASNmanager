@@ -1,3 +1,7 @@
+## v3.5.2
+
+- "Add ASNs, IPs or domains" has a field for a note: it is saved with the entries right away (with several entries in one go, under each of them). Command line: `add WGC3 '*.zdf.de' --src 192.168.5.41 --note "ZDF Mediathek"`
+
 ## v3.5.1
 
 - Fixed: ASN names that were looked up in the background only showed up after "Reload data". The page data is now written again as soon as new names arrive (up to 12 per routing check). `names` also refreshes the page data and lists every ASN with its name, or says that none was found

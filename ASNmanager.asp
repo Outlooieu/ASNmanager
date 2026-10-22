@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.5.1 -->
+<!-- ASNmanager-WebUI v3.5.2 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -405,7 +405,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.5.1';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.5.2';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -487,7 +487,7 @@ var ASNM_I18N = {
     rc_nolearned: 'none learned', rc_tip_nolearned: 'No address has been learned for this domain yet. A device has to look the name up through the router\'s DNS server (dnsmasq). Not covered: devices with another DNS server or DoH, and names that an AdGuard Home in front answers without passing through dnsmasq.',
     lang_label: 'Language', lang_default: 'Default', lang_en: 'English', theme_label: 'Theme', theme_dark: 'Dark', theme_light: 'Light', theme_blue: 'Blue',
     stat_asns: 'ASNs', stat_more: '+ {i} IP · {d} domains',
-    note_ph: 'Note, e.g. ZDF Mediathek', note_lbl: 'Note',
+    note_ph: 'Note, e.g. ZDF Mediathek', note_lbl: 'Note', add_note_lbl: 'Note (optional)', add_note_help: 'Shown under the entry - with several entries in one go, under each of them',
     c_clear_type: 'Remove ALL entries ({a} ASNs, {i} IP ranges, {d} domains) from the list?\nActive routing stays until you click "Apply rules".\n\nType {w} to confirm:', clear_word: 'DELETE', clear_wrong: 'Not removed - the word did not match.',
     dns_lbl: 'DNS / DHCP', dns_ok: 'dnsmasq OK', dns_ok_agh: 'dnsmasq OK (port 553, behind {p})', dns_dhcp_ok: 'DHCP OK', dns_dhcp_off: 'DHCP off in the router',
     dns_bad_nodnsmasq: 'dnsmasq is not running: devices get no new addresses (DHCP) and the domain entries learn nothing. Fix (SSH): service restart_dnsmasq - with AdGuard Home in front: /opt/etc/init.d/S99AdGuardHome restart',
@@ -614,7 +614,7 @@ var ASNM_I18N = {
     rc_nolearned: 'nichts gelernt', rc_tip_nolearned: 'Für diese Domain wurde noch keine Adresse gelernt. Ein Gerät muss den Namen über den DNS-Server des Routers (dnsmasq) auflösen. Nicht erfasst werden Geräte mit anderem DNS-Server oder DoH und Namen, die ein davorgeschalteter AdGuard Home beantwortet, ohne dass sie über dnsmasq laufen.',
     lang_label: 'Sprache', lang_default: 'Standard', lang_en: 'English', theme_label: 'Design', theme_dark: 'Dunkel', theme_light: 'Hell', theme_blue: 'Blau',
     stat_asns: 'ASNs', stat_more: '+ {i} IP · {d} Domains',
-    note_ph: 'Notiz, z. B. ZDF Mediathek', note_lbl: 'Notiz',
+    note_ph: 'Notiz, z. B. ZDF Mediathek', note_lbl: 'Notiz', add_note_lbl: 'Notiz (optional)', add_note_help: 'Steht unter dem Eintrag - bei mehreren Einträgen auf einmal unter jedem davon',
     c_clear_type: 'ALLE Einträge ({a} ASNs, {i} IP-Bereiche, {d} Domains) aus der Liste entfernen?\nDas aktive Routing bleibt bestehen, bis du "Regeln anwenden" klickst.\n\nZum Bestätigen {w} eintippen:', clear_word: 'LÖSCHEN', clear_wrong: 'Nicht entfernt - das Wort stimmte nicht.',
     dns_lbl: 'DNS / DHCP', dns_ok: 'dnsmasq OK', dns_ok_agh: 'dnsmasq OK (Port 553, hinter {p})', dns_dhcp_ok: 'DHCP OK', dns_dhcp_off: 'DHCP im Router aus',
     dns_bad_nodnsmasq: 'dnsmasq läuft nicht: Geräte bekommen keine neuen Adressen (DHCP), und die Domain-Einträge lernen nichts. Abhilfe (SSH): service restart_dnsmasq - mit AdGuard Home davor: /opt/etc/init.d/S99AdGuardHome restart',
@@ -1473,8 +1473,10 @@ function asnmAdd() {
     var src = asnmNormSrc(document.getElementById('asnm_add_src').value);
     if (!p.ok.length || p.bad.length) { alert(t('a_asns') + (p.bad.length ? '\n\n' + p.bad.slice(0, 5).join(', ') : '')); return; }
     if (!asnmValidSrc(src)) { alert(t('a_ip')); return; }
-    if (asnmSend('add', [document.getElementById('asnm_add_dest').value, src, p.ok.join(',')])) {
+    var note = document.getElementById('asnm_add_note').value.replace(/[\u0000-\u001f"\\|<>]/g, '').trim().slice(0, 60);
+    if (asnmSend('add', [document.getElementById('asnm_add_dest').value, src, p.ok.join(','), encodeURIComponent(note)])) {
         document.getElementById('asnm_add_asns').value = '';
+        document.getElementById('asnm_add_note').value = '';
         asnmAddHint();
     }
 }
@@ -3041,6 +3043,9 @@ function initial() {
         <input type="text" id="asnm_add_asns" maxlength="400" data-i18n-ph="ph_asns" autocomplete="off" oninput="asnmAddHint();"/>
         <span class="asnm-help" data-i18n="hint_multi"></span>
         <span class="asnm-help" id="asnm_add_domnote" data-i18n="add_domnote" style="display:none;"></span></div>
+      <div class="asnm-field"><span class="asnm-label" data-i18n="add_note_lbl"></span>
+        <input type="text" id="asnm_add_note" maxlength="60" data-i18n-ph="note_ph" autocomplete="off"/>
+        <span class="asnm-help" data-i18n="add_note_help"></span></div>
       <div class="asnm-field"><span class="asnm-label" data-i18n="target"></span><select id="asnm_add_dest"></select></div>
       <div class="asnm-field"><span class="asnm-label" data-i18n="src_ip"></span>
         <div class="asnm-inline"><input type="text" id="asnm_add_src" maxlength="600" data-i18n-ph="ph_ip" autocomplete="off" style="flex:1 1 150px; min-width:0;" oninput="asnmDevMsRender('asnm_add_ms','asnm_add_src');"/>

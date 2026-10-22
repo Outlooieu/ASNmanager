@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.5.1
+version=3.5.2
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.5.1"
+SCRIPT_VERSION="3.5.2"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -1882,16 +1882,17 @@ cli_list() {
 cli_add() {
     dest=$(norm_dest "$1") || { echo "Invalid target '$1' (use: $VALID_DESTS)"; return 1; }
     shift
-    src=""; asns=""
+    src=""; asns=""; add_note=""
     while [ $# -gt 0 ]; do
         case "$1" in
             --src) src="$2"; shift; [ $# -gt 0 ] && shift ;;
+            --note) add_note=$(printf '%s' "$2" | note_clean); shift; [ $# -gt 0 ] && shift ;;
             *) asns="$asns $1"; shift ;;
         esac
     done
     src=$(norm_src "$src")
     if ! is_valid_src "$src"; then echo "Invalid source IP '$src'"; return 1; fi
-    n=0; cn=0; added=""
+    n=0; cn=0; added=""; nkeys=""
     set -f
     for raw in $(echo "$asns" | tr ',;' '  '); do
         k=$(cu_kind "$raw") || { echo "Skipping invalid entry '$raw'"; continue; }
@@ -1900,13 +1901,19 @@ cli_add() {
                 asn=${k#asn }
                 sed -i "/^${asn}:/d" "$ASN_FILE"
                 echo "${asn}:${dest}:${src}" >> "$ASN_FILE"
-                n=$((n + 1)); added="$added $asn" ;;
+                n=$((n + 1)); added="$added $asn"; nkeys="$nkeys $asn" ;;
             *)
                 cid=$(cu_save "${k%% *}" "$dest" "$src" "${k#* }")
-                cn=$((cn + 1)); added="$added $cid" ;;
+                cn=$((cn + 1)); added="$added $cid"; nkeys="$nkeys ${k%% *}:${k#* }" ;;
         esac
     done
     set +f
+    # the note (optional) goes to every entry of this input
+    if [ -n "$add_note" ] && [ -n "$nkeys" ]; then
+        mkdir -p "$ADDON_DIR" 2>/dev/null
+        { awk -F'\t' -v ks="$nkeys" 'BEGIN { n = split(ks, a, " "); for (i = 1; i <= n; i++) k[a[i]] = 1 } !($1 in k)' "$NOTES_FILE" 2>/dev/null
+          for nk in $nkeys; do printf '%s\t%s\n' "$nk" "$add_note"; done; } > "$NOTES_FILE.new" && mv -f "$NOTES_FILE.new" "$NOTES_FILE"
+    fi
     sort -u "$ASN_FILE" -o "$ASN_FILE" 2>/dev/null
     [ $((n + cn)) -gt 0 ] || { echo "No valid ASN, IP/CIDR or domain given."; return 1; }
     [ $n -gt 0 ] && ( names_fill 10 >/dev/null 2>&1 & )
@@ -2402,7 +2409,7 @@ web_job() {
     set -- $1
     IFS=$old_ifs
     set +f
-    id="$1"; act="$2"; a1="$3"; a2="$4"; a3="$5"
+    id="$1"; act="$2"; a1="$3"; a2="$4"; a3="$5"; a4="$6"
     case "$id" in ''|*[!0-9]*) return 1 ;; esac
     case "$act" in ''|*[!a-z]*) return 1 ;; esac
 
@@ -2422,7 +2429,7 @@ web_job() {
         add)
             a3=$(echo "$a3" | tr ',' ' ')
             set -f
-            if [ -n "$a2" ]; then cli_add "$a1" $a3 --src "$a2"; else cli_add "$a1" $a3; fi > "$OUT" 2>&1
+            if [ -n "$a2" ]; then cli_add "$a1" $a3 --src "$a2" --note "$(url_dec "$a4")"; else cli_add "$a1" $a3 --note "$(url_dec "$a4")"; fi > "$OUT" 2>&1
             rc_add=$?; set +f; [ $rc_add -eq 0 ] ;;
         preset)
             if [ -n "$a3" ]; then cli_preset "$a1" "$a2" --src "$a3"; else cli_preset "$a1" "$a2"; fi > "$OUT" 2>&1 ;;
@@ -4433,7 +4440,7 @@ cli_usage() {
 ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   (no command)                       interactive menu
   list                               show ASN list
-  add <TARGET> <ENTRY>... [--src IP] add ASN(s), IP/CIDR ranges or domains (AS15169 1.2.3.0/24 *.example.com), TARGET: ${VALID_DESTS}
+  add <TARGET> <ENTRY>... [--src IP] [--note TEXT] add ASN(s), IP/CIDR ranges or domains (AS15169 1.2.3.0/24 *.example.com), TARGET: ${VALID_DESTS}
   preset <1-${PRESET_COUNT}> <TARGET> [--src IP]  add a service preset
   presets                            list service presets
   remove <ENTRY>...                  remove ASN(s) / entries (ASN, C1 ... id from "list", IP/CIDR or domain)
