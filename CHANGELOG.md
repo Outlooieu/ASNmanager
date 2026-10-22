@@ -1,3 +1,7 @@
+## v3.7.2
+
+- The DNS check now notices when AdGuard Home sends the lookups straight to another server (e.g. Unbound on 127.0.0.1:53535) instead of to dnsmasq, or shares them between both ("load balancing"). DNS works then, but dnsmasq sees only some lookups: domain entries learn only some addresses and the suggestions by domain stay empty. The status line shows a warning with the fix (upstream in AdGuard Home: 127.0.0.1:<dnsmasq port> - dnsmasq passes the lookups on to its own server); also in `ASNmanager.sh dns` and once in the system log
+
 ## v3.7.1
 
 - New: suggestions can be hidden. Every row has a button with a crossed-out eye next to "Add"; a hidden ASN or domain no longer shows up and is not counted. "Show hidden (n)" above the list shows them again (greyed out) with a button to bring a suggestion back. The choice is kept on the router (`/jffs/addons/asnmanager/sg_hidden.txt`), so it is the same in every browser. Command line: `ASNmanager.sh suggest hide|unhide <ASN|domain>...`, `suggest hidden`

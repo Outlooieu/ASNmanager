@@ -9,7 +9,7 @@ ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to eas
  /_\ / __| \| | |  \/  | /_\ | \| | /_\ / __| __|| _ \
 / _ \__ \ .' | | |\/| |/ _ \| .' |/ _ \ (_ | _| |   /
 /_/ \_\___/_|\_| |_|  |_/_/ \_\_|\_/_/ \_\___|___||_|_\
-              === ASN MANAGER v3.7.1 ===
+              === ASN MANAGER v3.7.2 ===
 ================================================================
  ASNs
  [1]  Show ASN list & routing targets
@@ -274,6 +274,8 @@ It is an estimate: very short connections that start and end within the same min
 The switch **by ASN | by domain** above the suggestions shows the same traffic grouped by the **domain** a device looked up, for example `zdf.de` with the names below it (`nrodl.zdf.de`, `www.zdf.de` ...). **Add** puts the main domain on the list as a domain entry - it covers every subdomain. Domains and ASNs that are already on the list are hidden; a domain that is on the list only for some devices stays suggested for the others.
 
 It is off by default. When you turn it on (in the domain view, or `ASNmanager.sh suggest domains on`), dnsmasq writes every lookup it answers into a file in RAM (`log-queries=extra`, `log-facility=/tmp/asnmanager-dnsq.log`). Once a minute the counting loop reads the new lines, notes which name belongs to which address (kept 2 days, in RAM) and empties the file again - nothing is written to the flash memory and nothing is looked up on the internet. The CPU cost is very small (a few hundred lines per minute in a normal home). Messages of dnsmasq that are not lookups (DHCP, start-up) are passed on to the system log, so the log looks as before. Turning it on or off restarts dnsmasq once. If another add-on (for example Diversion) already has dnsmasq write such a log, that file is only read and dnsmasq is left as it is.
+
+With AdGuard Home in front of dnsmasq, its upstream must be dnsmasq (`127.0.0.1:553`), not Unbound or another server directly - otherwise dnsmasq sees almost no lookups (this also applies to the domain entries). The DNS check in the status warns about it.
 
 Limits: traffic to an address whose name was looked up before the collection started, answered from a cache in front of dnsmasq (AdGuard Home), or not through the router at all ("secure DNS" in a browser, a device with a fixed DNS server) has no name - the page shows how much that is. Large networks (CDNs) serve many names from one address; the most recent lookup counts.
 

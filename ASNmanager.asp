@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.7.1 -->
+<!-- ASNmanager-WebUI v3.7.2 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -447,7 +447,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.7.1';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.7.2';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -540,6 +540,9 @@ var ASNM_I18N = {
     note_ph: 'Note, e.g. ZDF Mediathek', note_lbl: 'Note', add_note_lbl: 'Note (optional)', add_s1: 'Route', add_s2: 'via', add_s3: 'for', add_note_ph: 'optional, e.g. ZDF Mediathek', add_src_type: 'type IP addresses', add_src_hide: 'hide IP field', add_note_help: 'Shown under the entry - with several entries in one go, under each of them',
     c_clear_type: 'Remove ALL entries ({a} ASNs, {i} IP ranges, {d} domains) from the list?\nActive routing stays until you click "Apply rules".\n\nType {w} to confirm:', clear_word: 'DELETE', clear_wrong: 'Not removed - the word did not match.',
     dns_lbl: 'DNS / DHCP', dns_ok: 'dnsmasq OK', dns_ok_agh: 'dnsmasq OK (port {port}, behind {p})', dns_other: '{p} answers DNS instead of dnsmasq', dns_other_long: '{p} answers DNS (and DHCP) instead of dnsmasq. The devices are fine, but the domain entries learn nothing unless {p} fills the ipset sets of the dnsmasq ipset= lines. IP and ASN entries are not affected.', dns_dhcp_ok: 'DHCP OK', dns_dhcp_off: 'DHCP off in the router',
+    dns_agh: '{p} bypasses dnsmasq (asks {up})',
+    dns_agh_long: '{p} sends the lookups straight to {up} instead of dnsmasq (port {port}). DNS works, but the domain entries learn (almost) nothing and the suggestions by domain stay empty. Fix: in {p} -> Settings -> DNS settings -> Upstream DNS servers, replace {up} with 127.0.0.1:{port} (dnsmasq passes the lookups on to the same server).',
+    dns_agh_partly_long: '{p} shares the lookups between dnsmasq (port {port}) and {up}. DNS works, but the domain entries learn only the addresses of the lookups that happen to go through dnsmasq. Fix: in {p} -> Settings -> DNS settings -> Upstream DNS servers, keep only 127.0.0.1:{port} (dnsmasq passes the lookups on to {up}).',
     dns_bad_nodnsmasq: 'dnsmasq is not running: devices get no new addresses (DHCP) and the domain entries learn nothing. Fix (SSH): service restart_dnsmasq - with AdGuard Home in front: /opt/etc/init.d/S99AdGuardHome restart',
     dns_bad_no53: 'Nothing answers DNS on port 53 (dnsmasq runs on port {port}). Is AdGuard Home stopped? Fix (SSH): /opt/etc/init.d/S99AdGuardHome restart',
     dns_bad_nodhcp: 'DHCP is on in the router, but nothing answers (port 67): devices get no new addresses. Fix (SSH): service restart_dnsmasq',
@@ -675,6 +678,9 @@ var ASNM_I18N = {
     note_ph: 'Notiz, z. B. ZDF Mediathek', note_lbl: 'Notiz', add_note_lbl: 'Notiz (optional)', add_s1: 'Leite', add_s2: 'über', add_s3: 'für', add_note_ph: 'optional, z. B. ZDF Mediathek', add_src_type: 'IP-Adressen eintippen', add_src_hide: 'IP-Feld ausblenden', add_note_help: 'Steht unter dem Eintrag - bei mehreren Einträgen auf einmal unter jedem davon',
     c_clear_type: 'ALLE Einträge ({a} ASNs, {i} IP-Bereiche, {d} Domains) aus der Liste entfernen?\nDas aktive Routing bleibt bestehen, bis du "Regeln anwenden" klickst.\n\nZum Bestätigen {w} eintippen:', clear_word: 'LÖSCHEN', clear_wrong: 'Nicht entfernt - das Wort stimmte nicht.',
     dns_lbl: 'DNS / DHCP', dns_ok: 'dnsmasq OK', dns_ok_agh: 'dnsmasq OK (Port {port}, hinter {p})', dns_other: '{p} beantwortet DNS statt dnsmasq', dns_other_long: '{p} beantwortet DNS (und DHCP) statt dnsmasq. Die Geräte funktionieren, aber die Domain-Einträge lernen nichts, solange {p} die ipset-Mengen der dnsmasq-Zeilen nicht selbst füllt. IP- und ASN-Einträge sind nicht betroffen.', dns_dhcp_ok: 'DHCP OK', dns_dhcp_off: 'DHCP im Router aus',
+    dns_agh: '{p} umgeht dnsmasq (fragt {up})',
+    dns_agh_long: '{p} schickt die Anfragen direkt an {up} statt an dnsmasq (Port {port}). DNS funktioniert, aber die Domain-Einträge lernen (fast) nichts, und die Vorschläge nach Domain bleiben leer. Abhilfe: in {p} -> Einstellungen -> DNS-Einstellungen -> Upstream-DNS-Server {up} durch 127.0.0.1:{port} ersetzen (dnsmasq gibt die Anfragen an denselben Server weiter).',
+    dns_agh_partly_long: '{p} verteilt die Anfragen auf dnsmasq (Port {port}) und {up}. DNS funktioniert, aber die Domain-Einträge lernen nur die Adressen der Anfragen, die zufällig über dnsmasq laufen. Abhilfe: in {p} -> Einstellungen -> DNS-Einstellungen -> Upstream-DNS-Server nur 127.0.0.1:{port} stehen lassen (dnsmasq gibt die Anfragen an {up} weiter).',
     dns_bad_nodnsmasq: 'dnsmasq läuft nicht: Geräte bekommen keine neuen Adressen (DHCP), und die Domain-Einträge lernen nichts. Abhilfe (SSH): service restart_dnsmasq - mit AdGuard Home davor: /opt/etc/init.d/S99AdGuardHome restart',
     dns_bad_no53: 'Niemand beantwortet DNS auf Port 53 (dnsmasq läuft auf Port {port}). Ist AdGuard Home gestoppt? Abhilfe (SSH): /opt/etc/init.d/S99AdGuardHome restart',
     dns_bad_nodhcp: 'DHCP ist im Router an, aber niemand antwortet (Port 67): Geräte bekommen keine neuen Adressen. Abhilfe (SSH): service restart_dnsmasq',
@@ -2952,6 +2958,13 @@ function asnmDnsRender(d) {
         var a = d.port && d.port !== 53 ? t('dns_ok_agh', { p: asnmDnsName(d.p53), port: d.port }) : t('dns_ok');
         st.innerHTML = '<span class="asnm-rc-ok">✓ ' + asnmEsc(a) + ' · ' + asnmEsc(d.dhcp_on ? t('dns_dhcp_ok') : t('dns_dhcp_off')) + '</span>' + when;
         bn.parentNode.style.display = 'none';
+    } else if (d.state === 'warn' && /^agh_/.test(d.code)) {
+        // AdGuard Home asks another server directly: dnsmasq sees only some lookups
+        var ap = { p: asnmDnsName(d.p53), up: d.up || '?', port: d.port };
+        st.innerHTML = '<span class="asnm-rc-warn">! ' + asnmEsc(t('dns_agh', ap)) + '</span>' + when;
+        bn.textContent = t(d.code === 'agh_partly' ? 'dns_agh_partly_long' : 'dns_agh_long', ap);
+        bn.parentNode.className = 'asnm-banner';
+        bn.parentNode.style.display = 'flex';
     } else if (d.state === 'warn') {
         st.innerHTML = '<span class="asnm-rc-warn">! ' + asnmEsc(t('dns_other', { p: asnmDnsName(d.p53) })) + '</span>' + when;
         bn.textContent = t('dns_other_long', { p: asnmDnsName(d.p53) });

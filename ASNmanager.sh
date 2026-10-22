@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.7.1
+version=3.7.2
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.7.1"
+SCRIPT_VERSION="3.7.2"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -920,6 +920,25 @@ cli_nimport() {
 # Prints "state code o53 dport dhcp_on o67":
 #   state ok|warn|bad; code ok | other (another DNS server replaces dnsmasq, DHCP answers) | nodnsmasq | no53 | nodhcp
 #   o53 / o67 = program on port 53 / 67 ("-" = none), dport = DNS port of dnsmasq (53, 553 behind AdGuard Home, ...; 0 = none)
+# AdGuard Home in front of dnsmasq: do its general upstreams (not the "[/domain/]" ones) go to dnsmasq?
+# prints "bypass <upstream>" (none goes to dnsmasq) or "partly <upstream>" (load balancing between dnsmasq and
+# another server) - then dnsmasq sees only some lookups: domain entries learn only some addresses
+DNS_AGH_YAML=${DNS_AGH_YAML:-"/opt/etc/AdGuardHome/AdGuardHome.yaml /jffs/addons/AdGuardHome.d/AdGuardHome.yaml"}
+dns_agh_check() {
+    for dag_y in $DNS_AGH_YAML; do [ -r "$dag_y" ] && break; dag_y=""; done
+    [ -n "$dag_y" ] || return 0
+    awk -v port="$1" '
+        /^  upstream_dns:/ { f = 1; next }
+        f && /^  [a-z_]+:/ { f = 0 }
+        f && /^ *- / {
+            v = $0; sub(/^ *- */, "", v); gsub(/["\047 ]/, "", v)
+            if (v ~ /^\[\//) next                        # only for some domains
+            if (v ~ ("^((udp|tcp)://)?(127\\.0\\.0\\.1|localhost|\\[::1?\\]|::1|0\\.0\\.0\\.0):" port "$")) d++
+            else { o++; if (up == "") up = v }
+        }
+        END { if (o) printf "%s %s", (d ? "partly" : "bypass"), up }' "$dag_y" 2>/dev/null
+}
+
 dns_health() {
     dh_l=$(netstat -lnup 2>/dev/null | awk '{ n = split($NF, a, "/"); p = a[2]; m = split($4, q, ":"); port = q[m]
         if (port == "53" && o == "") o = p
@@ -934,13 +953,18 @@ dns_health() {
         if [ "$dh_o" = "-" ]; then dh_c=no53
         elif [ "$dh_on" = "1" ] && [ "$dh_h" = "-" ]; then dh_c=nodhcp
         else dh_c=ok; fi
+        dh_up="-"
+        if [ "$dh_c" = "ok" ] && [ "$dh_d" != "53" ] && echo "$dh_o" | grep -qi 'adguard'; then
+            dh_ag=$(dns_agh_check "$dh_d")
+            [ -n "$dh_ag" ] && { dh_c="agh_${dh_ag%% *}"; dh_up=$(echo "${dh_ag#* }" | tr -cd 'A-Za-z0-9_.:/[]-'); }
+        fi
     elif [ "$dh_o" != "-" ] && { [ "$dh_on" = "0" ] || [ "$dh_h" != "-" ]; }; then
         dh_c=other                    # e.g. Pi-hole answers DNS (and DHCP) itself: works, but the domain entries need dnsmasq
     else
         dh_c=nodnsmasq
     fi
-    case "$dh_c" in ok) dh_s=ok ;; other) dh_s=warn ;; *) dh_s=bad ;; esac
-    echo "$dh_s $dh_c $(echo "$dh_o" | tr -cd 'A-Za-z0-9_.-') $dh_d $dh_on $(echo "$dh_h" | tr -cd 'A-Za-z0-9_.-')"
+    case "$dh_c" in ok) dh_s=ok ;; other|agh_*) dh_s=warn ;; *) dh_s=bad ;; esac
+    echo "$dh_s $dh_c $(echo "$dh_o" | tr -cd 'A-Za-z0-9_.-') $dh_d $dh_on $(echo "$dh_h" | tr -cd 'A-Za-z0-9_.-') ${dh_up:--}"
 }
 # writes dns.js for the WebUI; a change between ok and a problem goes to the syslog (once)
 dns_export() {
@@ -951,13 +975,14 @@ dns_export() {
         case "$2" in
             ok)        [ -n "$de_prev" ] && logger -t ASNmanager "DNS check: dnsmasq and DHCP are working again" ;;
             other)     logger -t ASNmanager "DNS check: $3 answers DNS instead of dnsmasq - domain entries learn only if it fills the ipsets" ;;
+            agh_*)     logger -t ASNmanager "DNS check: AdGuard Home sends lookups to $7 instead of dnsmasq (port $4) - domain entries learn only some addresses" ;;
             nodnsmasq) logger -t ASNmanager "DNS check: dnsmasq is NOT running - no DHCP for the devices, domain entries learn nothing" ;;
             no53)      logger -t ASNmanager "DNS check: nothing answers DNS on port 53" ;;
             nodhcp)    logger -t ASNmanager "DNS check: DHCP (port 67) does not answer" ;;
         esac
     fi
     [ -d "$WEB_DIR" ] || return 0
-    printf '{"ts":%s,"state":"%s","code":"%s","p53":"%s","port":%s,"dhcp_on":%s,"dhcp":%s,"p67":"%s"}\n' "$(date +%s)" "$1" "$2" "$3" "$4" "$5" "$([ "$6" = "-" ] && echo 0 || echo 1)" "$6" > "$WEB_DIR/dns.js.tmp" && mv -f "$WEB_DIR/dns.js.tmp" "$WEB_DIR/dns.js"
+    printf '{"ts":%s,"state":"%s","code":"%s","p53":"%s","port":%s,"dhcp_on":%s,"dhcp":%s,"p67":"%s","up":"%s"}\n' "$(date +%s)" "$1" "$2" "$3" "$4" "$5" "$([ "$6" = "-" ] && echo 0 || echo 1)" "$6" "$([ "$7" = "-" ] && echo "" || echo "$7")" > "$WEB_DIR/dns.js.tmp" && mv -f "$WEB_DIR/dns.js.tmp" "$WEB_DIR/dns.js"
 }
 cli_dns() {
     set -- $(dns_health)
@@ -967,6 +992,8 @@ cli_dns() {
         nodnsmasq) echo "[FAIL] dnsmasq is not running. Devices get no addresses (DHCP), domain entries learn nothing. Try: service restart_dnsmasq (with AdGuard Home in front: /opt/etc/init.d/S99AdGuardHome restart)" ;;
         no53)      echo "[FAIL] Nothing answers DNS on port 53 (dnsmasq runs on port $4). Is AdGuard Home stopped? Try: /opt/etc/init.d/S99AdGuardHome restart, or stop it and run service restart_dnsmasq" ;;
         nodhcp)    echo "[FAIL] DHCP is on in the router, but nothing answers on port 67. Try: service restart_dnsmasq" ;;
+        agh_*)     echo "[WARN] AdGuard Home sends lookups $([ "$2" = "agh_partly" ] && echo "partly ")straight to $7 instead of dnsmasq (port $4). DNS works, but dnsmasq sees only some lookups: domain entries learn only some addresses and the suggestions by domain stay (nearly) empty."
+                   echo "       Fix: AdGuard Home -> Settings -> DNS settings -> Upstream DNS servers: replace $7 (and the like) with 127.0.0.1:$4 - dnsmasq passes the lookups on to its own server ($(grep -m 1 '^server=' /etc/dnsmasq.conf 2>/dev/null | cut -d= -f2))." ;;
     esac
     [ "$1" = "ok" ]
 }
