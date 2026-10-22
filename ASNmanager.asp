@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.6.3 -->
+<!-- ASNmanager-WebUI v3.6.4 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -431,7 +431,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.6.3';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.6.4';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -515,7 +515,7 @@ var ASNM_I18N = {
     stat_asns: 'ASNs', stat_more: '+ {i} IP · {d} domains',
     note_ph: 'Note, e.g. ZDF Mediathek', note_lbl: 'Note', add_note_lbl: 'Note (optional)', add_s1: 'Route', add_s2: 'via', add_s3: 'for', add_note_ph: 'optional, e.g. ZDF Mediathek', add_src_type: 'type IP addresses', add_src_hide: 'hide IP field', add_note_help: 'Shown under the entry - with several entries in one go, under each of them',
     c_clear_type: 'Remove ALL entries ({a} ASNs, {i} IP ranges, {d} domains) from the list?\nActive routing stays until you click "Apply rules".\n\nType {w} to confirm:', clear_word: 'DELETE', clear_wrong: 'Not removed - the word did not match.',
-    dns_lbl: 'DNS / DHCP', dns_ok: 'dnsmasq OK', dns_ok_agh: 'dnsmasq OK (port 553, behind {p})', dns_dhcp_ok: 'DHCP OK', dns_dhcp_off: 'DHCP off in the router',
+    dns_lbl: 'DNS / DHCP', dns_ok: 'dnsmasq OK', dns_ok_agh: 'dnsmasq OK (port {port}, behind {p})', dns_other: '{p} answers DNS instead of dnsmasq', dns_other_long: '{p} answers DNS (and DHCP) instead of dnsmasq. The devices are fine, but the domain entries learn nothing unless {p} fills the ipset sets of the dnsmasq ipset= lines. IP and ASN entries are not affected.', dns_dhcp_ok: 'DHCP OK', dns_dhcp_off: 'DHCP off in the router',
     dns_bad_nodnsmasq: 'dnsmasq is not running: devices get no new addresses (DHCP) and the domain entries learn nothing. Fix (SSH): service restart_dnsmasq - with AdGuard Home in front: /opt/etc/init.d/S99AdGuardHome restart',
     dns_bad_no53: 'Nothing answers DNS on port 53 (dnsmasq runs on port {port}). Is AdGuard Home stopped? Fix (SSH): /opt/etc/init.d/S99AdGuardHome restart',
     dns_bad_nodhcp: 'DHCP is on in the router, but nothing answers (port 67): devices get no new addresses. Fix (SSH): service restart_dnsmasq',
@@ -642,7 +642,7 @@ var ASNM_I18N = {
     stat_asns: 'ASNs', stat_more: '+ {i} IP · {d} Domains',
     note_ph: 'Notiz, z. B. ZDF Mediathek', note_lbl: 'Notiz', add_note_lbl: 'Notiz (optional)', add_s1: 'Leite', add_s2: 'über', add_s3: 'für', add_note_ph: 'optional, z. B. ZDF Mediathek', add_src_type: 'IP-Adressen eintippen', add_src_hide: 'IP-Feld ausblenden', add_note_help: 'Steht unter dem Eintrag - bei mehreren Einträgen auf einmal unter jedem davon',
     c_clear_type: 'ALLE Einträge ({a} ASNs, {i} IP-Bereiche, {d} Domains) aus der Liste entfernen?\nDas aktive Routing bleibt bestehen, bis du "Regeln anwenden" klickst.\n\nZum Bestätigen {w} eintippen:', clear_word: 'LÖSCHEN', clear_wrong: 'Nicht entfernt - das Wort stimmte nicht.',
-    dns_lbl: 'DNS / DHCP', dns_ok: 'dnsmasq OK', dns_ok_agh: 'dnsmasq OK (Port 553, hinter {p})', dns_dhcp_ok: 'DHCP OK', dns_dhcp_off: 'DHCP im Router aus',
+    dns_lbl: 'DNS / DHCP', dns_ok: 'dnsmasq OK', dns_ok_agh: 'dnsmasq OK (Port {port}, hinter {p})', dns_other: '{p} beantwortet DNS statt dnsmasq', dns_other_long: '{p} beantwortet DNS (und DHCP) statt dnsmasq. Die Geräte funktionieren, aber die Domain-Einträge lernen nichts, solange {p} die ipset-Mengen der dnsmasq-Zeilen nicht selbst füllt. IP- und ASN-Einträge sind nicht betroffen.', dns_dhcp_ok: 'DHCP OK', dns_dhcp_off: 'DHCP im Router aus',
     dns_bad_nodnsmasq: 'dnsmasq läuft nicht: Geräte bekommen keine neuen Adressen (DHCP), und die Domain-Einträge lernen nichts. Abhilfe (SSH): service restart_dnsmasq - mit AdGuard Home davor: /opt/etc/init.d/S99AdGuardHome restart',
     dns_bad_no53: 'Niemand beantwortet DNS auf Port 53 (dnsmasq läuft auf Port {port}). Ist AdGuard Home gestoppt? Abhilfe (SSH): /opt/etc/init.d/S99AdGuardHome restart',
     dns_bad_nodhcp: 'DHCP ist im Router an, aber niemand antwortet (Port 67): Geräte bekommen keine neuen Adressen. Abhilfe (SSH): service restart_dnsmasq',
@@ -2759,6 +2759,11 @@ function asnmRcStale(d) {
 }
 
 /* ---------- DNS / DHCP health (dns.js: written by the routing check every 5 minutes and on every refresh) ---------- */
+// program names as netstat shows them -> as people know them
+function asnmDnsName(p) {
+    var m = { AdGuardHome: 'AdGuard Home', 'pihole-FTL': 'Pi-hole', unbound: 'Unbound', 'dnscrypt-proxy': 'dnscrypt-proxy', stubby: 'Stubby', dnsmasq: 'dnsmasq' };
+    return m[p] || p || '?';
+}
 function asnmDnsLoad() {
     asnmGet('dns.js', function (txt) {
         var d = null; try { d = JSON.parse(txt); } catch (e) {}
@@ -2771,12 +2776,18 @@ function asnmDnsRender(d) {
     if (!d) { st.textContent = '-'; bn.parentNode.style.display = 'none'; return; }
     var when = ' <span class="asnm-muted" style="font-weight:400;">' + asnmEsc(t('dns_checked', { t: asnmFmtTime(d.ts) })) + '</span>';
     if (d.state === 'ok') {
-        var a = d.port === 553 ? t('dns_ok_agh', { p: d.p53 || '?' }) : t('dns_ok');
+        var a = d.port && d.port !== 53 ? t('dns_ok_agh', { p: asnmDnsName(d.p53), port: d.port }) : t('dns_ok');
         st.innerHTML = '<span class="asnm-rc-ok">✓ ' + asnmEsc(a) + ' · ' + asnmEsc(d.dhcp_on ? t('dns_dhcp_ok') : t('dns_dhcp_off')) + '</span>' + when;
         bn.parentNode.style.display = 'none';
+    } else if (d.state === 'warn') {
+        st.innerHTML = '<span class="asnm-rc-warn">! ' + asnmEsc(t('dns_other', { p: asnmDnsName(d.p53) })) + '</span>' + when;
+        bn.textContent = t('dns_other_long', { p: asnmDnsName(d.p53) });
+        bn.parentNode.className = 'asnm-banner';
+        bn.parentNode.style.display = 'flex';
     } else {
         var m = t('dns_bad_' + d.code, { port: d.port });
         st.innerHTML = '<span class="asnm-rc-bad">✗ ' + asnmEsc(m.split(':')[0]) + '</span>' + when;
+        bn.parentNode.className = 'asnm-banner asnm-banner-bad';
         bn.textContent = m;
         bn.parentNode.style.display = 'flex';
     }

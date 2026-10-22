@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.6.3
+version=3.6.4
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.6.3"
+SCRIPT_VERSION="3.6.4"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -901,22 +901,30 @@ cli_nimport() {
 }
 
 # DNS health: is dnsmasq running, who answers DNS on port 53, does DHCP answer (port 67)?
-# Prints "state code o53 dport dhcp_on dhcp" - state ok|bad, code ok|nodnsmasq|no53|nodhcp
+# Prints "state code o53 dport dhcp_on o67":
+#   state ok|warn|bad; code ok | other (another DNS server replaces dnsmasq, DHCP answers) | nodnsmasq | no53 | nodhcp
+#   o53 / o67 = program on port 53 / 67 ("-" = none), dport = DNS port of dnsmasq (53, 553 behind AdGuard Home, ...; 0 = none)
 dns_health() {
-    dh_l=$(netstat -lnup 2>/dev/null | awk '{ n = split($NF, a, "/"); p = a[2]
-        if ($4 ~ /:53$/ && o == "") o = p
-        if (p == "dnsmasq" && $4 ~ /:53$/) d = 53
-        if (p == "dnsmasq" && $4 ~ /:553$/ && d == "") d = 553
-        if (p == "dnsmasq" && $4 ~ /:67$/) h = 1 }
-        END { printf "%s %s %s", (o == "" ? "-" : o), (d == "" ? 0 : d), (h ? 1 : 0) }')
+    dh_l=$(netstat -lnup 2>/dev/null | awk '{ n = split($NF, a, "/"); p = a[2]; m = split($4, q, ":"); port = q[m]
+        if (port == "53" && o == "") o = p
+        if (port == "67" && h == "") h = p
+        if (p == "dnsmasq" && port == "53") d = 53
+        if (p == "dnsmasq" && port != "53" && port != "67" && port != "68" && port != "547" && d == "") d = port }
+        END { printf "%s %s %s", (o == "" ? "-" : o), (d == "" ? 0 : d), (h == "" ? "-" : h) }')
     dh_o=$(echo "$dh_l" | cut -d' ' -f1); dh_d=$(echo "$dh_l" | cut -d' ' -f2); dh_h=$(echo "$dh_l" | cut -d' ' -f3)
     dh_on=0; [ "$(nvram get dhcp_enable_x 2>/dev/null)" = "1" ] && dh_on=1
-    dh_c=ok
-    if ! pidof dnsmasq >/dev/null 2>&1 || [ "$dh_d" = "0" ]; then dh_c=nodnsmasq
-    elif [ "$dh_o" = "-" ]; then dh_c=no53
-    elif [ "$dh_on" = "1" ] && [ "$dh_h" = "0" ]; then dh_c=nodhcp; fi
-    dh_s=ok; [ "$dh_c" = "ok" ] || dh_s=bad
-    echo "$dh_s $dh_c $(echo "$dh_o" | tr -cd 'A-Za-z0-9_.-') $dh_d $dh_on $dh_h"
+    dh_dm=1; { pidof dnsmasq >/dev/null 2>&1 && [ "$dh_d" != "0" ]; } || dh_dm=0
+    if [ "$dh_dm" = "1" ]; then
+        if [ "$dh_o" = "-" ]; then dh_c=no53
+        elif [ "$dh_on" = "1" ] && [ "$dh_h" = "-" ]; then dh_c=nodhcp
+        else dh_c=ok; fi
+    elif [ "$dh_o" != "-" ] && { [ "$dh_on" = "0" ] || [ "$dh_h" != "-" ]; }; then
+        dh_c=other                    # e.g. Pi-hole answers DNS (and DHCP) itself: works, but the domain entries need dnsmasq
+    else
+        dh_c=nodnsmasq
+    fi
+    case "$dh_c" in ok) dh_s=ok ;; other) dh_s=warn ;; *) dh_s=bad ;; esac
+    echo "$dh_s $dh_c $(echo "$dh_o" | tr -cd 'A-Za-z0-9_.-') $dh_d $dh_on $(echo "$dh_h" | tr -cd 'A-Za-z0-9_.-')"
 }
 # writes dns.js for the WebUI; a change between ok and a problem goes to the syslog (once)
 dns_export() {
@@ -926,18 +934,20 @@ dns_export() {
         echo "$2" > "$DNS_STATE"
         case "$2" in
             ok)        [ -n "$de_prev" ] && logger -t ASNmanager "DNS check: dnsmasq and DHCP are working again" ;;
+            other)     logger -t ASNmanager "DNS check: $3 answers DNS instead of dnsmasq - domain entries learn only if it fills the ipsets" ;;
             nodnsmasq) logger -t ASNmanager "DNS check: dnsmasq is NOT running - no DHCP for the devices, domain entries learn nothing" ;;
             no53)      logger -t ASNmanager "DNS check: nothing answers DNS on port 53" ;;
             nodhcp)    logger -t ASNmanager "DNS check: DHCP (port 67) does not answer" ;;
         esac
     fi
     [ -d "$WEB_DIR" ] || return 0
-    printf '{"ts":%s,"state":"%s","code":"%s","p53":"%s","port":%s,"dhcp_on":%s,"dhcp":%s}\n' "$(date +%s)" "$1" "$2" "$3" "$4" "$5" "$6" > "$WEB_DIR/dns.js.tmp" && mv -f "$WEB_DIR/dns.js.tmp" "$WEB_DIR/dns.js"
+    printf '{"ts":%s,"state":"%s","code":"%s","p53":"%s","port":%s,"dhcp_on":%s,"dhcp":%s,"p67":"%s"}\n' "$(date +%s)" "$1" "$2" "$3" "$4" "$5" "$([ "$6" = "-" ] && echo 0 || echo 1)" "$6" > "$WEB_DIR/dns.js.tmp" && mv -f "$WEB_DIR/dns.js.tmp" "$WEB_DIR/dns.js"
 }
 cli_dns() {
     set -- $(dns_health)
     case "$2" in
-        ok)        echo "[OK]   DNS: answered on port 53 by $3$([ "$4" = "553" ] && echo ", dnsmasq on port 553 behind it"); DHCP: $([ "$5" = "1" ] && echo "answering" || echo "off in the router settings")" ;;
+        ok)        echo "[OK]   DNS: answered on port 53 by $3$([ "$4" != "53" ] && echo ", dnsmasq on port $4 behind it"); DHCP: $([ "$5" = "1" ] && echo "answered by $6" || echo "off in the router settings")" ;;
+        other)     echo "[WARN] $3 answers DNS$([ "$6" != "-" ] && echo " and DHCP") instead of dnsmasq. Devices are fine, but the domain entries of ASN Manager learn nothing unless $3 fills the ipsets (dnsmasq ipset= lines)." ;;
         nodnsmasq) echo "[FAIL] dnsmasq is not running. Devices get no addresses (DHCP), domain entries learn nothing. Try: service restart_dnsmasq (with AdGuard Home in front: /opt/etc/init.d/S99AdGuardHome restart)" ;;
         no53)      echo "[FAIL] Nothing answers DNS on port 53 (dnsmasq runs on port $4). Is AdGuard Home stopped? Try: /opt/etc/init.d/S99AdGuardHome restart, or stop it and run service restart_dnsmasq" ;;
         nodhcp)    echo "[FAIL] DHCP is on in the router, but nothing answers on port 67. Try: service restart_dnsmasq" ;;

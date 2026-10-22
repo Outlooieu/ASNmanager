@@ -1,3 +1,9 @@
+## v3.6.4
+
+- DNS / DHCP check: dnsmasq is found on any port, not only 53 and 553 (e.g. Pi-hole in front with dnsmasq on 5353 showed "dnsmasq is not running"). The real port is shown ("dnsmasq OK (port 5353, behind Pi-hole)")
+- If another DNS server replaces dnsmasq completely and DHCP still answers (e.g. Pi-hole with its own DHCP), the check shows a yellow notice instead of an error: the devices are fine, only the domain entries learn nothing unless that server fills the ipset sets
+- Program names are shown as people know them: AdGuard Home, Pi-hole, Unbound ... With Diversion nothing changes - it works inside dnsmasq ("dnsmasq OK")
+
 ## v3.6.3
 
 Review of the whole tool:
