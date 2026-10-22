@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.6.1 -->
+<!-- ASNmanager-WebUI v3.6.2 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -319,7 +319,8 @@
 .asnm-sg-clrow { display: flex; justify-content: space-between; gap: 8px; line-height: 18px; }
 .asnm-sg-clrow span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #asnm_sg .asnm-table th:not(:first-child), #asnm_sg .asnm-table td:not(:first-child) { padding-left: 6px; padding-right: 6px; }
-.asnm-sg-sel { width: 150px; }
+#asnm .asnm-sg-sel { width: 120px; }
+#asnm .asnm-sg-note { width: 150px; height: 32px !important; }
 .asnm-sg-foot { margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.5; }
 /* collapsible sections inside the traffic card */
 .asnm-sec { margin-top: 12px; border-top: 1px solid var(--line); }
@@ -424,7 +425,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.6.1';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.6.2';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -2325,7 +2326,7 @@ function asnmTrSaveMode(mode) {
 }
 
 /* ---------- suggestions from the traffic without a rule ---------- */
-var ASNM_SG = { data: null, added: {}, sel: {}, auto: {}, tgt: {}, f: { n: 10, dev: '', q: '' }, sig: '', fsig: '', open: '', dirty: false, clOpen: {} };
+var ASNM_SG = { data: null, added: {}, sel: {}, auto: {}, tgt: {}, f: { n: 10, dev: '', q: '' }, sig: '', fsig: '', open: '', dirty: false, clOpen: {}, note: {} };
 
 // "+N more" in the "Used by" column: show every device of this ASN (with its traffic), or fold the list again
 function asnmSgClToggle(asn) {
@@ -2528,7 +2529,7 @@ function asnmSgRender(force) {
         html = '<div class="asnm-muted">' + asnmEsc(n ? t('sg_nomatch') : (d.pending ? asnmSgPendingText(d) : t('sg_empty'))) + '</div>';
     } else {
         html = '<table class="asnm-table"><tr><th>' + t('sg_th_asn') + '</th><th style="text-align:right;">' + (ASNM_SG.f.dev ? t('sg_th_b_dev') : t('sg_th_b')) + '</th>' +
-               '<th>' + t('sg_th_cl') + '</th><th>' + t('sg_th_t') + '</th><th>' + t('sg_th_dev') + '</th><th></th></tr>';
+               '<th>' + t('sg_th_cl') + '</th><th>' + t('sg_th_t') + '</th><th>' + t('sg_th_dev') + '</th><th>' + t('note_lbl') + '</th><th></th></tr>';
         for (i = 0; i < shown.length; i++) {
             var r = shown[i].r, a = asnmEsc(r.asn), who = [];
             if (ASNM_SG.f.dev && ASNM_SG.sel[r.asn] === undefined) { ASNM_SG.sel[r.asn] = [ASNM_SG.f.dev]; ASNM_SG.auto[r.asn] = 1; }   // filter by device -> preselect it
@@ -2555,6 +2556,7 @@ function asnmSgRender(force) {
                     '<td><select id="asnm_sg_t_' + a + '" class="input_option asnm-sg-sel" onchange="ASNM_SG.tgt[\'' + a + '\'] = this.value;" onblur="asnmSgFlush();">' +
                     asnmSgTargetOptions(ASNM_SG.tgt[r.asn] || def) + '</select></td>' +
                     '<td>' + asnmMsHtml(r) + '</td>' +
+                    '<td><input type="text" id="asnm_sg_n_' + a + '" class="asnm-sg-note" maxlength="60" value="' + asnmEsc(ASNM_SG.note[r.asn] || '') + '" placeholder="' + asnmEsc(t('hint_optional')) + '" oninput="ASNM_SG.note[\'' + a + '\'] = this.value;" onblur="asnmSgFlush();" onkeydown="if (event.keyCode === 13) { asnmSgAdd(\'' + a + '\'); return false; }"/></td>' +
                     '<td><input type="button" class="button_gen asnm-small-btn asnm-btn asnm-primary" value="' + asnmEsc(t('sg_add')) + '" onclick="asnmSgAdd(\'' + a + '\');"/></td></tr>';
         }
         html += '</table>';
@@ -2581,7 +2583,8 @@ function asnmSgAdd(asn) {
     if (!sel || !sel.value) return;
     // ASN already on the list for some devices: add the chosen devices to that rule (empty = all devices)
     if (r && r.on && pick.length) src = asnmNormSrc(r.osrc + ',' + src);
-    if (asnmSend('add', [sel.value, src, asn])) { ASNM_SG.added[asn] = 1; ASNM_SG.open = ''; asnmSgRender(true); }
+    var note = String(ASNM_SG.note[asn] || '').replace(/[\u0000-\u001f"\\|<>]/g, '').trim().slice(0, 60);
+    if (asnmSend('add', [sel.value, src, asn, encodeURIComponent(note)])) { ASNM_SG.added[asn] = 1; ASNM_SG.open = ''; delete ASNM_SG.note[asn]; asnmSgRender(true); }
 }
 
 /* ============================ failover ============================ */

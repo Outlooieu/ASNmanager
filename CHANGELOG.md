@@ -1,3 +1,7 @@
+## v3.6.2
+
+- Suggestions: every row has a note field; the note is saved with the ASN when you click "Add" (Enter in the field adds too). The target dropdown is narrower so the row still fits
+
 ## v3.6.1
 
 - WebUI: the sentence form of "Enter ASNs" is laid out as a tidy grid - the words "Route / via / Note" in one column, the fields aligned next to them, target and devices side by side; each hint sits right under its field. On a phone the words become labels above the fields
