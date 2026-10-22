@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.7.9
+version=3.8.0
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.7.9"
+SCRIPT_VERSION="3.8.0"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -2273,7 +2273,8 @@ cli_diagpack() {
         dg_section "SYSTEM LOG (dnsmasq errors)"; grep -hE 'dnsmasq.*(fail|error|refused|warning)' /tmp/syslog.log 2>/dev/null | tail -n 30
     } > "$DG_FILE.raw" 2>&1
     dg_mask < "$DG_FILE.raw" > "$DG_FILE"; rm -f "$DG_FILE.raw"
-    if [ -d "$WEB_DIR" ]; then cp -f "$DG_FILE" "$WEB_DIR/diag.txt"; fi
+    # the router's web server delivers only some file types from /www/ext (.js, .htm ...): the page fetches .htm
+    if [ -d "$WEB_DIR" ]; then rm -f "$WEB_DIR/diag.txt"; cp -f "$DG_FILE" "$WEB_DIR/diag.htm"; fi
     echo "Diagnostic bundle written: $DG_FILE ($(wc -c < "$DG_FILE") bytes)$([ -d "$WEB_DIR" ] && echo " - download it in the WebUI (Diagnostics)")"
 }
 # masks: own public addresses, VPN servers, MAC addresses, global IPv6 addresses, WireGuard / OpenVPN keys

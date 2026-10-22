@@ -1,3 +1,8 @@
+## v3.8.0
+
+- Fixed: "Download" of the diagnostic bundle failed ("request cannot be completed") - the router's web server does not deliver .txt files from the add-on folder. The page now fetches the bundle like its other data files and hands it to the browser as a download (works on phones as well)
+- Version 3.8.0: the suggestions by domain, hidden suggestions, the new diagnostics (explain, device, DNS chain, bundle) and the AdGuard Home checks of the 3.7 releases together
+
 ## v3.7.9
 
 - Suggestions by domain: the line "... of traffic went to n addresses without a known name" can be opened - it lists the 15 busiest of these addresses with their network (ASN) and the device that used them most, with a hint: a device with a lot of traffic there probably asks its own DNS server (TV sticks with 8.8.8.8, "Private DNS" on Android, "secure DNS" in browsers). The text now also says that this counts since the collection started, so traffic from before the suggestions by domain were turned on is included

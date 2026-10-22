@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.7.9 -->
+<!-- ASNmanager-WebUI v3.8.0 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -454,7 +454,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.7.9';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.8.0';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -579,7 +579,7 @@ var ASNM_I18N = {
     btn_dnschain: 'Check DNS chain', act_explain: 'Explain', act_device: 'Check device', act_dnschain: 'DNS chain', act_diagpack: 'Diagnostic bundle',
     dp_title: 'Diagnostic bundle', dp_sub: 'Everything needed to analyse a problem, in one text file',
     dp_text: 'Collects version, entries, settings, DNS chain, routing check, ip rules, routing tables, marking rules, set sizes, VPN Director and the last messages of ASN Manager in the system log. Public IP addresses, VPN servers, MAC addresses and keys are masked - please look over the file before you share it. To report a problem: download it and attach it to a new issue on GitHub (drag it into the text field).',
-    btn_dp: 'Create bundle', dp_download: 'Download', dp_github: 'Report on GitHub',
+    btn_dp: 'Create bundle', dp_missing: 'The bundle was not found on the router - please create it again.', dp_download: 'Download', dp_github: 'Report on GitHub',
     dp_issue_title: 'Problem: ', dp_issue_body: 'ASN Manager v{v}\n\nWhat does not work / what did you expect?\n\n\nPlease attach the diagnostic bundle ({f}) here: drag the file into this text field.',
     btn_ipset: 'ipset status', btn_pubip: 'Public IPs', output_default: 'Output of apply, tests and checks appears here.',
     backup_title: 'Backup & restore', backup_export: 'Export', backup_export_desc: 'Download the list (ASNs, IP ranges, domains, notes), schedule, failover chains and settings as .conf file',
@@ -727,7 +727,7 @@ var ASNM_I18N = {
     btn_dnschain: 'DNS-Kette prüfen', act_explain: 'Erklären', act_device: 'Gerät prüfen', act_dnschain: 'DNS-Kette', act_diagpack: 'Diagnose-Paket',
     dp_title: 'Diagnose-Paket', dp_sub: 'Alles zur Analyse eines Problems in einer Textdatei',
     dp_text: 'Sammelt Version, Einträge, Einstellungen, DNS-Kette, Routing-Prüfung, ip rules, Routing-Tabellen, Markierungsregeln, Set-Größen, VPN Director und die letzten Meldungen von ASN Manager im Systemprotokoll. Öffentliche IP-Adressen, VPN-Server, MAC-Adressen und Schlüssel werden unkenntlich gemacht - bitte die Datei vor dem Weitergeben ansehen. Um ein Problem zu melden: herunterladen und an ein neues Issue auf GitHub anhängen (Datei in das Textfeld ziehen).',
-    btn_dp: 'Paket erstellen', dp_download: 'Herunterladen', dp_github: 'Auf GitHub melden',
+    btn_dp: 'Paket erstellen', dp_missing: 'Das Paket wurde auf dem Router nicht gefunden - bitte neu erstellen.', dp_download: 'Herunterladen', dp_github: 'Auf GitHub melden',
     dp_issue_title: 'Problem: ', dp_issue_body: 'ASN Manager v{v}\n\nWas funktioniert nicht / was hast du erwartet?\n\n\nBitte hier das Diagnose-Paket ({f}) anhängen: die Datei in dieses Textfeld ziehen.',
     btn_ipset: 'ipset-Status', btn_pubip: 'Öffentliche IPs', output_default: 'Hier erscheint die Ausgabe von Anwenden, Tests und Prüfungen.',
     backup_title: 'Sicherung & Wiederherstellung', backup_export: 'Export', backup_export_desc: 'Liste (ASNs, IP-Bereiche, Domains, Notizen), Zeitplan, Failover-Ketten und Einstellungen als .conf-Datei herunterladen',
@@ -1760,10 +1760,23 @@ function asnmDiagPackReady() {
     var d = new Date(), z = function (x) { return (x < 10 ? '0' : '') + x; };
     var name = 'asnmanager-diag-' + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes()) + '.txt';
     var dl = document.getElementById('asnm_dp_dl');
-    dl.href = ASNM.web + 'diag.txt?_=' + Date.now(); dl.setAttribute('download', name);
+    dl.href = '#'; dl.removeAttribute('download');
+    dl.onclick = function (ev) { ev.preventDefault(); asnmDiagDownload(name); };
     var body = t('dp_issue_body', { f: name, v: ASNM_PAGE_VER });
     document.getElementById('asnm_dp_gh').href = 'https://github.com/Outlooieu/ASNmanager/issues/new?title=' + encodeURIComponent(t('dp_issue_title')) + '&body=' + encodeURIComponent(body);
     document.getElementById('asnm_dp_links').style.display = '';
+}
+
+// the file is fetched like the other data files and handed to the browser as a download (works on phones too)
+function asnmDiagDownload(name) {
+    asnmGet('diag.htm', function (txt) {
+        try {
+            var url = URL.createObjectURL(new Blob([txt], { type: 'text/plain;charset=utf-8' })), a = document.createElement('a');
+            a.href = url; a.download = name; a.style.display = 'none';
+            document.body.appendChild(a); a.click();
+            setTimeout(function () { URL.revokeObjectURL(url); a.parentNode.removeChild(a); }, 2000);
+        } catch (e) { document.getElementById('asnm_output').textContent = txt; }
+    }, function () { alert(t('dp_missing')); });
 }
 
 function asnmLookup() {
