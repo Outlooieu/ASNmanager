@@ -1,3 +1,7 @@
+## v3.6.8
+
+- Fixed: after a VPN client was stopped and started again (e.g. WGC1 switched off and on), its ASNs went out via WAN until "Apply rules" was clicked. Stopping the client removes the route from ASN Manager's table for that target (211 for WGC1 ...) and nothing put it back. The routing check (every 5 minutes, and "Check now") and the failover round now add the route again as soon as the interface is up, and note it in the system log
+
 ## v3.6.7
 
 - Fixed: "Show ASN list" in the red routing banner did nothing when the ASN list was already open. It now opens the group of the affected entry, scrolls to it and highlights the row

@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.6.7
+version=3.6.8
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.6.7"
+SCRIPT_VERSION="3.6.8"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -440,6 +440,22 @@ cli_cimport() {
 }
 
 # ---------------- applying: routing rule + table of a target, marking rules, sets ----------------
+# Each VPN target has its own table (211 = WGC1, ...) with one route "default dev <vpn interface>". When the VPN
+# client is stopped, the kernel removes that route; after the restart the table stays empty and the marked traffic
+# falls through to the main table (WAN). Put the route back for every target that has a rule and is up again.
+rt_heal() {
+    rh_rules=$(ip rule show 2>/dev/null)
+    for rh_t in OVPN1 OVPN2 OVPN3 OVPN4 OVPN5 WGC1 WGC2 WGC3 WGC4 WGC5; do
+        rh_i=$(get_target_info "$rh_t"); rh_tab=${rh_i%% *}; rh_m=$(echo "$rh_i" | cut -d' ' -f2)
+        echo "$rh_rules" | grep -q "fwmark ${rh_m}/${MARK_MASK} " || continue
+        check_iface_up "$rh_t" >/dev/null 2>&1 || continue
+        rh_dev=$(get_ifname "$rh_t"); [ -n "$rh_dev" ] || continue
+        ip route show table "$rh_tab" 2>/dev/null | grep -q '^default' && continue
+        ip route add default dev "$rh_dev" table "$rh_tab" 2>/dev/null &&
+            logger -t ASNmanager "Routing: route of $rh_t (table $rh_tab, $rh_dev) was missing - VPN client restarted? Added again"
+    done
+}
+
 cu_usable() { check_iface_up "$1" >/dev/null 2>&1 || grep -q "^${1}=" "$FO_CONF" 2>/dev/null; }
 cu_fw() { cf=$(get_target_info "$1" | cut -d' ' -f2); echo "${cf}/${MARK_MASK}"; }
 cu_route() {
@@ -3915,6 +3931,7 @@ fo_round_safe() { [ -s "$FO_CONF" ] || return 0; fo_lock || return 0; fo_round; 
 # one probe round over all chains
 fo_round() {
     [ -s "$FO_CONF" ] || return 0
+    rt_heal
     mkdir -p "$FO_RT"
     fo_now=$(date +%s); fo_changed=0
     for fo_i in $(sed 's/=/,/' "$FO_CONF" | tr ',' '\n' | grep -v '^$' | sort -u); do echo "$fo_i $(fo_health "$fo_i")"; done > "$FO_RT/health.txt"
@@ -4071,6 +4088,7 @@ rc_rule_active() {
 
 rc_check() {
     nv_refresh
+    rt_heal
     ep_guard_sync >/dev/null 2>&1
     [ -d "$(dirname "$WEB_DIR")" ] || return 0
     mkdir -p "$WEB_DIR" 2>/dev/null || return 0
