@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.1
+version=3.9.2
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.1"
+SCRIPT_VERSION="3.9.2"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -66,15 +66,6 @@ tvde|ORF (Austria)|orf.at|
 tvde|SRF / SRG (Switzerland)|srf.ch srgssr.ch hdvodsrforigin-f.akamaihd.net srfvodhd-vh.akamaihd.net|
 tvde|funk|funk.net|
 tvde|ServusTV|servustv.com|
-news|Spiegel|spiegel.de|
-news|Zeit|zeit.de|
-news|FAZ|faz.net|
-news|Süddeutsche|sueddeutsche.de|
-news|Welt|welt.de|
-news|Bild|bild.de bildstatic.de|
-news|n-tv|n-tv.de|
-news|t-online|t-online.de|
-news|heise / golem|heise.de golem.de|
 news|BBC|bbc.co.uk bbc.com bbci.co.uk|
 news|CNN|cnn.com|
 news|New York Times|nytimes.com nyt.com|
@@ -134,29 +125,13 @@ shop|Amazon shop|amazon.de amazon.com media-amazon.com ssl-images-amazon.com|
 shop|eBay|ebay.de ebay.com ebaystatic.com ebayimg.com|
 shop|PayPal|paypal.com paypalobjects.com|
 shop|Zalando|zalando.de ztat.net|
-shop|Otto|otto.de|
 shop|AliExpress|aliexpress.com alicdn.com|
 shop|Temu|temu.com kwcdn.com|
 shop|Shein|shein.com ltwebstatic.com|
 shop|Etsy|etsy.com etsystatic.com|
 shop|IKEA|ikea.com|
-shop|Lidl|lidl.de lidl.com|
 shop|Booking.com|booking.com bstatic.com|
 shop|Klarna|klarna.com|
-bank|Sparkasse|sparkasse.de starfinanz.de|
-bank|ING|ing.de|
-bank|DKB|dkb.de|
-bank|comdirect|comdirect.de|
-bank|Commerzbank|commerzbank.de|
-bank|Deutsche Bank|deutsche-bank.de db.com|
-bank|Postbank|postbank.de|
-bank|Consorsbank|consorsbank.de|
-bank|N26|n26.com|
-bank|Trade Republic|traderepublic.com|
-services|ELSTER (tax office)|elster.de|
-services|Deutsche Bahn|bahn.de|
-services|DHL / Deutsche Post|dhl.de dhl.com deutschepost.de|
-services|Telekom|telekom.de|
 cloud|Amazon AWS|16509 14618 7224 8987 38895|wide
 cloud|Google (all networks)|15169 19527 22859 26910 36039 36384 36492 41264 139070 396982 16550|wide
 cloud|Microsoft / Azure|8075 8068 8069 8070 8071 8072 8073 8074 3598 6584|wide
@@ -167,11 +142,19 @@ cloud|Hetzner & OVH|24940 16276|wide
 cloud|DigitalOcean & Linode|14061 46652 63949|wide
 cloud|Oracle Cloud|31898|wide
 test|Speed tests & IP check|speedtest.net ookla.com fast.com whatismyip.com wieistmeineip.de ipify.org browserleaks.com ipleak.net dnsleaktest.com|'
-PRESET_COUNT=$(echo "$PRESET_DATA" | grep -c .)
+# own presets: a file "presets.txt" (same format, one preset per line) in /jffs/addons/asnmanager or in the folder
+# ASNmanager of a USB device - its presets are added after the built-in ones (they are never uploaded anywhere)
+preset_all() {
+    echo "$PRESET_DATA"
+    for pa_f in /jffs/addons/asnmanager/presets.txt /tmp/mnt/*/ASNmanager/presets.txt; do
+        [ -f "$pa_f" ] && grep -E '^[a-z]+\|[^|]+\|[^|]+\|(wide)?$' "$pa_f" 2>/dev/null
+    done | tr -d '\r' | awk '!s[$0]++'
+}
+PRESET_COUNT=$(preset_all | grep -c .)
 
 print_presets() {
     # grouped by category, numbered in the order of PRESET_DATA (the number is what "preset <n>" takes)
-    echo "$PRESET_DATA" | awk -F'|' '
+    preset_all | awk -F'|' '
         BEGIN { split("stream:Streaming,tvde:TV & media libraries (DE / AT / CH),news:News,gaming:Gaming,social:Social & messaging,work:Tools & work,shop:Shopping & payment,bank:Banks (DE),services:Services (DE),cloud:Cloud & CDN (whole networks),test:Tests & IP check", c, ","); for (i in c) { split(c[i], kv, ":"); lbl[kv[1]] = kv[2] } }
         {
             if ($1 != last) { printf "%s -- %s --\n", (NR > 1 ? "\n" : ""), ($1 in lbl ? lbl[$1] : $1); last = $1 }
@@ -182,11 +165,11 @@ print_presets() {
     echo " (!) = a large share of the internet runs through these networks - routing them moves far more than this one service"
 }
 
-preset_wide() { [ "$(echo "$PRESET_DATA" | sed -n "${1}p" | cut -d'|' -f4)" = "wide" ]; }
+preset_wide() { [ "$(preset_all | sed -n "${1}p" | cut -d'|' -f4)" = "wide" ]; }
 # the entries of a preset: ASNs and domains, separated by spaces
 preset_asns() {
     case "$1" in ''|*[!0-9]*) return 1 ;; esac
-    echo "$PRESET_DATA" | sed -n "${1}p" | cut -d'|' -f3
+    preset_all | sed -n "${1}p" | cut -d'|' -f3
 }
 
 ensure_script() {
@@ -2812,7 +2795,7 @@ web_export() {
         printf '],'
 
         printf '"presets":['
-        echo "$PRESET_DATA" | awk -F'|' '{ gsub(/["\\]/, "", $2); printf "%s{\"cat\":\"%s\",\"name\":\"%s\",\"items\":\"%s\",\"wide\":%d}", (NR > 1 ? "," : ""), $1, $2, $3, ($4 == "wide") }'
+        preset_all | awk -F'|' '{ gsub(/["\\]/, "", $2); printf "%s{\"cat\":\"%s\",\"name\":\"%s\",\"items\":\"%s\",\"wide\":%d}", (NR > 1 ? "," : ""), $1, $2, $3, ($4 == "wide") }'
         printf ']}\n'
     } > "$out" && mv "$out" "$WEB_DIR/data.js"
     rm -f "$sets_tmp" "$fail_tmp" "$pend_tmp" "$nm_tmp" "$nt_tmp"

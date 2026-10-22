@@ -1,3 +1,8 @@
+## v3.9.2
+
+- Own presets: a file `presets.txt` in `/jffs/addons/asnmanager/` or in the `ASNmanager` folder of a USB device adds presets of your own (one per line: `category|Name|ASNs and domains|` or `...|wide`). They appear after the built-in ones, in the menu, on the command line and in the WebUI; nothing of it leaves the router
+- Country-specific presets (national news sites, banks, public services, regional shops) are no longer built in - they belong in an own presets file. The built-in list has 110 presets in 9 categories
+
 ## v3.9.1
 
 - 76 more service presets (135 in total), three new categories:
