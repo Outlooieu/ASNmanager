@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.7.4
+version=3.7.5
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.7.4"
+SCRIPT_VERSION="3.7.5"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -3231,9 +3231,8 @@ ts_save() {
         if ! cmp -s "$TS_RT/save.new" "$f" 2>/dev/null; then
             cp "$TS_RT/save.new" "$f.tmp" 2>/dev/null && mv -f "$f.tmp" "$f" 2>/dev/null || { rm -f "$f.tmp"; rm -f "$TS_RT/data.new" "$TS_RT/save.new"; return 1; }
         fi
-    else
-        rm -f "$f"
     fi
+    # nothing counted (e.g. a moment without counters): the saved file stays - only "stats reset" deletes it
     rm -f "$TS_RT/data.new" "$TS_RT/save.new"
     return 0
 }
@@ -3778,7 +3777,8 @@ ts_loop() {
     [ -s "$TS_RT/sg_since" ] || date +%s > "$TS_RT/sg_since"
     last_sg=0
     echo $$ > "$TS_RT/loop.pid"
-    last_save=$(date +%s)
+    # first save 5 minutes after the start (an update or repair starts the loop again - the hour would start over every time)
+    last_save=$(( $(date +%s) - TS_SAVE_EVERY + 300 ))
     while [ "$(ts_state)" = "enabled" ] && [ "$(cat "$TS_RT/loop.pid" 2>/dev/null)" = "$$" ]; do
         nvc=$((nvc + 1)); [ $((nvc % 6)) -eq 1 ] && nv_refresh        # the WAN values: now and then a minute (they hardly ever change)
         sig=$(ts_signature)

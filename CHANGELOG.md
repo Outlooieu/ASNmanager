@@ -1,3 +1,8 @@
+## v3.7.5
+
+- Fixed: the traffic numbers were saved on the USB device only one hour after the counting loop started - an update, a repair or turning the statistics on starts the loop again, so on a day with several updates nothing was saved ("last change: never"). The first save now happens 5 minutes after the start, then every hour as before
+- A save with nothing counted at that moment no longer deletes the saved file on the USB device - only "Disable & reset" does
+
 ## v3.7.4
 
 - New in Diagnostics: **Explain** a domain or IP - what DNS answers (asked like a device), which domain entry covers the name, and for every address: its network (ASN), every ASN Manager rule that contains it in the order the router checks them, which one wins (for any device or the device chosen below), and the interface the traffic leaves through (with a warning if that is not the target). Command line: `ASNmanager.sh explain <domain|IP> [device IP]`
