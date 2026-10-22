@@ -1,3 +1,10 @@
+## v3.5.0
+
+- **Names of the ASNs**: the list shows who an ASN belongs to ("AS14061 DigitalOcean, LLC", hover for the full RIPE name), the traffic statistics too. The names are looked up once per ASN (RIPEstat, at most 8 per routing check; a new ASN right after adding it; known names from the suggestions and from "Find by domain / IP" are taken over) and kept in `/jffs/addons/asnmanager/asn_names.txt`. Command line: `names` looks up all missing names now
+- **Notes per entry**: "Edit" has a field for a short note (up to 60 characters, e.g. "ZDF Mediathek"); it is shown under the entry. ASNs keep their note by number, IP / domain entries by their value, so notes survive a restore; they are part of backups (`[NOTES]`) and go when the entry is removed. Command line: `note <ASN|C1> [text]`
+- **DNS / DHCP check**: the overview shows whether dnsmasq runs, who answers DNS on port 53 (e.g. "dnsmasq OK (port 553, behind AdGuardHome)") and whether DHCP answers. Checked every 5 minutes with the routing check and on every refresh; if dnsmasq is down, nothing answers on port 53 or DHCP is silent, a red notice with the fix appears at the top and the change is written to the syslog. Command line: `dns`
+- "Remove all" asks you to type DELETE / LÖSCHEN and says how many ASNs, IP ranges and domains would go; the button moved to the right and is less prominent
+
 ## v3.4.1
 
 - WebUI: the "ASNs" status tile also shows the other entries below the number of ASNs ("+ 1 IP · 4 Domains")

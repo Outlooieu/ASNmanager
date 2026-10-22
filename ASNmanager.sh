@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.4.1
+version=3.5.0
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.4.1"
+SCRIPT_VERSION="3.5.0"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -742,8 +742,8 @@ cu_json() {
                 cj_ips=$(cu_learned_ips "$cid" 200 | awk '{ printf "%s\"%s\"", (n++ ? "," : ""), $1 }')
             fi
             [ $cj_n -gt 0 ] && printf ','
-            printf '{"id":"%s","dest":"%s","src":"%s","kind":"%s","value":"%s","loaded":%d,"new":%d,"learned":%d,"ips":[%s]}' \
-                "$cid" "$cdest" "$(echo "$csrc" | tr -cd '0-9.,')" "$ckind" "$(echo "$cval" | tr -cd 'A-Za-z0-9./-')" "$cj_l" "$cj_new" "${cj_c:-0}" "$cj_ips"
+            printf '{"id":"%s","dest":"%s","src":"%s","kind":"%s","value":"%s","loaded":%d,"new":%d,"learned":%d,"ips":[%s],"note":"%s"}' \
+                "$cid" "$cdest" "$(echo "$csrc" | tr -cd '0-9.,')" "$ckind" "$(echo "$cval" | tr -cd 'A-Za-z0-9./-')" "$cj_l" "$cj_new" "${cj_c:-0}" "$cj_ips" "$(note_of "$ckind:$cval")"
             cj_n=$((cj_n + 1))
         done < "$CUSTOM_FILE"
     fi
@@ -811,6 +811,154 @@ cu_ipset_report() {
 }
 
 # ---------- backup: ASN list, schedule, failover chains, settings ----------
+# =====================================================================
+#  ASN names, notes per entry, DNS health
+# =====================================================================
+NAMES_FILE="/jffs/addons/asnmanager/asn_names.txt"       # "ASN <TAB> holder" (flash, a few KB; filled once per ASN)
+NAMES_FAIL="/tmp/asnmanager-names.fail"     # RAM: "ASN <TAB> time" - a failed look-up is tried again after a day
+NOTES_FILE="/jffs/addons/asnmanager/notes.txt"           # "KEY <TAB> note"   KEY = ASN number | ip:<range> | dom:<domain>
+DNS_STATE="/tmp/asnmanager-dns.state"
+
+name_clean() { tr -d '\000-\037\177"\\|' | tr '\t' ' ' | sed 's/^ *//; s/ *$//' | cut -c1-80; }
+name_of() { awk -F'\t' -v a="$1" '$1 == a { print $2; exit }' "$NAMES_FILE" 2>/dev/null; }
+name_set() {          # ASN HOLDER
+    [ -n "$2" ] || return 0
+    mkdir -p "$ADDON_DIR" 2>/dev/null
+    ns_v=$(echo "$2" | name_clean); [ -n "$ns_v" ] || return 0
+    [ "$(name_of "$1")" = "$ns_v" ] && return 0
+    { awk -F'\t' -v a="$1" '$1 != a' "$NAMES_FILE" 2>/dev/null; printf '%s\t%s\n' "$1" "$ns_v"; } > "$NAMES_FILE.new" && mv -f "$NAMES_FILE.new" "$NAMES_FILE"
+}
+# names of listed ASNs that are not known yet: first from the suggestions cache, then RIPEstat (at most $1 per run)
+names_fill() {
+    [ -s "$ASN_FILE" ] || return 0
+    nf_max=${1:-8}; nf_now=$(date +%s)
+    cut -d: -f1 "$ASN_FILE" | grep -E '^[0-9]+$' | sort -u > /tmp/asnmanager-names.want
+    [ -f "$NAMES_FILE" ] && cut -f1 "$NAMES_FILE" | sort -u > /tmp/asnmanager-names.have || : > /tmp/asnmanager-names.have
+    ts_not_in /tmp/asnmanager-names.have /tmp/asnmanager-names.want > /tmp/asnmanager-names.todo
+    rm -f /tmp/asnmanager-names.want /tmp/asnmanager-names.have
+    [ -s /tmp/asnmanager-names.todo ] || { rm -f /tmp/asnmanager-names.todo; return 0; }
+    # the suggestions already know many holders ("net <TAB> asn <TAB> name")
+    if [ -s "$TS_RT/sg_asn.txt" ]; then
+        awk -F'\t' 'FILENAME == ARGV[1] { w[$1] = 1; next } ($2 in w) && $3 != "" && !s[$2]++ { print $2 "\t" $3 }' \
+            /tmp/asnmanager-names.todo "$TS_RT/sg_asn.txt" | while IFS="$(printf '\t')" read -r nf_a nf_n; do name_set "$nf_a" "$nf_n"; done
+    fi
+    nf_i=0
+    while read -r nf_a; do
+        [ -n "$(name_of "$nf_a")" ] && continue
+        nf_f=$(awk -F'\t' -v a="$nf_a" '$1 == a { print $2; exit }' "$NAMES_FAIL" 2>/dev/null)
+        [ -n "$nf_f" ] && [ $((nf_now - nf_f)) -lt 86400 ] && continue
+        [ $nf_i -ge "$nf_max" ] && break
+        nf_i=$((nf_i + 1))
+        nf_h=$(curl -fsSk --connect-timeout 5 -m 10 "https://stat.ripe.net/data/as-overview/data.json?resource=AS${nf_a}" 2>/dev/null \
+               | sed -n 's/.*"holder": *"\([^"]*\)".*/\1/p' | head -n 1)
+        if [ -n "$nf_h" ]; then name_set "$nf_a" "$nf_h"
+        else { awk -F'\t' -v a="$nf_a" '$1 != a' "$NAMES_FAIL" 2>/dev/null; printf '%s\t%s\n' "$nf_a" "$nf_now"; } > "$NAMES_FAIL.new" && mv -f "$NAMES_FAIL.new" "$NAMES_FAIL"; fi
+    done < /tmp/asnmanager-names.todo
+    rm -f /tmp/asnmanager-names.todo
+}
+
+# note keys: an ASN keeps its number, a custom entry is stored by kind and value (stays valid after a restore)
+note_key() {          # ASN | C<n> | ip:<range> | dom:<domain>  ->  key (empty = unknown entry)
+    case "$1" in
+        ''|*[!0-9]*) ;;
+        *) grep -q "^$1:" "$ASN_FILE" 2>/dev/null && echo "$1"; return 0 ;;
+    esac
+    case "$1" in
+        C[0-9]*|c[0-9]*) awk -F: -v id="C${1#?}" '$1 == id { print $4 ":" $5; exit }' "$CUSTOM_FILE" 2>/dev/null ;;
+        ip:*|dom:*) awk -F: -v k="${1%%:*}" -v v="${1#*:}" '$4 == k && $5 == v { print k ":" v; exit }' "$CUSTOM_FILE" 2>/dev/null ;;
+    esac
+}
+note_clean() { tr -d '\000-\037\177"\\|<>' | sed 's/^ *//; s/ *$//' | cut -c1-120; }
+note_of() { awk -F'\t' -v k="$1" '$1 == k { print $2; exit }' "$NOTES_FILE" 2>/dev/null; }
+# %XX decoding of the text sent by the WebUI (bytes, so umlauts arrive as UTF-8)
+url_dec() {
+    printf '%s\n' "$1" | LC_ALL=C awk 'BEGIN { for (i = 1; i < 256; i++) h[sprintf("%02X", i)] = i }
+        { s = $0; o = ""
+          while ((p = index(s, "%")) > 0) {
+              o = o substr(s, 1, p - 1); x = toupper(substr(s, p + 1, 2))
+              if (x in h) { o = o sprintf("%c", h[x]); s = substr(s, p + 3) } else { o = o "%"; s = substr(s, p + 1) }
+          }
+          print o s }'
+}
+# note <ASN|C<n>> [text]   - an empty text removes the note
+cli_note() {
+    nk=$(note_key "$1"); [ -n "$nk" ] || { echo "Unknown entry '$1' (ASN number or ID like C1)"; return 1; }
+    shift
+    nv=$(printf '%s' "$*" | note_clean)
+    mkdir -p "$ADDON_DIR" 2>/dev/null
+    { awk -F'\t' -v k="$nk" '$1 != k' "$NOTES_FILE" 2>/dev/null; [ -n "$nv" ] && printf '%s\t%s\n' "$nk" "$nv"; } > "$NOTES_FILE.new" && mv -f "$NOTES_FILE.new" "$NOTES_FILE"
+    notes_prune
+    if [ -n "$nv" ]; then echo "Note saved for $nk."; else echo "Note removed for $nk."; fi
+}
+# notes of entries that are no longer in the lists go
+notes_prune() {
+    [ -s "$NOTES_FILE" ] || return 0
+    { cut -d: -f1 "$ASN_FILE" 2>/dev/null; awk -F: '$1 ~ /^C[0-9]+$/ { print $4 ":" $5 }' "$CUSTOM_FILE" 2>/dev/null; } | sort -u > /tmp/asnmanager-notes.keys
+    awk -F'\t' 'FILENAME == ARGV[1] { k[$1] = 1; next } ($1 in k)' /tmp/asnmanager-notes.keys "$NOTES_FILE" > "$NOTES_FILE.new" && mv -f "$NOTES_FILE.new" "$NOTES_FILE"
+    rm -f /tmp/asnmanager-notes.keys
+}
+# notes import <replace|merge> KEY=%XX-text;...   (WebUI restore)
+cli_nimport() {
+    ni_mode="$1"; shift
+    mkdir -p "$ADDON_DIR" 2>/dev/null
+    [ "$ni_mode" = "replace" ] && : > "$NOTES_FILE"
+    ni_n=0
+    for ni_e in $(echo "$*" | tr ';' ' '); do
+        ni_k=${ni_e%%=*}; ni_v=$(url_dec "${ni_e#*=}" | note_clean)
+        case "$ni_k" in ''|*[!0-9]*) case "$ni_k" in ip:*|dom:*) ;; *) continue ;; esac ;; esac
+        [ -n "$ni_v" ] || continue
+        { awk -F'\t' -v k="$ni_k" '$1 != k' "$NOTES_FILE" 2>/dev/null; printf '%s\t%s\n' "$ni_k" "$ni_v"; } > "$NOTES_FILE.new" && mv -f "$NOTES_FILE.new" "$NOTES_FILE"
+        ni_n=$((ni_n + 1))
+    done
+    notes_prune
+    echo "Notes imported ($ni_n in the backup; notes of entries that are not in the list are left out)."
+}
+
+# DNS health: is dnsmasq running, who answers DNS on port 53, does DHCP answer (port 67)?
+# Prints "state code o53 dport dhcp_on dhcp" - state ok|bad, code ok|nodnsmasq|no53|nodhcp
+dns_health() {
+    dh_l=$(netstat -lnup 2>/dev/null | awk '{ n = split($NF, a, "/"); p = a[2]
+        if ($4 ~ /:53$/ && o == "") o = p
+        if (p == "dnsmasq" && $4 ~ /:53$/) d = 53
+        if (p == "dnsmasq" && $4 ~ /:553$/ && d == "") d = 553
+        if (p == "dnsmasq" && $4 ~ /:67$/) h = 1 }
+        END { printf "%s %s %s", (o == "" ? "-" : o), (d == "" ? 0 : d), (h ? 1 : 0) }')
+    dh_o=$(echo "$dh_l" | cut -d' ' -f1); dh_d=$(echo "$dh_l" | cut -d' ' -f2); dh_h=$(echo "$dh_l" | cut -d' ' -f3)
+    dh_on=0; [ "$(nvram get dhcp_enable_x 2>/dev/null)" = "1" ] && dh_on=1
+    dh_c=ok
+    if ! pidof dnsmasq >/dev/null 2>&1 || [ "$dh_d" = "0" ]; then dh_c=nodnsmasq
+    elif [ "$dh_o" = "-" ]; then dh_c=no53
+    elif [ "$dh_on" = "1" ] && [ "$dh_h" = "0" ]; then dh_c=nodhcp; fi
+    dh_s=ok; [ "$dh_c" = "ok" ] || dh_s=bad
+    echo "$dh_s $dh_c $(echo "$dh_o" | tr -cd 'A-Za-z0-9_.-') $dh_d $dh_on $dh_h"
+}
+# writes dns.js for the WebUI; a change between ok and a problem goes to the syslog (once)
+dns_export() {
+    set -- $(dns_health)
+    de_prev=$(cat "$DNS_STATE" 2>/dev/null)
+    if [ "$2" != "$de_prev" ]; then
+        echo "$2" > "$DNS_STATE"
+        case "$2" in
+            ok)        [ -n "$de_prev" ] && logger -t ASNmanager "DNS check: dnsmasq and DHCP are working again" ;;
+            nodnsmasq) logger -t ASNmanager "DNS check: dnsmasq is NOT running - no DHCP for the devices, domain entries learn nothing" ;;
+            no53)      logger -t ASNmanager "DNS check: nothing answers DNS on port 53" ;;
+            nodhcp)    logger -t ASNmanager "DNS check: DHCP (port 67) does not answer" ;;
+        esac
+    fi
+    [ -d "$WEB_DIR" ] || return 0
+    printf '{"ts":%s,"state":"%s","code":"%s","p53":"%s","port":%s,"dhcp_on":%s,"dhcp":%s}\n' "$(date +%s)" "$1" "$2" "$3" "$4" "$5" "$6" > "$WEB_DIR/dns.js.tmp" && mv -f "$WEB_DIR/dns.js.tmp" "$WEB_DIR/dns.js"
+}
+cli_dns() {
+    set -- $(dns_health)
+    case "$2" in
+        ok)        echo "[OK]   DNS: answered on port 53 by $3$([ "$4" = "553" ] && echo ", dnsmasq on port 553 behind it"); DHCP: $([ "$5" = "1" ] && echo "answering" || echo "off in the router settings")" ;;
+        nodnsmasq) echo "[FAIL] dnsmasq is not running. Devices get no addresses (DHCP), domain entries learn nothing. Try: service restart_dnsmasq (with AdGuard Home in front: /opt/etc/init.d/S99AdGuardHome restart)" ;;
+        no53)      echo "[FAIL] Nothing answers DNS on port 53 (dnsmasq runs on port $4). Is AdGuard Home stopped? Try: /opt/etc/init.d/S99AdGuardHome restart, or stop it and run service restart_dnsmasq" ;;
+        nodhcp)    echo "[FAIL] DHCP is on in the router, but nothing answers on port 67. Try: service restart_dnsmasq" ;;
+    esac
+    [ "$1" = "ok" ]
+}
+
 backup_text() {
     echo "# ASN Manager Backup"
     echo "# version=$SCRIPT_VERSION"
@@ -819,6 +967,8 @@ backup_text() {
     [ -s "$ASN_FILE" ] && cat "$ASN_FILE"
     echo "[CUSTOM]"
     [ -s "$CUSTOM_FILE" ] && awk -F: '{ print $2 ":" $3 ":" $4 ":" $5 }' "$CUSTOM_FILE"
+    echo "[NOTES]"
+    [ -s "$NOTES_FILE" ] && cat "$NOTES_FILE"
     load_schedule
     echo "[SCHEDULE]"
     echo "INTERVAL=$INTERVAL"
@@ -861,6 +1011,7 @@ rs_scan() {
         awk -v d="$RS_DIR" '
             /^\[ASN_LIST\]/ { f = d "/asn.txt"; next }
             /^\[CUSTOM\]/ { f = d "/custom.txt"; next }
+            /^\[NOTES\]/ { f = d "/notes.txt"; next }
             /^\[SCHEDULE\]/ { f = d "/sched.txt"; next }
             /^\[FAILOVER\]/ { f = d "/fo.txt"; next }
             /^\[SETTINGS\]/ { f = d "/set.txt"; next }
@@ -918,7 +1069,15 @@ rs_apply() {
             cli_cimport "$ra_mode" "$(tr '\n' ';' < "$RS_DIR/custom.txt" | sed 's/;$//')"
         elif [ "$ra_mode" = "replace" ]; then
             [ -f "$CUSTOM_FILE" ] && : > "$CUSTOM_FILE"
-        fi ;;
+        fi
+        if [ -s "$RS_DIR/notes.txt" ]; then
+            mkdir -p "$ADDON_DIR" 2>/dev/null
+            if [ "$ra_mode" = "replace" ]; then cp -f "$RS_DIR/notes.txt" "$NOTES_FILE"
+            else awk -F'\t' 'FILENAME == ARGV[1] { n[$1] = $0; next } !($1 in n) { print } END { for (k in n) print n[k] }' "$RS_DIR/notes.txt" "$NOTES_FILE" > "$NOTES_FILE.new" 2>/dev/null && mv -f "$NOTES_FILE.new" "$NOTES_FILE"; fi
+        elif [ "$ra_mode" = "replace" ]; then
+            rm -f "$NOTES_FILE"
+        fi
+        notes_prune ;;
     esac
     case "$ra_cats" in *,schedule,*)
         [ "$RS_HAS_SCHED" = "1" ] && cli_schedule "$RS_INT" "$RS_TIME" ;;
@@ -1091,7 +1250,7 @@ uninstall_menu() {
             done
             rm -f /tmp/asn_[0-9]*.txt /tmp/asn_counts.txt /tmp/asn_progress.txt /tmp/asn_failed.txt /tmp/ASNmanager-*.tmp /tmp/ASNmanager-update.sh 2>/dev/null
             rm -rf "/jffs/scripts/asn_cache" 2>/dev/null
-            rm -f "$ASN_FILE" "$CUSTOM_FILE" "$CUSTOM_FILE.seq" "$SCHEDULE_FILE" "$STATS_FILE" "$WORKER_SCRIPT" "$SCRIPT_PATH" "$SCRIPT_PATH.bak" "$SCRIPT_PATH.new" 2>/dev/null
+            rm -f "$ASN_FILE" "$CUSTOM_FILE" "$CUSTOM_FILE.seq" "$NAMES_FILE" "$NOTES_FILE" "$SCHEDULE_FILE" "$STATS_FILE" "$WORKER_SCRIPT" "$SCRIPT_PATH" "$SCRIPT_PATH.bak" "$SCRIPT_PATH.new" 2>/dev/null
             rm -rf /tmp/${WEBUI_NS}-* /tmp/asnm_* /tmp/asn_display_*.tmp /tmp/asn_sec_*.tmp /tmp/asnstats 2>/dev/null
             [ $bk_del -eq 1 ] && echo "$bk_files" | while read -r bk_f; do [ -n "$bk_f" ] && rm -f "$bk_f"; done
             for bk_d in /tmp/mnt/*/ASNmanager /tmp/mnt/*/*/ASNmanager; do [ -d "$bk_d" ] && rmdir "$bk_d" 2>/dev/null; done
@@ -1750,6 +1909,7 @@ cli_add() {
     set +f
     sort -u "$ASN_FILE" -o "$ASN_FILE" 2>/dev/null
     [ $((n + cn)) -gt 0 ] || { echo "No valid ASN, IP/CIDR or domain given."; return 1; }
+    [ $n -gt 0 ] && ( names_fill 10 >/dev/null 2>&1 & )
     mark_pending $added
     if [ $cn -eq 0 ]; then echo "Saved $n ASN(s) -> ${dest}${src:+ (Src: $src)}. Apply rules to activate."
     elif [ $n -eq 0 ]; then echo "Saved $cn IP/domain entry(ies) -> ${dest}${src:+ (Src: $src)}. Apply rules to activate."
@@ -1842,6 +2002,7 @@ cli_remove() {
     done
     set +f
     [ $((n + cn)) -gt 0 ] && mark_pending
+    notes_prune
     if [ $cn -eq 0 ]; then echo "Removed $n ASN(s). Apply rules to activate."
     else echo "Removed $n ASN(s) and $cn IP/domain entry(ies). Apply rules to activate."; fi
 }
@@ -1849,6 +2010,7 @@ cli_remove() {
 cli_clear() {
     > "$ASN_FILE"
     [ -f "$CUSTOM_FILE" ] && : > "$CUSTOM_FILE"
+    rm -f "$NOTES_FILE"
     mark_pending
     echo "All ASNs cleared. Apply rules to remove active routing."
 }
@@ -1961,6 +2123,7 @@ cli_lookup() {
         info=$(asn_of_ip "$ip") || { echo "$ip -> lookup failed"; continue; }
         num=$(echo "$info" | grep -oE '^AS[0-9]+' | sed 's/^AS//')
         holder=$(echo "$info" | sed -E 's/^AS[0-9]+ ?//')
+        [ -n "$holder" ] && grep -q "^${num}:" "$ASN_FILE" 2>/dev/null && name_set "$num" "$holder"
         in_list=$(grep "^${num}:" "$ASN_FILE" 2>/dev/null | head -n 1 | cut -d':' -f2)
         echo "$ip -> AS${num} ${holder}${in_list:+ [in list: $in_list]}"
         case " $found " in *" AS$num "*) ;; *) found="$found AS$num" ;; esac
@@ -2011,6 +2174,9 @@ web_export() {
         pending=1
     fi
     cat "$ADDON_DIR/pending" > "$pend_tmp" 2>/dev/null || : > "$pend_tmp"
+    nm_tmp="/tmp/asnm_names.$$"; nt_tmp="/tmp/asnm_notes.$$"
+    cat "$NAMES_FILE" > "$nm_tmp" 2>/dev/null || : > "$nm_tmp"
+    cat "$NOTES_FILE" > "$nt_tmp" 2>/dev/null || : > "$nt_tmp"
     cron=0; cru l 2>/dev/null | grep -q "#ASN_Worker#" && cron=1
     worker=0; [ -x "$WORKER_SCRIPT" ] && worker=1
 
@@ -2027,6 +2193,8 @@ web_export() {
             FILENAME == ARGV[2] { sets[$0] = 1; next }
             FILENAME == ARGV[3] { fail[$1 ":" $2] = 1; next }
             FILENAME == ARGV[4] { pend[$1] = 1; next }
+            FILENAME == ARGV[5] { split($0, nn, "\t"); nmv[nn[1]] = nn[2]; next }
+            FILENAME == ARGV[6] { split($0, nn, "\t"); ntv[nn[1]] = nn[2]; next }
             {
                 sub(/\r$/, "")
                 asn = $1; dest = $2; src = $3
@@ -2038,8 +2206,8 @@ web_export() {
                 l = (("ASN_" dest "_" asn) in sets) ? 1 : 0
                 f = ((k in fail) && !(k in cnt)) ? 1 : 0
                 nw = (asn in pend) ? 1 : 0
-                printf "%s{\"asn\":\"%s\",\"dest\":\"%s\",\"src\":\"%s\",\"subnets\":%d,\"loaded\":%d,\"failed\":%d,\"new\":%d}", (n++ ? "," : ""), asn, dest, src, c, l, f, nw
-            }' "$STATS_FILE" "$sets_tmp" "$fail_tmp" "$pend_tmp" "$ASN_FILE"
+                printf "%s{\"asn\":\"%s\",\"dest\":\"%s\",\"src\":\"%s\",\"subnets\":%d,\"loaded\":%d,\"failed\":%d,\"new\":%d,\"name\":\"%s\",\"note\":\"%s\"}", (n++ ? "," : ""), asn, dest, src, c, l, f, nw, nmv[asn], ntv[asn]
+            }' "$STATS_FILE" "$sets_tmp" "$fail_tmp" "$pend_tmp" "$nm_tmp" "$nt_tmp" "$ASN_FILE"
         printf '],'
         cu_json "$pend_tmp"
 
@@ -2062,7 +2230,8 @@ web_export() {
         echo "$PRESET_DATA" | awk -F'|' '{ gsub(/["\\]/, "", $1); printf "%s{\"name\":\"%s\",\"asns\":\"%s\"}", (NR > 1 ? "," : ""), $1, $2 }'
         printf ']}\n'
     } > "$out" && mv "$out" "$WEB_DIR/data.js"
-    rm -f "$sets_tmp" "$fail_tmp" "$pend_tmp"
+    rm -f "$sets_tmp" "$fail_tmp" "$pend_tmp" "$nm_tmp" "$nt_tmp"
+    dns_export >/dev/null 2>&1
     ts_export >/dev/null 2>&1
 }
 
@@ -2263,6 +2432,8 @@ web_job() {
         reload)   cli_apply force > "$OUT" 2>&1 ;;
         retry)    cli_apply cache > "$OUT" 2>&1 ;;
         edit)     cli_edit "$a1" "$a2" "$a3" > "$OUT" 2>&1 ;;
+        note)     cli_note "$a1" "$(url_dec "$a2")" > "$OUT" 2>&1 ;;
+        nimport)  cli_nimport "$a1" "$a2" > "$OUT" 2>&1 ;;
         import)   cli_import "$a1" "$a2" > "$OUT" 2>&1 ;;
         cimport)  cli_cimport "$a1" "$a2" > "$OUT" 2>&1 ;;
         schedule) cli_schedule "$a1" "$a2" > "$OUT" 2>&1 ;;
@@ -4274,6 +4445,9 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   edit <ASN|Cn> <TARGET> [SRC-IP]    change target / source IP of an ASN or custom entry
   custom list | apply | early | purge   custom entries (IP/CIDR, domains): list / apply (done by "apply") / purge
   custom learned [ID]                addresses dnsmasq has learned for the domain entries
+  note <ASN|C1> [text]               note for an entry (no text = remove it)
+  names                              look up the names (holders) of all ASNs in the list now
+  dns                                is dnsmasq running, who answers DNS, does DHCP answer?
   import <replace|merge> <ASN:TARGET:SRC>[,...]  import entries
   status                             ipset status
   test <IP|domain>                   check which route a target takes
@@ -4319,6 +4493,9 @@ cli_main() {
         reload)   cli_apply force ;;
         retry)    cli_apply cache ;;
         edit)     cli_edit "$@" ;;
+        note)     cli_note "$@" ;;
+        names)    names_fill 200; [ -s "$NAMES_FILE" ] && sed 's/\t/  /' "$NAMES_FILE" ;;
+        dns)      cli_dns ;;
         import)   cli_import "$@" ;;
         status)   ipset_status_report ;;
         test)     if is_valid_host "$1"; then route_test "$1"; else echo "Usage: test <IP|domain>"; false; fi ;;
@@ -4369,7 +4546,7 @@ cli_main() {
             esac ;;
         check)
             case "$1" in
-                run) proc_reap; cu_learned_save >/dev/null 2>&1; rc_run_once ;;
+                run) proc_reap; cu_learned_save >/dev/null 2>&1; dns_export >/dev/null 2>&1; rc_run_once; names_fill 8 >/dev/null 2>&1 ;;
                 *)   rc_print ;;
             esac ;;
         update)

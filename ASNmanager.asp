@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.4.1 -->
+<!-- ASNmanager-WebUI v3.5.0 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -109,6 +109,10 @@
 .asnm-stat { background: var(--card2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .asnm-stat-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
 .asnm-stat-value { font-size: 20px; font-weight: 700; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asnm-asname { color: var(--text2); font-weight: 500; margin-left: 4px; }
+.asnm-note { margin-top: 3px; font-size: 11px; color: var(--muted); font-style: italic; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asnm-note-in { margin-top: 6px; width: 200px; }
+.asnm-btn.asnm-danger-text { color: var(--bad) !important; }
 .asnm-stat-sub { display: block; margin-top: 2px; font-size: 11px; font-weight: 600; color: var(--muted); white-space: normal; }
 .asnm-stat-value.asnm-small { font-size: 13px; font-weight: 600; padding-top: 6px; }
 .asnm-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -401,7 +405,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.4.1';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.5.0';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -482,7 +486,14 @@ var ASNM_I18N = {
     add_domnote: 'A domain also covers all its subdomains. It only works for devices that use the router as their DNS server (not with DoH or fixed DNS servers; IPv4 only). The router learns the addresses when a device looks the name up.',
     rc_nolearned: 'none learned', rc_tip_nolearned: 'No address has been learned for this domain yet. A device has to look the name up through the router\'s DNS server (dnsmasq). Not covered: devices with another DNS server or DoH, and names that an AdGuard Home in front answers without passing through dnsmasq.',
     lang_label: 'Language', lang_default: 'Default', lang_en: 'English', theme_label: 'Theme', theme_dark: 'Dark', theme_light: 'Light', theme_blue: 'Blue',
-    stat_asns: 'ASNs', stat_more: '+ {i} IP · {d} domains', stat_subnets: 'Subnets', stat_ifaces: 'Interfaces online', stat_last: 'Last applied',
+    stat_asns: 'ASNs', stat_more: '+ {i} IP · {d} domains',
+    note_ph: 'Note, e.g. ZDF Mediathek', note_lbl: 'Note',
+    c_clear_type: 'Remove ALL entries ({a} ASNs, {i} IP ranges, {d} domains) from the list?\nActive routing stays until you click "Apply rules".\n\nType {w} to confirm:', clear_word: 'DELETE', clear_wrong: 'Not removed - the word did not match.',
+    dns_lbl: 'DNS / DHCP', dns_ok: 'dnsmasq OK', dns_ok_agh: 'dnsmasq OK (port 553, behind {p})', dns_dhcp_ok: 'DHCP OK', dns_dhcp_off: 'DHCP off in the router',
+    dns_bad_nodnsmasq: 'dnsmasq is not running: devices get no new addresses (DHCP) and the domain entries learn nothing. Fix (SSH): service restart_dnsmasq - with AdGuard Home in front: /opt/etc/init.d/S99AdGuardHome restart',
+    dns_bad_no53: 'Nothing answers DNS on port 53 (dnsmasq runs on port {port}). Is AdGuard Home stopped? Fix (SSH): /opt/etc/init.d/S99AdGuardHome restart',
+    dns_bad_nodhcp: 'DHCP is on in the router, but nothing answers (port 67): devices get no new addresses. Fix (SSH): service restart_dnsmasq',
+    dns_checked: 'checked {t}', stat_subnets: 'Subnets', stat_ifaces: 'Interfaces online', stat_last: 'Last applied',
     card_add_sub: 'Route an Autonomous System, an IP range or a domain through a WAN or VPN interface', card_list_sub: 'Click a group to expand or collapse it',
     status: 'Status', version: 'Version', last_applied: 'Rules last applied', auto_refresh: 'Auto-refresh of subnets', actions: 'Actions',
     btn_apply: 'Apply rules', btn_full: 'Reload all subnets', btn_full_tip: 'Download the subnets of every ASN again and rebuild all rules (the daily schedule does this anyway)', btn_reload: 'Reload data', btn_retry: 'Retry failed',
@@ -602,7 +613,14 @@ var ASNM_I18N = {
     add_domnote: 'Eine Domain gilt auch für alle Subdomains. Sie wirkt nur für Geräte, die den Router als DNS-Server nutzen (nicht bei DoH oder fest eingestelltem DNS; nur IPv4). Der Router lernt die Adressen, wenn ein Gerät den Namen auflöst.',
     rc_nolearned: 'nichts gelernt', rc_tip_nolearned: 'Für diese Domain wurde noch keine Adresse gelernt. Ein Gerät muss den Namen über den DNS-Server des Routers (dnsmasq) auflösen. Nicht erfasst werden Geräte mit anderem DNS-Server oder DoH und Namen, die ein davorgeschalteter AdGuard Home beantwortet, ohne dass sie über dnsmasq laufen.',
     lang_label: 'Sprache', lang_default: 'Standard', lang_en: 'English', theme_label: 'Design', theme_dark: 'Dunkel', theme_light: 'Hell', theme_blue: 'Blau',
-    stat_asns: 'ASNs', stat_more: '+ {i} IP · {d} Domains', stat_subnets: 'Subnetze', stat_ifaces: 'Interfaces online', stat_last: 'Zuletzt angewendet',
+    stat_asns: 'ASNs', stat_more: '+ {i} IP · {d} Domains',
+    note_ph: 'Notiz, z. B. ZDF Mediathek', note_lbl: 'Notiz',
+    c_clear_type: 'ALLE Einträge ({a} ASNs, {i} IP-Bereiche, {d} Domains) aus der Liste entfernen?\nDas aktive Routing bleibt bestehen, bis du "Regeln anwenden" klickst.\n\nZum Bestätigen {w} eintippen:', clear_word: 'LÖSCHEN', clear_wrong: 'Nicht entfernt - das Wort stimmte nicht.',
+    dns_lbl: 'DNS / DHCP', dns_ok: 'dnsmasq OK', dns_ok_agh: 'dnsmasq OK (Port 553, hinter {p})', dns_dhcp_ok: 'DHCP OK', dns_dhcp_off: 'DHCP im Router aus',
+    dns_bad_nodnsmasq: 'dnsmasq läuft nicht: Geräte bekommen keine neuen Adressen (DHCP), und die Domain-Einträge lernen nichts. Abhilfe (SSH): service restart_dnsmasq - mit AdGuard Home davor: /opt/etc/init.d/S99AdGuardHome restart',
+    dns_bad_no53: 'Niemand beantwortet DNS auf Port 53 (dnsmasq läuft auf Port {port}). Ist AdGuard Home gestoppt? Abhilfe (SSH): /opt/etc/init.d/S99AdGuardHome restart',
+    dns_bad_nodhcp: 'DHCP ist im Router an, aber niemand antwortet (Port 67): Geräte bekommen keine neuen Adressen. Abhilfe (SSH): service restart_dnsmasq',
+    dns_checked: 'geprüft {t}', stat_subnets: 'Subnetze', stat_ifaces: 'Interfaces online', stat_last: 'Zuletzt angewendet',
     card_add_sub: 'Ein Autonomes System, einen IP-Bereich oder eine Domain über ein WAN- oder VPN-Interface leiten', card_list_sub: 'Gruppe anklicken zum Auf- oder Zuklappen',
     status: 'Status', version: 'Version', last_applied: 'Regeln zuletzt angewendet', auto_refresh: 'Automatische Aktualisierung', actions: 'Aktionen',
     btn_apply: 'Regeln anwenden', btn_full: 'Alle neu laden', btn_full_tip: 'Die Subnetze aller ASNs neu herunterladen und alle Regeln neu aufbauen (der tägliche Zeitplan macht das ohnehin)', btn_reload: 'Daten neu laden', btn_retry: 'Fehlgeschlagene wiederholen',
@@ -808,7 +826,7 @@ function asnmLoadData(first) {
         if (typeof asnmPerfMark === 'function') asnmPerfMark();
         if (ASNM.data.custom) for (var ci = 0; ci < ASNM.data.custom.length; ci++) {
             var cc = ASNM.data.custom[ci];
-            ASNM.data.entries.push({ asn: cc.id, dest: cc.dest, src: cc.src, subnets: cc.kind === 'ip' ? 1 : -1, loaded: cc.loaded, failed: 0, 'new': cc['new'], kind: cc.kind, value: cc.value, learned: cc.learned, ips: cc.ips || [] });
+            ASNM.data.entries.push({ asn: cc.id, dest: cc.dest, src: cc.src, subnets: cc.kind === 'ip' ? 1 : -1, loaded: cc.loaded, failed: 0, 'new': cc['new'], kind: cc.kind, value: cc.value, learned: cc.learned, ips: cc.ips || [], note: cc.note || '' });
         }
         ASNM.data.devices.sort(function (a, b) {
             var x = a.ip.split('.'), y = b.ip.split('.');
@@ -1070,7 +1088,8 @@ function asnmListSection(sec, entries, rcMap) {
         if (closed) continue;
 
         if (ASNM.editing === e.asn) {
-            html += '<tr class="asnm-editing"><td></td><td>' + asnmEntryCell(e) + '</td>' +
+            html += '<tr class="asnm-editing"><td></td><td>' + asnmEntryCell(e) +
+                '<br/><input type="text" id="asnm_edit_note" class="input_15_table asnm-note-in" maxlength="60" value="' + asnmEsc(e.note || '') + '" placeholder="' + asnmEsc(t('note_ph')) + '"/></td>' +
                 '<td colspan="4"><select id="asnm_edit_dest" class="input_option">' + asnmTargetOptions(asnmNormDest(e.dest)) + '</select><br/>' +
                 '<input type="text" id="asnm_edit_src" class="input_15_table" maxlength="600" style="margin-top:6px;width:230px;" oninput="asnmDevMsRender(\'asnm_edit_ms\',\'asnm_edit_src\');" value="' + asnmEsc(e.src) + '" placeholder="' + asnmEsc(t('src_empty')) + '"/>' +
                 '<div class="asnm-ms" id="asnm_edit_ms" style="margin:6px 0 0 6px;vertical-align:top;"></div></td>' +
@@ -1091,7 +1110,7 @@ function asnmListSection(sec, entries, rcMap) {
         else num = e.subnets >= 0 ? e.subnets : '<span class="asnm-muted">-</span>';
 
         html += '<tr' + rowCls + '><td><input type="checkbox" class="asnm-chk asnm-chk-' + sec + '" value="' + a + '"/></td>' +
-                '<td>' + (sec === 'asn' ? asnmEntryCell(e) : asnmEsc(sec === 'dom' ? '*.' + e.value : e.value) + ' <span class="asnm-muted asnm-cid">' + a + '</span>') + '</td><td>' + asnmSrcCell(e.src) + '</td>' +
+                '<td>' + (sec === 'asn' ? asnmEntryCell(e) : asnmEsc(sec === 'dom' ? '*.' + e.value : e.value) + ' <span class="asnm-muted asnm-cid">' + a + '</span>') + asnmNoteHtml(e) + '</td><td>' + asnmSrcCell(e.src) + '</td>' +
                 '<td class="num">' + num + '</td>' +
                 '<td>' + state + '</td>' +
                 '<td id="asnm_rc_' + a + '">' + asnmRcBadge(e, rcMap) + '</td>' +
@@ -1364,8 +1383,9 @@ function asnmJobDone(job) {
         asnmGet('output.htm', function (txt) { asnmRenderLookup(txt, ok, job.msg); },
                 function () { asnmRenderLookup('', false, job.msg); });
     }
-    if (job.action === 'edit' && ok) ASNM.editing = null;
+    if ((job.action === 'edit' || job.action === 'note') && ok) ASNM.editing = null;
     if (job.action === 'speedtest') asnmSpLoad();
+    asnmDnsLoad();
     if (job.action === 'setting') { asnmTrLoad(); setTimeout(asnmPerfMark, 1500); }
     if (job.action === 'update') {
         if (ok && /^Updated to/.test(job.msg || '')) { setTimeout(function () { ASNM_UPD.reload(); }, 2500); return; }   // new script + page are in place
@@ -1508,13 +1528,30 @@ function asnmTrRowLabel(r) {
             var e = ASNM.data.entries[i];
             if (e.asn === r.asn && e.kind) return asnmEntryCell(e);
         }
-    return /^C\d+$/.test(r.asn) ? asnmEsc(r.asn) : 'AS' + asnmEsc(r.asn);
+    if (/^C\d+$/.test(r.asn)) return asnmEsc(r.asn);
+    var nm = asnmNameOf(r.asn);
+    return 'AS' + asnmEsc(r.asn) + (nm ? ' <span class="asnm-asname">' + asnmEsc(nm) + '</span>' : '');
 }
+
+// holder as RIPE gives it ("DIGITALOCEAN-ASN - DigitalOcean, LLC") -> the readable part ("DigitalOcean, LLC")
+function asnmAsName(n) {
+    n = String(n || '');
+    var k = n.indexOf(' - ');
+    if (k > 0 && k < n.length - 3) n = n.slice(k + 3);
+    return n.replace(/,\s*[A-Z]{2}$/, '').trim();
+}
+function asnmNameOf(asn) {
+    var en = (ASNM.data && ASNM.data.entries) || [];
+    for (var i = 0; i < en.length; i++) if (en[i].asn === String(asn) && en[i].name) return asnmAsName(en[i].name);
+    return '';
+}
+function asnmNoteHtml(e) { return e.note ? '<div class="asnm-note">' + asnmEsc(e.note) + '</div>' : ''; }
 
 function asnmEntryCell(e) {
     if (e.kind === 'ip') return '<span class="asnm-kind">' + asnmEsc(t('kind_ip')) + '</span> ' + asnmEsc(e.value);
     if (e.kind === 'dom') return '<span class="asnm-kind">' + asnmEsc(t('kind_dom')) + '</span> *.' + asnmEsc(e.value);
-    return 'AS' + asnmEsc(e.asn);
+    var nm = asnmAsName(e.name);
+    return 'AS' + asnmEsc(e.asn) + (nm ? ' <span class="asnm-asname" title="' + asnmEsc(e.name) + '">' + asnmEsc(nm) + '</span>' : '');
 }
 
 function asnmAddPreset() {
@@ -1535,7 +1572,13 @@ function asnmEditSave(asn) {
     var dest = document.getElementById('asnm_edit_dest').value;
     var src = asnmNormSrc(document.getElementById('asnm_edit_src').value);
     if (!asnmValidSrc(src)) { alert(t('a_ip')); return; }
-    asnmSend('edit', [asn, dest, src]);
+    var nEl = document.getElementById('asnm_edit_note'), note = nEl ? nEl.value.replace(/[\u0000-\u001f"\\|<>]/g, '').trim().slice(0, 60) : null, old = '', e0 = null;
+    for (var i = 0; i < ASNM.data.entries.length; i++) if (ASNM.data.entries[i].asn === asn) { e0 = ASNM.data.entries[i]; old = e0.note || ''; }
+    var jobs = [];
+    if (!e0 || asnmNormDest(e0.dest) !== dest || asnmNormSrc(e0.src) !== src) jobs.push(['edit', [asn, dest, src]]);
+    if (note !== null && note !== old) jobs.push(['note', [asn, encodeURIComponent(note)]]);
+    if (!jobs.length) { asnmEdit(null); return; }
+    asnmSendQueue(jobs);
 }
 
 function asnmRemove(list) {
@@ -1550,7 +1593,15 @@ function asnmRemoveSelected() {
     asnmRemove(l);
 }
 
-function asnmClearAll() { if (confirm(t('c_clear'))) asnmSend('clear', []); }
+function asnmClearAll() {
+    var a = 0, ip = 0, dm = 0, en = (ASNM.data && ASNM.data.entries) || [];
+    for (var i = 0; i < en.length; i++) { if (!en[i].kind) a++; else if (en[i].kind === 'ip') ip++; else dm++; }
+    if (!en.length) { alert(t('no_asns')); return; }
+    var w = t('clear_word'), v = prompt(t('c_clear_type', { a: a, i: ip, d: dm, w: w }), '');
+    if (v === null) return;
+    if (v.trim().toUpperCase() !== w.toUpperCase()) { alert(t('clear_wrong')); return; }
+    asnmSend('clear', []);
+}
 function asnmApply() { asnmSend('apply', []); }
 function asnmApplyFull() { if (confirm(t('c_full'))) asnmSend('reload', []); }
 function asnmRetry() { asnmSend('retry', []); }
@@ -1634,6 +1685,9 @@ function asnmBackupLocal() {
     }
     L.push('[CUSTOM]');
     for (i = 0; i < cus.length; i++) L.push(cus[i]);
+    L.push('[NOTES]');
+    for (i = 0; i < d.entries.length; i++) if (d.entries[i].note)
+        L.push((d.entries[i].kind ? d.entries[i].kind + ':' + d.entries[i].value : d.entries[i].asn) + '\t' + d.entries[i].note);
     if (d.schedule) L.push('[SCHEDULE]', 'INTERVAL=' + d.schedule.interval, 'TIME=' + d.schedule.time);
     var fo = ASNM_FO.data;
     if (fo && fo.chains && fo.chains.length) {
@@ -1695,7 +1749,7 @@ var ASNM_SET_OK = { STATS: /^(enabled|disabled)$/, STATS_SAVING: /^(on|off)$/, S
 
 function asnmParseBackup(txt) {
     var lines = txt.replace(/\r/g, '').split('\n'), section = null, hasSections = /^\[(ASN_LIST|CUSTOM)\]/m.test(txt);
-    var res = { entries: [], custom: [], bad: 0, interval: null, time: null, hasAsn: false, failover: [], hasFo: false, settings: {}, nset: 0, version: '' };
+    var res = { notes: [], entries: [], custom: [], bad: 0, interval: null, time: null, hasAsn: false, failover: [], hasFo: false, settings: {}, nset: 0, version: '' };
     var tg = '(?:WAN1|WAN2|OVPN[1-5]|WGC[1-5])', reFo = new RegExp('^(WAN|' + tg + ')=(' + tg + '|BLOCK)(?:,(' + tg + '|BLOCK))?$');
     for (var i = 0; i < lines.length; i++) {
         var l = lines[i].trim();
@@ -1715,6 +1769,11 @@ function asnmParseBackup(txt) {
         if (section === '[SETTINGS]') {
             var sm = /^([A-Z_]+)=([a-z]+)$/.exec(l);
             if (sm && ASNM_SET_OK[sm[1]] && ASNM_SET_OK[sm[1]].test(sm[2])) { res.settings[sm[1]] = sm[2]; res.nset++; }
+            continue;
+        }
+        if (section === '[NOTES]') {
+            var nmx = /^(\d+|ip:[0-9.\/]+|dom:[A-Za-z0-9.-]+)\t+(.+)$/.exec(lines[i].replace(/\r$/, ''));
+            if (nmx) res.notes.push(nmx[1] + '=' + encodeURIComponent(nmx[2].trim().slice(0, 60)));
             continue;
         }
         if (section === '[CUSTOM]') {
@@ -1807,6 +1866,15 @@ function asnmImportRun() {
         }
         if (cchunk.length) jobs.push(['cimport', [cfirst ? mode : 'merge', cchunk.join(';')]]);
         else if (mode === 'replace') jobs.push(['cimport', ['replace', '']]);
+        var nchunk = [], nlen = 0, nfirst = true;
+        for (i = 0; i < r.notes.length; i++) {
+            if (nlen + r.notes[i].length + 1 > ASNM.chunkChars && nchunk.length) {
+                jobs.push(['nimport', [nfirst ? mode : 'merge', nchunk.join(';')]]); nfirst = false;
+                nchunk = []; nlen = 0;
+            }
+            nchunk.push(r.notes[i]); nlen += r.notes[i].length + 1;
+        }
+        if (nchunk.length) jobs.push(['nimport', [nfirst ? mode : 'merge', nchunk.join(';')]]);
     }
     if (chk('asnm_rs_sched') && r.interval && r.time && +r.interval >= 1 && +r.interval <= 30) jobs.push(['schedule', [r.interval, r.time]]);
     if (chk('asnm_rs_fo')) {
@@ -2653,6 +2721,30 @@ function asnmRcStale(d) {
     }
 }
 
+/* ---------- DNS / DHCP health (dns.js: written by the routing check every 5 minutes and on every refresh) ---------- */
+function asnmDnsLoad() {
+    asnmGet('dns.js', function (txt) {
+        var d = null; try { d = JSON.parse(txt); } catch (e) {}
+        asnmDnsRender(d);
+    }, function () { asnmDnsRender(null); });
+}
+function asnmDnsRender(d) {
+    var st = document.getElementById('asnm_dns_state'), bn = document.getElementById('asnm_dns_banner_text');
+    if (!st || !bn) return;
+    if (!d) { st.textContent = '-'; bn.parentNode.style.display = 'none'; return; }
+    var when = ' <span class="asnm-muted" style="font-weight:400;">' + asnmEsc(t('dns_checked', { t: asnmFmtTime(d.ts) })) + '</span>';
+    if (d.state === 'ok') {
+        var a = d.port === 553 ? t('dns_ok_agh', { p: d.p53 || '?' }) : t('dns_ok');
+        st.innerHTML = '<span class="asnm-rc-ok">✓ ' + asnmEsc(a) + ' · ' + asnmEsc(d.dhcp_on ? t('dns_dhcp_ok') : t('dns_dhcp_off')) + '</span>' + when;
+        bn.parentNode.style.display = 'none';
+    } else {
+        var m = t('dns_bad_' + d.code, { port: d.port });
+        st.innerHTML = '<span class="asnm-rc-bad">✗ ' + asnmEsc(m.split(':')[0]) + '</span>' + when;
+        bn.textContent = m;
+        bn.parentNode.style.display = 'flex';
+    }
+}
+
 function asnmRcLoad(auto) {
     asnmGet('check.js', function (txt) {
         var d = null;
@@ -2818,6 +2910,8 @@ function initial() {
     setInterval(asnmTabBadges, 3000);
     asnmRcLoad(true);
     setInterval(function () { asnmRcLoad(false); }, 60000);
+    asnmDnsLoad();
+    setInterval(asnmDnsLoad, 60000);
     asnmFoLoad();
     setInterval(asnmFoLoad, 30000);
     setInterval(asnmLrLoad, 30000);
@@ -2888,6 +2982,7 @@ function initial() {
   <div id="asnm_banner_update" class="asnm-banner asnm-banner-info"><span id="asnm_upd_text"></span><span class="asnm-spacer"></span>
     <a id="asnm_upd_notes" class="asnm-link" target="_blank" rel="noopener" data-i18n="upd_notes"></a>
     <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="upd_install" onclick="asnmUpdate();"/></div>
+  <div id="asnm_banner_dns" class="asnm-banner asnm-banner-bad"><span id="asnm_dns_banner_text"></span></div>
   <div id="asnm_banner_rc" class="asnm-banner asnm-banner-bad"><span id="asnm_rc_banner_text"></span><span class="asnm-spacer"></span><span class="asnm-link" data-i18n="rc_to_list" onclick="asnmTab('asns');"></span></div>
   <div id="asnm_banner" class="asnm-banner"><span data-i18n-html="banner_pending"></span></div>
   <div id="asnm_banner_failed" class="asnm-banner asnm-banner-bad"></div>
@@ -2900,6 +2995,7 @@ function initial() {
       <div class="asnm-stat"><div class="asnm-stat-label" data-i18n="stat_last"></div><div class="asnm-stat-value asnm-small" id="asnm_last_apply">-</div></div>
     </div>
     <div class="asnm-kv"><span data-i18n="auto_refresh"></span>: <b id="asnm_schedule_info">-</b></div>
+    <div class="asnm-kv"><span data-i18n="dns_lbl"></span>: <b id="asnm_dns_state">-</b></div>
     <div class="asnm-kv"><span data-i18n="rc_title"></span>: <b id="asnm_rc_state">-</b>
       <span class="asnm-link" style="margin-left: 8px;" data-i18n="rc_now" onclick="asnmRcCheck();"></span></div>
     <div class="asnm-row">
@@ -2928,7 +3024,8 @@ function initial() {
     <div class="asnm-table-wrap"><div id="asnm_list" class="asnm-muted"><div style="padding:14px;">...</div></div></div>
     <div class="asnm-row" style="margin-top:14px;">
       <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_remove_sel" onclick="asnmRemoveSelected();"/>
-      <input type="button" class="button_gen asnm-btn asnm-danger" data-i18n-value="btn_remove_all" onclick="asnmClearAll();"/>
+      <span class="asnm-spacer"></span>
+      <input type="button" class="button_gen asnm-btn asnm-ghost asnm-danger-text" data-i18n-value="btn_remove_all" onclick="asnmClearAll();"/>
     </div>
   </div>
   <div class="asnm-card" id="asnm_add_card">
