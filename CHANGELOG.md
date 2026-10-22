@@ -1,3 +1,7 @@
+## v3.9.4
+
+- Service presets checked on a router: every main domain answers, the CDN domains were confirmed through typical subdomains (or public domain databases). Removed what could not be confirmed: `indazn.com` and `dazn-api.com` (DAZN) and `spotifycdn.net` (Spotify)
+
 ## v3.9.3
 
 - Service presets: 20 ASNs removed that announce no prefixes at the moment (they would show up as "failed" with 0 subnets): Twitch 46489 / 397153, Blizzard 32163, Ubisoft 8361 / 22634 / 28759, NVIDIA 60977, Meta 149642, OpenAI 401864, Apple 2709 / 1042, Amazon 38895, Google 22859 / 26910 / 36039, Microsoft 8071-8074 / 6584. Twitch, Ubisoft and OpenAI work through their domains

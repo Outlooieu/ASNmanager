@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.3
+version=3.9.4
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.3"
+SCRIPT_VERSION="3.9.4"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -35,9 +35,9 @@ PRESET_DATA='stream|Netflix|2906 40027 netflix.com nflxvideo.net nflximg.net nfl
 stream|YouTube|43515 36040 youtube.com googlevideo.com ytimg.com youtu.be youtube-nocookie.com ggpht.com|
 stream|Disney+|disneyplus.com disney-plus.net bamgrid.com dssott.com disneystreaming.com|
 stream|Amazon Prime Video|primevideo.com aiv-cdn.net aiv-delivery.net amazonvideo.com pv-cdn.net|
-stream|Spotify|spotify.com scdn.co spotifycdn.com spotifycdn.net|
+stream|Spotify|spotify.com scdn.co spotifycdn.com|
 stream|Twitch|twitch.tv ttvnw.net jtvnw.net|
-stream|DAZN|dazn.com indazn.com dazn-api.com|
+stream|DAZN|dazn.com|
 stream|Paramount+|paramountplus.com|
 stream|Crunchyroll|crunchyroll.com|
 stream|WOW / Sky|sky.de sky.com wowtv.de|
