@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.7.2 -->
+<!-- ASNmanager-WebUI v3.7.3 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -344,6 +344,9 @@
 .asnm-sec-body { padding: 2px 0 8px; }
 /* suggestions: filter bar and multi-device selection */
 .asnm-sg-since { font-size: 11px; color: var(--muted); margin: 0 0 8px; }
+.asnm-ex { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; padding: 1px 5px; border-radius: 5px;
+    background: var(--card2); border: 1px solid var(--line); color: var(--text); white-space: nowrap; }
+.asnm-s-formats { line-height: 1.9; }
 .asnm-sg-x { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin-left: 4px; padding: 0;
     vertical-align: middle; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
 .asnm-sg-x:hover { color: var(--text); border-color: var(--muted); }
@@ -447,7 +450,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.7.2';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.7.3';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -575,8 +578,8 @@ var ASNM_I18N = {
     every: 'Every {n} day(s) at {t}', cron_on: '(cron active)', cron_off: '(cron not active - apply rules once)',
     btn_edit: 'Edit', btn_remove: 'Remove', btn_save: 'Save',
     pick_device: '- select device -', no_asns: 'No ASNs configured yet.', summary: '{n} ASN(s), {s} subnets loaded',
-    hint_multi: 'ASN, IP / CIDR range (/8 to /32) or domain - several: separated by commas', hint_optional: 'optional',
-    ph_asns: 'e.g. AS13335, 181.209.202.0/24, *.googlevideo.com', ph_ip: 'e.g. 192.168.1.50 or 192.168.1.50,192.168.1.60', ph_domain: 'e.g. netflix.com', ph_diag: 'e.g. one.one.one.one',
+    hint_multi: 'ASN, IP / CIDR range (/8 to /32) or domain - several: separated by commas', hint_formats: '<b>ASN</b> <span class="asnm-ex">AS13335</span> or <span class="asnm-ex">13335</span> &middot; <b>IP</b> <span class="asnm-ex">1.2.3.4</span> &middot; <b>range</b> <span class="asnm-ex">181.209.202.0/24</span> (/8 to /32) &middot; <b>domain</b> <span class="asnm-ex">googlevideo.com</span> - covers every subdomain, no <span class="asnm-ex">*.</span> needed &middot; several: separated by commas or spaces', hint_optional: 'optional',
+    ph_asns: 'e.g. AS13335, 1.2.3.4, 181.209.202.0/24, googlevideo.com', ph_ip: 'e.g. 192.168.1.50 or 192.168.1.50,192.168.1.60', ph_domain: 'e.g. netflix.com', ph_diag: 'e.g. one.one.one.one',
     working: 'Working...', applying: 'Applying rules - from the saved subnets, only new ASNs are downloaded...', reloading: 'Downloading the subnets of all ASNs - this can take a few minutes...', retrying: 'Rebuilding from cache, downloading only failed ASNs...',
     progress: 'AS{asn} -> {dest}  ({d} of {t})', running_x: 'Running {a}...',
     timeout: 'No answer from the router (timeout). Check that the service-event hook is installed.',
@@ -713,8 +716,8 @@ var ASNM_I18N = {
     every: 'Alle {n} Tag(e) um {t}', cron_on: '(Cron aktiv)', cron_off: '(Cron nicht aktiv - einmal Regeln anwenden)',
     btn_edit: 'Bearbeiten', btn_remove: 'Entfernen', btn_save: 'Speichern',
     pick_device: '- Gerät auswählen -', no_asns: 'Noch keine ASNs eingetragen.', summary: '{n} ASN(s), {s} Subnetze geladen',
-    hint_multi: 'ASN, IP-/CIDR-Bereich (/8 bis /32) oder Domain - mehrere: mit Komma trennen', hint_optional: 'optional',
-    ph_asns: 'z. B. AS13335, 181.209.202.0/24, *.googlevideo.com', ph_ip: 'z. B. 192.168.1.50 oder 192.168.1.50,192.168.1.60', ph_domain: 'z. B. netflix.com', ph_diag: 'z. B. one.one.one.one',
+    hint_multi: 'ASN, IP-/CIDR-Bereich (/8 bis /32) oder Domain - mehrere: mit Komma trennen', hint_formats: '<b>ASN</b> <span class="asnm-ex">AS13335</span> oder <span class="asnm-ex">13335</span> &middot; <b>IP</b> <span class="asnm-ex">1.2.3.4</span> &middot; <b>Bereich</b> <span class="asnm-ex">181.209.202.0/24</span> (/8 bis /32) &middot; <b>Domain</b> <span class="asnm-ex">googlevideo.com</span> - gilt für alle Unterdomains, kein <span class="asnm-ex">*.</span> nötig &middot; mehrere: mit Komma oder Leerzeichen trennen', hint_optional: 'optional',
+    ph_asns: 'z. B. AS13335, 1.2.3.4, 181.209.202.0/24, googlevideo.com', ph_ip: 'z. B. 192.168.1.50 oder 192.168.1.50,192.168.1.60', ph_domain: 'z. B. netflix.com', ph_diag: 'z. B. one.one.one.one',
     working: 'Wird ausgeführt...', applying: 'Regeln werden angewendet - aus den gespeicherten Subnetzen, nur neue ASNs werden geladen...', reloading: 'Subnetze aller ASNs werden geladen - das kann einige Minuten dauern...', retrying: 'Neuaufbau aus dem Cache, nur fehlgeschlagene ASNs werden geladen...',
     progress: 'AS{asn} -> {dest}  ({d} von {t})', running_x: '{a} läuft...',
     timeout: 'Keine Antwort vom Router (Zeitüberschreitung). Prüfe, ob der service-event-Hook installiert ist.',
@@ -3273,7 +3276,7 @@ function initial() {
     <div class="asnm-sentence">
       <span class="asnm-sw" data-i18n="add_s1"></span>
       <input type="text" id="asnm_add_asns" maxlength="400" data-i18n-ph="ph_asns" autocomplete="off" oninput="asnmAddHint();" onkeydown="if (event.keyCode === 13) { asnmAdd(); return false; }"/>
-      <div class="asnm-s-help" data-i18n="hint_multi"></div>
+      <div class="asnm-s-help asnm-s-formats" data-i18n-html="hint_formats"></div>
       <span class="asnm-help asnm-s-dom" id="asnm_add_domnote" data-i18n="add_domnote" style="display:none;"></span>
       <span class="asnm-sw" data-i18n="add_s2"></span>
       <div class="asnm-s-row"><select id="asnm_add_dest"></select><span class="asnm-sw" data-i18n="add_s3"></span><div class="asnm-ms" id="asnm_add_ms"></div></div>

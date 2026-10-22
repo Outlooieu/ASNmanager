@@ -1,3 +1,7 @@
+## v3.7.3
+
+- "Enter ASNs": the help under the field lists every accepted form with an example - ASN (`AS13335` or `13335`), single IP (`1.2.3.4`), range (`181.209.202.0/24`, /8 to /32) and domain (`googlevideo.com` - covers every subdomain, no `*.` needed); several separated by commas or spaces
+
 ## v3.7.2
 
 - The DNS check now notices when AdGuard Home sends the lookups straight to another server (e.g. Unbound on 127.0.0.1:53535) instead of to dnsmasq, or shares them between both ("load balancing"). DNS works then, but dnsmasq sees only some lookups: domain entries learn only some addresses and the suggestions by domain stay empty. The status line shows a warning with the fix (upstream in AdGuard Home: 127.0.0.1:<dnsmasq port> - dnsmasq passes the lookups on to its own server); also in `ASNmanager.sh dns` and once in the system log
