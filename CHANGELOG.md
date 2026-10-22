@@ -1,3 +1,8 @@
+## v3.6.5
+
+- Fixed: since the ASN names were added, long names (e.g. "Deutsche Welle Anstalt des Oeffentlichen Rechts") made the first column of "Traffic per ASN / target" so wide that the numbers were pushed out of view on a phone. The name now sits on a second line under the ASN number and is cut with "..." when it is too long (the full name shows on hover)
+- ASN names are cleaned up further: a leading RIPE handle is dropped ("DPAG-AS DHL AG" -> "DHL AG", "AS12638 Telefonica ..." -> "Telefonica ...", "netcup-AS netcup GmbH" -> "netcup GmbH")
+
 ## v3.6.4
 
 - DNS / DHCP check: dnsmasq is found on any port, not only 53 and 553 (e.g. Pi-hole in front with dnsmasq on 5353 showed "dnsmasq is not running"). The real port is shown ("dnsmasq OK (port 5353, behind Pi-hole)")

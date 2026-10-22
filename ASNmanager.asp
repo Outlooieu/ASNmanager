@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.6.4 -->
+<!-- ASNmanager-WebUI v3.6.5 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -427,11 +427,12 @@
 #asnm_add_ms .asnm-ms-btn, #asnm_preset_ms .asnm-ms-btn { width: 165px; }
 #asnm_edit_ms .asnm-ms-btn { width: 200px; }
 .asnm-tr-dest { color: var(--muted); font-size: 11px; margin-left: 6px; }
+.asnm-tr-name { display: block; margin: 2px 0 0 26px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
 .asnm-tr-gone { color: var(--muted); font-size: 11px; margin-left: 6px; font-style: italic; }
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.6.4';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.6.5';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -1563,9 +1564,13 @@ function asnmTrRowLabel(r) {
             var e = ASNM.data.entries[i];
             if (e.asn === r.asn && e.kind) return asnmEntryCell(e);
         }
-    if (/^C\d+$/.test(r.asn)) return asnmEsc(r.asn);
+    return /^C\d+$/.test(r.asn) ? asnmEsc(r.asn) : 'AS' + asnmEsc(r.asn);
+}
+// second line of a stats row: the ASN name (cut with "..." so long names do not push the numbers out of view)
+function asnmTrNameLine(r) {
+    if (/^C\d+$/.test(r.asn)) return '';
     var nm = asnmNameOf(r.asn);
-    return 'AS' + asnmEsc(r.asn) + (nm ? ' <span class="asnm-asname">' + asnmEsc(nm) + '</span>' : '');
+    return nm ? '<span class="asnm-tr-name" title="' + asnmEsc(nm) + '">' + asnmEsc(nm) + '</span>' : '';
 }
 
 // holder as RIPE gives it ("DIGITALOCEAN-ASN - DigitalOcean, LLC") -> the readable part ("DigitalOcean, LLC")
@@ -1573,6 +1578,11 @@ function asnmAsName(n) {
     n = String(n || '');
     var k = n.indexOf(' - ');
     if (k > 0 && k < n.length - 3) n = n.slice(k + 3);
+    else {
+        // leading RIPE handle: "DPAG-AS DHL AG", "netcup-AS netcup GmbH", "NORIS-NETWORK noris network AG"
+        var m = /^(\S+)\s+(.{2,})$/.exec(n);
+        if (m && (/(^AS\d|-AS\d*$|^AS-|-ASN\d*$)/i.test(m[1]) || (/^[A-Z0-9][A-Z0-9_.-]*$/.test(m[1]) && /[a-z]/.test(m[2])))) n = m[2];
+    }
     return n.replace(/,\s*[A-Z]{2}$/, '').trim();
 }
 function asnmNameOf(asn) {
@@ -2297,7 +2307,7 @@ function asnmTrRender() {
         html += '<tr class="asnm-tr-row' + (open ? ' open' : '') + '" onclick="asnmTrExpand(\'' + asnmEsc(key) + '\')"><td><span class="asnm-tgl"></span>' +
                 asnmTrRowLabel(a) + '<span class="asnm-tr-dest">' + asnmEsc(asnmNormDest(a.dest)) + '</span>' +
                 (listed[asnmNormDest(a.dest) + '|' + a.asn] ? '' : '<span class="asnm-tr-gone">' + asnmEsc(t('tr_gone')) + '</span>') +
-                asnmDevCount(a.cl.length) + '</td>' + asnmTrCells(a.db, a.ub, a.up + a.dp, tAll, a.rd || 0, a.ru || 0) + '</tr>';
+                asnmDevCount(a.cl.length) + asnmTrNameLine(a) + '</td>' + asnmTrCells(a.db, a.ub, a.up + a.dp, tAll, a.rd || 0, a.ru || 0) + '</tr>';
         if (open) html += asnmTrClientRows(a.cl, { db: a.db, ub: a.ub, pk: a.up + a.dp, rd: a.rd || 0, ru: a.ru || 0 }, 1);
     }
     if (!asns.length && other.db + other.ub === 0)
