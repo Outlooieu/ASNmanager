@@ -1,3 +1,17 @@
+## v3.9.1
+
+- 76 more service presets (135 in total), three new categories:
+  - Streaming: Max / HBO Max, Apple TV+ / Apple Music, SoundCloud, Deezer, TIDAL, Audible, Pluto TV, Plex, Vimeo, Dailymotion, ProSieben / Sat.1 / Kabel Eins, Kick
+  - TV & media libraries: funk, ServusTV
+  - **News** (new): Spiegel, Zeit, FAZ, Süddeutsche, Welt, Bild, n-tv, t-online, heise / golem, BBC, CNN, New York Times
+  - Gaming: Rockstar, Activision / Call of Duty, Minecraft, Roblox, GOG, Bethesda, FACEIT, HoYoverse, Wargaming
+  - Social: LinkedIn, Pinterest, Bluesky, Tumblr, Threema; Threads added to Meta
+  - Tools & work: Microsoft 365 / Outlook, Slack, Notion, Dropbox, Webex, Gemini, Perplexity, DeepL, Canva, Figma, AnyDesk, TeamViewer, Proton
+  - Shopping: Zalando, Otto, AliExpress, Temu, Shein, Etsy, IKEA, Lidl, Booking.com, Klarna
+  - **Banks (DE)** (new): Sparkasse, ING, DKB, comdirect, Commerzbank, Deutsche Bank, Postbank, Consorsbank, N26, Trade Republic - banks often block VPN addresses, route them via WAN
+  - **Services (DE)** (new): ELSTER, Deutsche Bahn, DHL / Deutsche Post, Telekom
+  - Tests: browserleaks.com, ipleak.net, dnsleaktest.com
+
 ## v3.9.0
 
 - Service presets with **domains** and **categories**: 59 presets in 8 categories - Streaming (Netflix, YouTube, Disney+, Prime Video, Spotify, Twitch, DAZN, Paramount+, Crunchyroll, WOW / Sky, Joyn, RTL+, Zattoo, waipu.tv), TV & media libraries (ARD with the regional broadcasters, ZDF & 3sat, arte, Deutsche Welle, HbbTV, ORF, SRF), Gaming (Steam, Epic / Fortnite, PlayStation, Xbox Live, Nintendo, Riot, Blizzard, EA, Ubisoft, GeForce NOW, Discord), Social & messaging, Tools & work (Zoom, Teams, ChatGPT, Claude, GitHub, Apple), Shopping & payment, Cloud & CDN (whole networks, marked ⚠) and Tests (speed tests, IP check)

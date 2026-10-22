@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.0
+version=3.9.1
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.0"
+SCRIPT_VERSION="3.9.1"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -30,7 +30,7 @@ NC='\033[0m'
 # Entries are ASNs and / or domains (a domain covers every subdomain). The ASN holders were checked with RIPEstat
 # (as-overview) in 10/2026. "wide" = a large share of the internet goes through these networks (cloud, CDN, hosting) -
 # routing them moves far more than the one service, the menu and the page ask first.
-# Categories: stream, tvde, gaming, social, work, shop, cloud, test
+# Categories: stream, tvde, news, gaming, social, work, shop, bank, services, cloud, test
 PRESET_DATA='stream|Netflix|2906 40027 netflix.com nflxvideo.net nflximg.net nflxext.com nflxso.net|
 stream|YouTube|43515 36040 youtube.com googlevideo.com ytimg.com youtu.be youtube-nocookie.com ggpht.com|
 stream|Disney+|disneyplus.com disney-plus.net bamgrid.com dssott.com disneystreaming.com|
@@ -45,6 +45,18 @@ stream|Joyn|joyn.de|
 stream|RTL+|rtl.de|
 stream|Zattoo|zattoo.com|
 stream|waipu.tv|waipu.tv|
+stream|Max / HBO Max|max.com hbomax.com|
+stream|Apple TV+ / Apple Music|tv.apple.com music.apple.com|
+stream|SoundCloud|soundcloud.com sndcdn.com|
+stream|Deezer|deezer.com dzcdn.net|
+stream|TIDAL|tidal.com tidalhifi.com|
+stream|Audible|audible.de audible.com|
+stream|Pluto TV|pluto.tv|
+stream|Plex|plex.tv plex.direct|
+stream|Vimeo|vimeo.com vimeocdn.com|
+stream|Dailymotion|dailymotion.com dmcdn.net|
+stream|ProSieben / Sat.1 / Kabel Eins|prosieben.de sat1.de kabeleins.de sixx.de|
+stream|Kick|kick.com|
 tvde|ARD Mediathek & regional broadcasters|ard.de ardmediathek.de daserste.de tagesschau.de ardaudiothek.de br.de wdr.de ndr.de swr.de hr.de mdr.de rbb-online.de sr-online.de radiobremen.de kika.de phoenix.de deutschlandfunk.de wdrmedien-a.akamaihd.net wdradaptiv-vh.akamaihd.net mediandr-a.akamaihd.net hrardmediathek-a.akamaihd.net odmdr-a.akamaihd.net pdodswr-a.akamaihd.net rbbmediapmdp-a.akamaihd.net srstorage01-a.akamaihd.net pmdonlinekika-a.akamaihd.net|
 tvde|ZDF Mediathek & 3sat|zdf.de zdfmediathek.de heute.de 3sat.de tvdlzdf-a.akamaihd.net nrodlzdf-a.akamaihd.net rodlzdf-a.akamaihd.net ssl.zdf.de.edgekey.net|
 tvde|arte|arte.tv arte.de arteconcert-a.akamaihd.net arteptweb-a.akamaihd.net arte.gl-systemhaus.de|
@@ -52,6 +64,20 @@ tvde|Deutsche Welle|dw.com dw.de tvdownloaddw-a.akamaihd.net|
 tvde|HbbTV (ARD / ZDF red button)|hbbtv.zdf.de itv.ard.de cdn.hbbtvlive.de|
 tvde|ORF (Austria)|orf.at|
 tvde|SRF / SRG (Switzerland)|srf.ch srgssr.ch hdvodsrforigin-f.akamaihd.net srfvodhd-vh.akamaihd.net|
+tvde|funk|funk.net|
+tvde|ServusTV|servustv.com|
+news|Spiegel|spiegel.de|
+news|Zeit|zeit.de|
+news|FAZ|faz.net|
+news|Süddeutsche|sueddeutsche.de|
+news|Welt|welt.de|
+news|Bild|bild.de bildstatic.de|
+news|n-tv|n-tv.de|
+news|t-online|t-online.de|
+news|heise / golem|heise.de golem.de|
+news|BBC|bbc.co.uk bbc.com bbci.co.uk|
+news|CNN|cnn.com|
+news|New York Times|nytimes.com nyt.com|
 gaming|Steam / Valve|32590 steampowered.com steamcommunity.com steamstatic.com steamcontent.com steamserver.net|
 gaming|Epic Games / Fortnite|4356 epicgames.com epicgames.dev unrealengine.com fortnite.com|
 gaming|PlayStation Network|33353 playstation.com playstation.net sonyentertainmentnetwork.com|
@@ -63,7 +89,16 @@ gaming|EA / Electronic Arts|33572 ea.com|
 gaming|Ubisoft|8361 22634 28759 ubisoft.com ubi.com|
 gaming|NVIDIA GeForce NOW|11414 20347 60977 geforcenow.com nvidia.com|
 gaming|Discord|discord.com discord.gg discordapp.com discordapp.net discord.media|
-social|Meta / Facebook / Instagram / WhatsApp|32934 63293 54115 149642 facebook.com fbcdn.net instagram.com cdninstagram.com whatsapp.com whatsapp.net|
+gaming|Rockstar Games|rockstargames.com|
+gaming|Activision / Call of Duty|activision.com callofduty.com|
+gaming|Minecraft / Mojang|minecraft.net mojang.com|
+gaming|Roblox|roblox.com rbxcdn.com|
+gaming|GOG|gog.com|
+gaming|Bethesda|bethesda.net|
+gaming|FACEIT|faceit.com|
+gaming|HoYoverse (Genshin)|hoyoverse.com mihoyo.com|
+gaming|Wargaming (World of Tanks)|wargaming.net|
+social|Meta / Facebook / Instagram / WhatsApp|32934 63293 54115 149642 facebook.com fbcdn.net instagram.com cdninstagram.com whatsapp.com whatsapp.net threads.net|
 social|TikTok|138699 396986 tiktok.com tiktokcdn.com tiktokv.com|
 social|Telegram|62041 59930 44907 211157 telegram.org t.me|
 social|X / Twitter|x.com twitter.com twimg.com|
@@ -71,15 +106,57 @@ social|Snapchat|snapchat.com sc-cdn.net|
 social|Reddit|reddit.com redd.it redditmedia.com redditstatic.com|
 social|Signal|signal.org|
 social|Tinder|tinder.com gotinder.com|
+social|LinkedIn|linkedin.com licdn.com|
+social|Pinterest|pinterest.com pinimg.com|
+social|Bluesky|bsky.app bsky.social|
+social|Tumblr|tumblr.com|
+social|Threema|threema.ch|
 work|Zoom|30103 zoom.us zoom.com|
 work|Microsoft Teams|teams.microsoft.com teams.live.com|
 work|OpenAI / ChatGPT|401864 openai.com chatgpt.com oaiusercontent.com|
 work|Claude / Anthropic|claude.ai anthropic.com|
 work|GitHub|36459 github.com githubusercontent.com github.io githubassets.com|
 work|Apple / iCloud|714 6185 2709 1042|
+work|Microsoft 365 / Outlook|office.com office.net office365.com microsoftonline.com sharepoint.com onedrive.com outlook.com|
+work|Slack|slack.com slack-edge.com|
+work|Notion|notion.so notion.com|
+work|Dropbox|dropbox.com dropboxusercontent.com dropboxstatic.com|
+work|Webex|webex.com|
+work|Google Gemini|gemini.google.com|
+work|Perplexity|perplexity.ai|
+work|DeepL|deepl.com|
+work|Canva|canva.com|
+work|Figma|figma.com|
+work|AnyDesk|anydesk.com|
+work|TeamViewer|teamviewer.com|
+work|Proton (Mail, VPN, Drive)|proton.me protonmail.com|
 shop|Amazon shop|amazon.de amazon.com media-amazon.com ssl-images-amazon.com|
 shop|eBay|ebay.de ebay.com ebaystatic.com ebayimg.com|
 shop|PayPal|paypal.com paypalobjects.com|
+shop|Zalando|zalando.de ztat.net|
+shop|Otto|otto.de|
+shop|AliExpress|aliexpress.com alicdn.com|
+shop|Temu|temu.com kwcdn.com|
+shop|Shein|shein.com ltwebstatic.com|
+shop|Etsy|etsy.com etsystatic.com|
+shop|IKEA|ikea.com|
+shop|Lidl|lidl.de lidl.com|
+shop|Booking.com|booking.com bstatic.com|
+shop|Klarna|klarna.com|
+bank|Sparkasse|sparkasse.de starfinanz.de|
+bank|ING|ing.de|
+bank|DKB|dkb.de|
+bank|comdirect|comdirect.de|
+bank|Commerzbank|commerzbank.de|
+bank|Deutsche Bank|deutsche-bank.de db.com|
+bank|Postbank|postbank.de|
+bank|Consorsbank|consorsbank.de|
+bank|N26|n26.com|
+bank|Trade Republic|traderepublic.com|
+services|ELSTER (tax office)|elster.de|
+services|Deutsche Bahn|bahn.de|
+services|DHL / Deutsche Post|dhl.de dhl.com deutschepost.de|
+services|Telekom|telekom.de|
 cloud|Amazon AWS|16509 14618 7224 8987 38895|wide
 cloud|Google (all networks)|15169 19527 22859 26910 36039 36384 36492 41264 139070 396982 16550|wide
 cloud|Microsoft / Azure|8075 8068 8069 8070 8071 8072 8073 8074 3598 6584|wide
@@ -89,13 +166,13 @@ cloud|Fastly CDN|54113|wide
 cloud|Hetzner & OVH|24940 16276|wide
 cloud|DigitalOcean & Linode|14061 46652 63949|wide
 cloud|Oracle Cloud|31898|wide
-test|Speed tests & IP check|speedtest.net ookla.com fast.com whatismyip.com wieistmeineip.de ipify.org|'
+test|Speed tests & IP check|speedtest.net ookla.com fast.com whatismyip.com wieistmeineip.de ipify.org browserleaks.com ipleak.net dnsleaktest.com|'
 PRESET_COUNT=$(echo "$PRESET_DATA" | grep -c .)
 
 print_presets() {
     # grouped by category, numbered in the order of PRESET_DATA (the number is what "preset <n>" takes)
     echo "$PRESET_DATA" | awk -F'|' '
-        BEGIN { split("stream:Streaming,tvde:TV & media libraries (DE / AT / CH),gaming:Gaming,social:Social & messaging,work:Tools & work,shop:Shopping & payment,cloud:Cloud & CDN (whole networks),test:Tests & IP check", c, ","); for (i in c) { split(c[i], kv, ":"); lbl[kv[1]] = kv[2] } }
+        BEGIN { split("stream:Streaming,tvde:TV & media libraries (DE / AT / CH),news:News,gaming:Gaming,social:Social & messaging,work:Tools & work,shop:Shopping & payment,bank:Banks (DE),services:Services (DE),cloud:Cloud & CDN (whole networks),test:Tests & IP check", c, ","); for (i in c) { split(c[i], kv, ":"); lbl[kv[1]] = kv[2] } }
         {
             if ($1 != last) { printf "%s -- %s --\n", (NR > 1 ? "\n" : ""), ($1 in lbl ? lbl[$1] : $1); last = $1 }
             n = split($3, e, " "); na = 0; nd = 0; for (i = 1; i <= n; i++) if (e[i] ~ /^[0-9]+$/) na++; else nd++

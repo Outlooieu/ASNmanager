@@ -9,7 +9,7 @@ ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to eas
  /_\ / __| \| | |  \/  | /_\ | \| | /_\ / __| __|| _ \
 / _ \__ \ .' | | |\/| |/ _ \| .' |/ _ \ (_ | _| |   /
 /_/ \_\___/_|\_| |_|  |_/_/ \_\_|\_/_/ \_\___|___||_|_\
-              === ASN MANAGER v3.9.0 ===
+              === ASN MANAGER v3.9.1 ===
 ================================================================
  ASNs
  [1]  Show ASN list & routing targets
@@ -84,7 +84,7 @@ Here is a short guide for each menu option of the ASN Manager:
 
 [3] Find ASN for domain / IP: Resolves a domain or IP address, identifies its ASN and lets you add it to or remove it from the list.
 
-[4] Add service presets: 59 predefined services in 8 categories - streaming, TV & media libraries (ARD, ZDF, arte, DW, ORF, SRF ...), gaming, social & messaging, tools & work, shopping & payment, cloud & CDN, tests - with their ASNs and / or domains (a domain covers every subdomain), added to an interface in one go. In the WebUI you pick the category first, then the service; below it shows every ASN and domain of the preset and marks those that are already on your list. The ASNs are checked against their holders (RIPEstat). Presets marked (!) / ⚠ are cloud, CDN or hosting networks that carry a large share of the internet - the menu and the page ask first.
+[4] Add service presets: 135 predefined services in 11 categories - streaming, TV & media libraries (ARD, ZDF, arte, DW, ORF, SRF ...), news, gaming, social & messaging, tools & work, shopping & payment, banks (DE), services (DE), cloud & CDN, tests - with their ASNs and / or domains (a domain covers every subdomain), added to an interface in one go. In the WebUI you pick the category first, then the service; below it shows every ASN and domain of the preset and marks those that are already on your list. The ASNs are checked against their holders (RIPEstat). Presets marked (!) / ⚠ are cloud, CDN or hosting networks that carry a large share of the internet - the menu and the page ask first.
 
 [5] Edit ASN: Change the target interface and the source devices of an entry that is already on the list.
 
