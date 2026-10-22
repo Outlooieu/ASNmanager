@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.7.7
+version=3.7.8
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.7.7"
+SCRIPT_VERSION="3.7.8"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -612,7 +612,7 @@ cu_hook_sync() {
 }
 
 cu_apply_dom() {
-    : > "$CU_GROUPS.raw"; : > /tmp/asnmanager-dnsmasq.lines; cad_new=""; cad_fresh=""
+    : > "$CU_GROUPS.raw"; : > /tmp/asnmanager-dnsmasq.lines; : > /tmp/asnmanager-seed.ent; cad_new=""; cad_fresh=""
     if [ -s "$CUSTOM_FILE" ]; then
         while IFS=: read -r cid cdest csrc ckind cval; do
             [ "$ckind" = "dom" ] || continue
@@ -623,6 +623,7 @@ cu_apply_dom() {
             # one line per domain: the group set routes, the entry's own set counts what was learned for this domain
             [ "$(cu_set_make "ASNC_$cid")" = "new" ] && { cad_new=force; cad_fresh="$cad_fresh ASNC_$cid"; }
             echo "ipset=/$cval/$cad_set,ASNC_$cid" >> /tmp/asnmanager-dnsmasq.lines
+            printf '%s\t%s\t%s\n' "$cid" "$cad_set" "$cval" >> /tmp/asnmanager-seed.ent
         done < "$CUSTOM_FILE"
     fi
     awk -F'\t' '{ if ($1 in l) l[$1] = l[$1] " " $3; else { l[$1] = $3; s[$1] = $2 } } END { for (k in l) printf "%s\t%s\t%s\n", k, s[k], l[k] }' "$CU_GROUPS.raw" > "$CU_GROUPS.new"
@@ -639,10 +640,29 @@ cu_apply_dom() {
         if cu_usable "$cad_t"; then cu_route "$cad_t"; cu_rules_add "$cad_set" "$cad_t" "$cad_src"; fi
     done < "$CU_GROUPS"
     cu_learned_restore $cad_fresh
+    cu_seed_known /tmp/asnmanager-seed.ent; rm -f /tmp/asnmanager-seed.ent
     cu_dnsmasq_write /tmp/asnmanager-dnsmasq.lines "$cad_new"
     rm -f /tmp/asnmanager-dnsmasq.lines
     cu_cset_cleanup
     cu_hook_sync "$(cut -f2 "$CU_GROUPS" 2>/dev/null)"
+}
+
+# A device asked for the name before the entry existed: its answer is cached on the device (and in AdGuard Home),
+# so dnsmasq sees no new lookup for a while and the entry learns nothing. The suggestions by domain already know
+# which addresses were looked up under which name (last 2 days): those go into the sets right away.
+cu_seed_known() {         # file "id <TAB> group set <TAB> domain"
+    [ -s "$1" ] && [ -s "$TS_RT/sg_dns.txt" ] || return 0
+    awk -F'\t' 'FILENAME == ARGV[1] { id[++n] = $1; gs[n] = $2; dm[n] = $3; next }
+        {
+            m = split($2, nm, ",")
+            for (j = 1; j <= m; j++) for (i = 1; i <= n; i++) {
+                d = dm[i]; x = nm[j]
+                if (x == d || (length(x) > length(d) && substr(x, length(x) - length(d)) == "." d)) {
+                    if (!((i "|" $1) in done)) { done[i "|" $1] = 1; print "ASNC_" id[i], $1; print gs[i], $1 }
+                }
+            }
+        }' "$1" "$TS_RT/sg_dns.txt" 2>/dev/null | sort -u | while read -r cs_set cs_ip; do ipset -q add -exist "$cs_set" "$cs_ip"; done
+    return 0
 }
 
 # per-entry sets of entries that no longer exist (a set the statistics still use is removed by its next sync)

@@ -1,3 +1,7 @@
+## v3.7.8
+
+- A domain entry learns at once: a device that looked the name up before the entry existed keeps the answer in its cache, so dnsmasq saw no new lookup and the entry stayed at "nothing learned" (and the routing check warned) until the cache ran out. When the suggestions by domain are on, the addresses already looked up under the domain (last 2 days) now go into its sets when the rules are applied - e.g. right after "Add" in the domain suggestions
+
 ## v3.7.7
 
 - DNS check: the Merlin AdGuard Home installer copies the domain lines of dnsmasq into its own `ipset_file`, so AdGuard Home fills the sets of the domain entries itself - also when it asks Unbound directly. In that case there is no warning any more (the status line says "AdGuard Home fills the domain sets itself"); "Check DNS chain" notes that the suggestions by domain then miss names, and that every change of a domain entry restarts AdGuard Home (DNS pauses for up to a minute)
