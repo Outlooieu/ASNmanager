@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.2
+version=3.9.3
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.2"
+SCRIPT_VERSION="3.9.3"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -28,7 +28,7 @@ NC='\033[0m'
 
 # Service presets: one line per preset -> "category|Name|entries|wide" (single source for menu + WebUI)
 # Entries are ASNs and / or domains (a domain covers every subdomain). The ASN holders were checked with RIPEstat
-# (as-overview) in 10/2026. "wide" = a large share of the internet goes through these networks (cloud, CDN, hosting) -
+# (as-overview) in 10/2026; ASNs that announce no prefixes (ipverse removes them after 90 days) are left out. "wide" = a large share of the internet goes through these networks (cloud, CDN, hosting) -
 # routing them moves far more than the one service, the menu and the page ask first.
 # Categories: stream, tvde, news, gaming, social, work, shop, bank, services, cloud, test
 PRESET_DATA='stream|Netflix|2906 40027 netflix.com nflxvideo.net nflximg.net nflxext.com nflxso.net|
@@ -36,7 +36,7 @@ stream|YouTube|43515 36040 youtube.com googlevideo.com ytimg.com youtu.be youtub
 stream|Disney+|disneyplus.com disney-plus.net bamgrid.com dssott.com disneystreaming.com|
 stream|Amazon Prime Video|primevideo.com aiv-cdn.net aiv-delivery.net amazonvideo.com pv-cdn.net|
 stream|Spotify|spotify.com scdn.co spotifycdn.com spotifycdn.net|
-stream|Twitch|46489 397153 twitch.tv ttvnw.net jtvnw.net|
+stream|Twitch|twitch.tv ttvnw.net jtvnw.net|
 stream|DAZN|dazn.com indazn.com dazn-api.com|
 stream|Paramount+|paramountplus.com|
 stream|Crunchyroll|crunchyroll.com|
@@ -75,10 +75,10 @@ gaming|PlayStation Network|33353 playstation.com playstation.net sonyentertainme
 gaming|Xbox Live|xbox.com xboxlive.com|
 gaming|Nintendo|11278 nintendo.com nintendo.net nintendo.de|
 gaming|Riot Games / LoL / Valorant|6507 62830 riotgames.com leagueoflegends.com|
-gaming|Blizzard / Battle.net|57976 32163 blizzard.com battle.net|
+gaming|Blizzard / Battle.net|57976 blizzard.com battle.net|
 gaming|EA / Electronic Arts|33572 ea.com|
-gaming|Ubisoft|8361 22634 28759 ubisoft.com ubi.com|
-gaming|NVIDIA GeForce NOW|11414 20347 60977 geforcenow.com nvidia.com|
+gaming|Ubisoft|ubisoft.com ubi.com|
+gaming|NVIDIA GeForce NOW|11414 20347 geforcenow.com nvidia.com|
 gaming|Discord|discord.com discord.gg discordapp.com discordapp.net discord.media|
 gaming|Rockstar Games|rockstargames.com|
 gaming|Activision / Call of Duty|activision.com callofduty.com|
@@ -89,7 +89,7 @@ gaming|Bethesda|bethesda.net|
 gaming|FACEIT|faceit.com|
 gaming|HoYoverse (Genshin)|hoyoverse.com mihoyo.com|
 gaming|Wargaming (World of Tanks)|wargaming.net|
-social|Meta / Facebook / Instagram / WhatsApp|32934 63293 54115 149642 facebook.com fbcdn.net instagram.com cdninstagram.com whatsapp.com whatsapp.net threads.net|
+social|Meta / Facebook / Instagram / WhatsApp|32934 63293 54115 facebook.com fbcdn.net instagram.com cdninstagram.com whatsapp.com whatsapp.net threads.net|
 social|TikTok|138699 396986 tiktok.com tiktokcdn.com tiktokv.com|
 social|Telegram|62041 59930 44907 211157 telegram.org t.me|
 social|X / Twitter|x.com twitter.com twimg.com|
@@ -104,10 +104,10 @@ social|Tumblr|tumblr.com|
 social|Threema|threema.ch|
 work|Zoom|30103 zoom.us zoom.com|
 work|Microsoft Teams|teams.microsoft.com teams.live.com|
-work|OpenAI / ChatGPT|401864 openai.com chatgpt.com oaiusercontent.com|
+work|OpenAI / ChatGPT|openai.com chatgpt.com oaiusercontent.com|
 work|Claude / Anthropic|claude.ai anthropic.com|
 work|GitHub|36459 github.com githubusercontent.com github.io githubassets.com|
-work|Apple / iCloud|714 6185 2709 1042|
+work|Apple / iCloud|714 6185|
 work|Microsoft 365 / Outlook|office.com office.net office365.com microsoftonline.com sharepoint.com onedrive.com outlook.com|
 work|Slack|slack.com slack-edge.com|
 work|Notion|notion.so notion.com|
@@ -132,9 +132,9 @@ shop|Etsy|etsy.com etsystatic.com|
 shop|IKEA|ikea.com|
 shop|Booking.com|booking.com bstatic.com|
 shop|Klarna|klarna.com|
-cloud|Amazon AWS|16509 14618 7224 8987 38895|wide
-cloud|Google (all networks)|15169 19527 22859 26910 36039 36384 36492 41264 139070 396982 16550|wide
-cloud|Microsoft / Azure|8075 8068 8069 8070 8071 8072 8073 8074 3598 6584|wide
+cloud|Amazon AWS|16509 14618 7224 8987|wide
+cloud|Google (all networks)|15169 19527 36384 36492 41264 139070 396982 16550|wide
+cloud|Microsoft / Azure|8075 8068 8069 8070 3598|wide
 cloud|Cloudflare|13335 209242|wide
 cloud|Akamai CDN|20940 16625|wide
 cloud|Fastly CDN|54113|wide
