@@ -1,3 +1,8 @@
+## v3.8.7
+
+- Fixed: the main source of the ASN subnets did not answer any more (404) - the ipverse repository was renamed in January 2026 (`asn-ip` -> `as-ip-blocks`) and the files are called `ipv4-aggregated.txt` now. Since then every ASN was loaded from the slower fallbacks (RIPEstat, HackerTarget). The new address is used now
+- Removed the fallback api.bgpview.io - the service does not exist any more
+
 ## v3.8.6
 
 - Service presets corrected: every ASN was checked against its holder in RIPEstat. Wrong ones are gone (e.g. Microsoft in "Google Services", Vultr in "Telegram", Alibaba in "Spotify", foreign networks in PlayStation, Nintendo, Zoom, OpenAI, NVIDIA, EA, Ubisoft, Epic, GitHub, Microsoft) and the right ones added (Sony Interactive 33353, Nintendo 11278, Zoom 30103, OpenAI 401864, NVIDIA 11414 / 20347 / 60977, Ubisoft 8361 / 22634 / 28759, Apple 6185 / 2709 / 1042, more Google, Microsoft, Amazon, Meta, Twitch, Riot, Blizzard and DigitalOcean networks)
