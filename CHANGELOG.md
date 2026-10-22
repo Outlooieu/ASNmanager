@@ -1,3 +1,7 @@
+## v3.7.6
+
+- The DNS check no longer reports "dnsmasq is not running" when it happens to look while dnsmasq is being restarted (by "Apply rules", another add-on or the router): a problem is checked once more 8 seconds later and only reported if it is still there
+
 ## v3.7.5
 
 - Fixed: the traffic numbers were saved on the USB device only one hour after the counting loop started - an update, a repair or turning the statistics on starts the loop again, so on a day with several updates nothing was saved ("last change: never"). The first save now happens 5 minutes after the start, then every hour as before

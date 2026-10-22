@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.7.5
+version=3.7.6
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.7.5"
+SCRIPT_VERSION="3.7.6"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -969,6 +969,9 @@ dns_health() {
 # writes dns.js for the WebUI; a change between ok and a problem goes to the syslog (once)
 dns_export() {
     set -- $(dns_health)
+    # a problem is checked once more a few seconds later: dnsmasq is restarted now and then (apply, other add-ons) and is
+    # gone for a moment - that must not show up as "dnsmasq is not running"
+    if [ "$1" = "bad" ]; then sleep 8; set -- $(dns_health); fi
     de_prev=$(cat "$DNS_STATE" 2>/dev/null)
     if [ "$2" != "$de_prev" ]; then
         echo "$2" > "$DNS_STATE"
