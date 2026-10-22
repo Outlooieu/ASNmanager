@@ -1,3 +1,7 @@
+## v3.5.3
+
+- ASN list: a note is shown as "Note: ..." so it can not be mistaken for a name
+
 ## v3.5.2
 
 - "Add ASNs, IPs or domains" has a field for a note: it is saved with the entries right away (with several entries in one go, under each of them). Command line: `add WGC3 '*.zdf.de' --src 192.168.5.41 --note "ZDF Mediathek"`

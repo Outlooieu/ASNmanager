@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.5.2 -->
+<!-- ASNmanager-WebUI v3.5.3 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -111,6 +111,7 @@
 .asnm-stat-value { font-size: 20px; font-weight: 700; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .asnm-asname { color: var(--text2); font-weight: 500; margin-left: 4px; }
 .asnm-note { margin-top: 3px; font-size: 11px; color: var(--muted); font-style: italic; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asnm-note-lbl { font-style: normal; font-weight: 600; }
 .asnm-note-in { margin-top: 6px; width: 200px; }
 .asnm-btn.asnm-danger-text { color: var(--bad) !important; }
 .asnm-stat-sub { display: block; margin-top: 2px; font-size: 11px; font-weight: 600; color: var(--muted); white-space: normal; }
@@ -405,7 +406,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.5.2';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.5.3';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -1547,7 +1548,7 @@ function asnmNameOf(asn) {
     for (var i = 0; i < en.length; i++) if (en[i].asn === String(asn) && en[i].name) return asnmAsName(en[i].name);
     return '';
 }
-function asnmNoteHtml(e) { return e.note ? '<div class="asnm-note">' + asnmEsc(e.note) + '</div>' : ''; }
+function asnmNoteHtml(e) { return e.note ? '<div class="asnm-note"><span class="asnm-note-lbl">' + asnmEsc(t('note_lbl')) + ':</span> ' + asnmEsc(e.note) + '</div>' : ''; }
 
 function asnmEntryCell(e) {
     if (e.kind === 'ip') return '<span class="asnm-kind">' + asnmEsc(t('kind_ip')) + '</span> ' + asnmEsc(e.value);
