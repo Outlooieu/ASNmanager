@@ -1,3 +1,7 @@
+## v3.8.5
+
+- The status data is loaded automatically when the page opens: if the data file of the router is older than 2 minutes, the page asks the router to write it again right away (interfaces online, subnets, devices, last apply ...) - no need to click "Reload data" first (suggested by AvalonOC)
+
 ## v3.8.4
 
 - The status line under the buttons no longer shows the last output line of a diagnostic tool (e.g. "[INFO] suggestions by domain: on ..." after "Check DNS chain"). For the tools of the Diagnostics tab and the look-up it now says "<tool>: done - see the result below" or "... failed"; the full output is in the output box as before

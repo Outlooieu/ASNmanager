@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.8.4 -->
+<!-- ASNmanager-WebUI v3.8.5 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -456,7 +456,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.8.4';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.8.5';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -931,6 +931,10 @@ function asnmLoadData(first) {
             return 0;
         });
         asnmRender();
+        // the data file is written when something changes - when the page opens and it is older than 2 minutes, the router
+        // writes it again (interfaces online, subnets, devices ...), so nobody has to click "Reload data" first
+        if (first && ASNM.data.generated && Date.now() / 1000 - ASNM.data.generated > 120)
+            setTimeout(function () { if (!ASNM.busy) asnmSend('refresh', []); }, 1500);
     }, function () {
         if (first) asnmSend('refresh', []);
         else asnmSetStatus(t('no_data'), true);
