@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.7.3 -->
+<!-- ASNmanager-WebUI v3.7.4 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -347,6 +347,9 @@
 .asnm-ex { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; padding: 1px 5px; border-radius: 5px;
     background: var(--card2); border: 1px solid var(--line); color: var(--text); white-space: nowrap; }
 .asnm-s-formats { line-height: 1.9; }
+.asnm-dp-text { font-size: 12px; color: var(--text2); line-height: 1.55; margin: 0 0 12px; max-width: 760px; }
+.asnm-dp-row { align-items: center; gap: 12px; }
+#asnm .asnm-diag-dev { width: 260px; }
 .asnm-sg-x { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin-left: 4px; padding: 0;
     vertical-align: middle; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
 .asnm-sg-x:hover { color: var(--text); border-color: var(--muted); }
@@ -450,7 +453,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.7.3';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.7.4';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -567,6 +570,14 @@ var ASNM_I18N = {
     ifaces_title: 'Target interfaces', schedule_title: 'Auto-refresh schedule', refresh_every: 'Refresh every', days: 'day(s)', days_range: '(1-30)',
     at_time: 'At time', time_fmt: '(HH:MM, 24h)', btn_save_schedule: 'Save schedule',
     diag_title: 'Diagnostics', btn_test: 'Test route', btn_trace: 'Traceroute', router_checks: 'Router checks',
+    btn_explain: 'Explain', explain_help: 'Explain: what DNS answers, which entries contain each address, which rule wins (for the device chosen below) and which interface the traffic leaves through.',
+    diag_dev: 'Device', diag_dev_any: '- any device -', btn_device: 'Check device', a_dev: 'Please choose a device.',
+    diag_dev_help: 'Check device: the rules for this device, its normal way (VPN Director) and its current connections with name, traffic, rule and interface.',
+    btn_dnschain: 'Check DNS chain', act_explain: 'Explain', act_device: 'Check device', act_dnschain: 'DNS chain', act_diagpack: 'Diagnostic bundle',
+    dp_title: 'Diagnostic bundle', dp_sub: 'Everything needed to analyse a problem, in one text file',
+    dp_text: 'Collects version, entries, settings, DNS chain, routing check, ip rules, routing tables, marking rules, set sizes, VPN Director and the last messages of ASN Manager in the system log. Public IP addresses, VPN servers, MAC addresses and keys are masked - please look over the file before you share it. To report a problem: download it and attach it to a new issue on GitHub (drag it into the text field).',
+    btn_dp: 'Create bundle', dp_download: 'Download', dp_github: 'Report on GitHub',
+    dp_issue_title: 'Problem: ', dp_issue_body: 'ASN Manager v{v}\n\nWhat does not work / what did you expect?\n\n\nPlease attach the diagnostic bundle ({f}) here: drag the file into this text field.',
     btn_ipset: 'ipset status', btn_pubip: 'Public IPs', output_default: 'Output of apply, tests and checks appears here.',
     backup_title: 'Backup & restore', backup_export: 'Export', backup_export_desc: 'Download the list (ASNs, IP ranges, domains, notes), schedule, failover chains and settings as .conf file',
     btn_export: 'Download backup', backup_import: 'Import', backup_import_desc: 'You choose what is restored. Compatible with backups from the terminal menu',
@@ -705,6 +716,14 @@ var ASNM_I18N = {
     ifaces_title: 'Ziel-Interfaces', schedule_title: 'Zeitplan für Aktualisierung', refresh_every: 'Aktualisieren alle', days: 'Tag(e)', days_range: '(1-30)',
     at_time: 'Um', time_fmt: '(HH:MM, 24h)', btn_save_schedule: 'Zeitplan speichern',
     diag_title: 'Diagnose', btn_test: 'Route testen', btn_trace: 'Traceroute', router_checks: 'Router-Prüfungen',
+    btn_explain: 'Erklären', explain_help: 'Erklären: was DNS antwortet, welche Einträge jede Adresse enthalten, welche Regel gewinnt (für das unten gewählte Gerät) und über welches Interface der Verkehr hinausgeht.',
+    diag_dev: 'Gerät', diag_dev_any: '- beliebiges Gerät -', btn_device: 'Gerät prüfen', a_dev: 'Bitte ein Gerät wählen.',
+    diag_dev_help: 'Gerät prüfen: die Regeln für dieses Gerät, sein normaler Weg (VPN Director) und seine aktuellen Verbindungen mit Name, Traffic, Regel und Interface.',
+    btn_dnschain: 'DNS-Kette prüfen', act_explain: 'Erklären', act_device: 'Gerät prüfen', act_dnschain: 'DNS-Kette', act_diagpack: 'Diagnose-Paket',
+    dp_title: 'Diagnose-Paket', dp_sub: 'Alles zur Analyse eines Problems in einer Textdatei',
+    dp_text: 'Sammelt Version, Einträge, Einstellungen, DNS-Kette, Routing-Prüfung, ip rules, Routing-Tabellen, Markierungsregeln, Set-Größen, VPN Director und die letzten Meldungen von ASN Manager im Systemprotokoll. Öffentliche IP-Adressen, VPN-Server, MAC-Adressen und Schlüssel werden unkenntlich gemacht - bitte die Datei vor dem Weitergeben ansehen. Um ein Problem zu melden: herunterladen und an ein neues Issue auf GitHub anhängen (Datei in das Textfeld ziehen).',
+    btn_dp: 'Paket erstellen', dp_download: 'Herunterladen', dp_github: 'Auf GitHub melden',
+    dp_issue_title: 'Problem: ', dp_issue_body: 'ASN Manager v{v}\n\nWas funktioniert nicht / was hast du erwartet?\n\n\nBitte hier das Diagnose-Paket ({f}) anhängen: die Datei in dieses Textfeld ziehen.',
     btn_ipset: 'ipset-Status', btn_pubip: 'Öffentliche IPs', output_default: 'Hier erscheint die Ausgabe von Anwenden, Tests und Prüfungen.',
     backup_title: 'Sicherung & Wiederherstellung', backup_export: 'Export', backup_export_desc: 'Liste (ASNs, IP-Bereiche, Domains, Notizen), Zeitplan, Failover-Ketten und Einstellungen als .conf-Datei herunterladen',
     btn_export: 'Sicherung herunterladen', backup_import: 'Import', backup_import_desc: 'Du wählst, was wiederhergestellt wird. Kompatibel mit Sicherungen aus dem Terminal-Menü',
@@ -1444,7 +1463,7 @@ function asnmJobDone(job) {
     asnmHideProgress();
     asnmSetStatus(asnmTrMsg(job.msg) || (ok ? t('done') : t('failed')), !ok);
 
-    if (['apply', 'reload', 'retry', 'test', 'trace', 'lookup', 'ifaces', 'status'].indexOf(job.action) >= 0) {
+    if (['apply', 'reload', 'retry', 'test', 'trace', 'lookup', 'ifaces', 'status', 'explain', 'device', 'dnschain', 'diagpack'].indexOf(job.action) >= 0) {
         asnmGet('output.htm', function (txt) { document.getElementById('asnm_output').textContent = txt || t('no_output'); });
     }
     if (job.action === 'lookup') {
@@ -1461,6 +1480,7 @@ function asnmJobDone(job) {
     }
     if (job.action === 'statssave') asnmTrLoad();
     if (job.action === 'sghide') asnmSgLoad();
+    if (job.action === 'diagpack' && ok) asnmDiagPackReady();
     asnmRcLoad(false);                                                                                                // "apply" runs a routing check
     asnmFoLoad();
 
@@ -1706,6 +1726,39 @@ function asnmTool(action, fieldId) {
     if (fieldId && !ASNM.reHost.test(v)) { alert(t('a_host')); return; }
     document.getElementById('asnm_output').textContent = t('running_x', { a: action });
     asnmSend(action, fieldId ? [v] : []);
+}
+
+// diagnostics: explain a destination (optionally for the chosen device), check a device, diagnostic bundle
+function asnmExplain() {
+    var v = document.getElementById('asnm_diag').value.trim().replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
+    if (!ASNM.reHost.test(v)) { alert(t('a_host')); return; }
+    document.getElementById('asnm_output').textContent = t('running_x', { a: t('btn_explain') });
+    asnmSend('explain', [v, document.getElementById('asnm_diag_dev').value]);
+}
+function asnmDevCheck() {
+    var ip = document.getElementById('asnm_diag_dev').value;
+    if (!ip) { alert(t('a_dev')); return; }
+    document.getElementById('asnm_output').textContent = t('running_x', { a: t('btn_device') });
+    asnmSend('device', [ip]);
+}
+function asnmDiagDevFill() {
+    var sel = document.getElementById('asnm_diag_dev');
+    if (!sel) return;
+    var cur = sel.value, devs = (ASNM.data && ASNM.data.devices) || [], h = '<option value="">' + asnmEsc(t('diag_dev_any')) + '</option>';
+    for (var i = 0; i < devs.length; i++) {
+        var n = asnmDevLabel(devs[i]);
+        h += '<option value="' + asnmEsc(devs[i].ip) + '"' + (devs[i].ip === cur ? ' selected="selected"' : '') + '>' + asnmEsc((n ? n + ' - ' : '') + devs[i].ip) + '</option>';
+    }
+    sel.innerHTML = h;
+}
+function asnmDiagPackReady() {
+    var d = new Date(), z = function (x) { return (x < 10 ? '0' : '') + x; };
+    var name = 'asnmanager-diag-' + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes()) + '.txt';
+    var dl = document.getElementById('asnm_dp_dl');
+    dl.href = ASNM.web + 'diag.txt?_=' + Date.now(); dl.setAttribute('download', name);
+    var body = t('dp_issue_body', { f: name, v: ASNM_PAGE_VER });
+    document.getElementById('asnm_dp_gh').href = 'https://github.com/Outlooieu/ASNmanager/issues/new?title=' + encodeURIComponent(t('dp_issue_title')) + '&body=' + encodeURIComponent(body);
+    document.getElementById('asnm_dp_links').style.display = '';
 }
 
 function asnmLookup() {
@@ -3089,6 +3142,7 @@ function asnmTab(id) {
     }
     asnmTabBadges();
     if (id === 'settings') asnmPerfMark();
+    if (id === 'diag') asnmDiagDevFill();
     // inside its own tab the traffic card does not need to be opened first
     if (id === 'traffic' && typeof ASNM_TR !== 'undefined' && !ASNM_TR.open) asnmTrToggle();
 }
@@ -3359,17 +3413,33 @@ function initial() {
     <div class="asnm-form">
       <div class="asnm-field asnm-full"><span class="asnm-label" data-i18n="domain_ip"></span>
         <div class="asnm-inline">
-          <input type="text" id="asnm_diag" maxlength="253" data-i18n-ph="ph_diag" autocomplete="off"/>
+          <input type="text" id="asnm_diag" maxlength="253" data-i18n-ph="ph_diag" autocomplete="off" onkeydown="if (event.keyCode === 13) { asnmExplain(); return false; }"/>
+          <input type="button" class="button_gen asnm-btn asnm-primary" data-i18n-value="btn_explain" onclick="asnmExplain();"/>
           <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_test" onclick="asnmTool('test','asnm_diag');"/>
           <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_trace" onclick="asnmTool('trace','asnm_diag');"/>
-        </div></div>
+        </div><span class="asnm-help" data-i18n="explain_help"></span></div>
+      <div class="asnm-field asnm-full"><span class="asnm-label" data-i18n="diag_dev"></span>
+        <div class="asnm-inline">
+          <select id="asnm_diag_dev" class="input_option asnm-diag-dev"></select>
+          <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_device" onclick="asnmDevCheck();"/>
+        </div><span class="asnm-help" data-i18n="diag_dev_help"></span></div>
       <div class="asnm-field asnm-full"><span class="asnm-label" data-i18n="router_checks"></span>
         <div class="asnm-row">
+          <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_dnschain" onclick="asnmTool('dnschain');"/>
           <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_ipset" onclick="asnmTool('status');"/>
           <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_pubip" onclick="asnmTool('ifaces');"/>
         </div></div>
     </div>
     <pre id="asnm_output" class="asnm-output" data-i18n="output_default"></pre>
+  </div>
+  <div class="asnm-card" id="asnm_dp_card">
+    <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg><div class="asnm-card-titles"><h3 data-i18n="dp_title"></h3><div class="asnm-card-sub" data-i18n="dp_sub"></div></div></div>
+    <div class="asnm-dp-text" data-i18n="dp_text"></div>
+    <div class="asnm-row asnm-dp-row">
+      <input type="button" class="button_gen asnm-btn asnm-primary" data-i18n-value="btn_dp" onclick="asnmTool('diagpack');"/>
+      <span id="asnm_dp_links" style="display:none;"><a class="asnm-link" id="asnm_dp_dl" href="#" data-i18n="dp_download"></a> &middot;
+        <a class="asnm-link" id="asnm_dp_gh" href="#" target="_blank" rel="noopener" data-i18n="dp_github"></a></span>
+    </div>
   </div>
   </div>
   <div class="asnm-tabpanel" id="asnm_tab_settings" role="tabpanel" style="display:none;">

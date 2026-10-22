@@ -1,3 +1,10 @@
+## v3.7.4
+
+- New in Diagnostics: **Explain** a domain or IP - what DNS answers (asked like a device), which domain entry covers the name, and for every address: its network (ASN), every ASN Manager rule that contains it in the order the router checks them, which one wins (for any device or the device chosen below), and the interface the traffic leaves through (with a warning if that is not the target). Command line: `ASNmanager.sh explain <domain|IP> [device IP]`
+- New: **Check device** - the rules for all devices, the rules only for this device, its VPN Director rules, its normal way, and its current connections (top 15 by traffic) with name, traffic, winning rule and interface. `ASNmanager.sh device <IP>`
+- New: **Check DNS chain** - port 53 -> dnsmasq -> its servers (is something listening?), AdGuard Home upstream check, cache, number of domain lines, and a learning test: one lookup of a domain entry like a device, then the check whether the answer landed in its set. `ASNmanager.sh dnschain`
+- New: **Diagnostic bundle** - one text file with version, entries, settings, DNS chain, routing check, ip rules, routing tables, marking rules, set sizes, VPN Director, statistics state and the last ASN Manager messages of the system log. Public IP addresses, VPN servers, MAC addresses, global IPv6 addresses and keys are masked. Download it in the WebUI, "Report on GitHub" opens a new issue with a short template to attach it to. `ASNmanager.sh diag` (writes /tmp/asnmanager-diag.txt)
+
 ## v3.7.3
 
 - "Enter ASNs": the help under the field lists every accepted form with an example - ASN (`AS13335` or `13335`), single IP (`1.2.3.4`), range (`181.209.202.0/24`, /8 to /32) and domain (`googlevideo.com` - covers every subdomain, no `*.` needed); several separated by commas or spaces

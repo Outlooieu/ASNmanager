@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.7.3
+version=3.7.4
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.7.3"
+SCRIPT_VERSION="3.7.4"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -1913,6 +1913,350 @@ route_test() {
     return 0
 }
 
+# =====================================================================
+#  Diagnostics: explain a destination, check a device, check the DNS chain, diagnostic bundle
+# =====================================================================
+# the marking rules in the order the router checks them: "set <TAB> source (or -) <TAB> mark"
+dg_rules() {
+    iptables -t mangle -S PREROUTING 2>/dev/null | awk '/--match-set / && /MARK/ {
+        set = ""; src = "-"; mk = ""
+        for (i = 1; i <= NF; i++) {
+            if ($i == "--match-set") set = $(i + 1)
+            else if ($i == "-s") { src = $(i + 1); sub(/\/32$/, "", src) }
+            else if ($i == "--set-xmark" || $i == "--set-mark") { mk = $(i + 1); sub(/\/.*/, "", mk) }
+        }
+        if (set != "" && mk != "") printf "%s\t%s\t%s\n", set, src, mk }'
+}
+# mark -> target name (0x6100 -> WGC1)
+dg_target_of_mark() {
+    for dt_t in WAN1 WAN2 OVPN1 OVPN2 OVPN3 OVPN4 OVPN5 WGC1 WGC2 WGC3 WGC4 WGC5; do
+        [ "$(get_target_info "$dt_t" | cut -d' ' -f2)" = "$1" ] && { echo "$dt_t"; return 0; }
+    done
+    echo "$1"
+}
+# interface -> target name (wgc1 -> WGC1, eth0 -> WAN1)
+dg_target_of_dev() {
+    for dt_t in WAN1 WAN2 OVPN1 OVPN2 OVPN3 OVPN4 OVPN5 WGC1 WGC2 WGC3 WGC4 WGC5; do
+        [ -n "$1" ] && [ "$(get_ifname "$dt_t")" = "$1" ] && { echo "$dt_t"; return 0; }
+    done
+    echo "$1"
+}
+# what a set stands for, for the address $2: "AS20940 Akamai ..." / "domain *.zdf.de (C12)" / "IP 1.2.3.0/24 (C3)"
+dg_desc() {
+    case "$1" in
+        ASNC_*)
+            dd_id=${1#ASNC_}
+            dd_l=$(awk -F: -v id="$dd_id" '$1 == id { printf "%s %s", ($4 == "dom" ? "domain *." : "IP "), $5; exit }' "$CUSTOM_FILE" 2>/dev/null)
+            dd_n=$(note_of "$(note_key "$dd_id")")
+            echo "${dd_l:-$1} ($dd_id)${dd_n:+ - \"$dd_n\"}" ;;
+        ASND_*)
+            dd_o=""
+            while IFS=: read -r dd_id dd_d dd_s dd_k dd_v; do
+                [ "$dd_k" = "dom" ] || continue
+                ipset test "ASNC_$dd_id" "$2" >/dev/null 2>&1 && dd_o="${dd_o:+$dd_o, }*.$dd_v ($dd_id)"
+            done < "$CUSTOM_FILE"
+            echo "domain ${dd_o:-group $1}" ;;
+        ASNU_*|ASN_*)
+            dd_t=$(echo "$1" | cut -d_ -f2)
+            if [ "${1%%_*}" = "ASN" ]; then dd_a=$(echo "$1" | cut -d_ -f3)
+            else
+                dd_a=""
+                for dd_s in $(ipset list -n 2>/dev/null | grep "^ASN_${dd_t}_"); do
+                    ipset test "$dd_s" "$2" >/dev/null 2>&1 && { dd_a=$(echo "$dd_s" | cut -d_ -f3); break; }
+                done
+            fi
+            if [ -n "$dd_a" ]; then
+                dd_nm=$(name_of "$dd_a"); dd_n=$(note_of "$dd_a")
+                echo "AS$dd_a${dd_nm:+ $dd_nm}${dd_n:+ - \"$dd_n\"}"
+            else echo "ASN group $1"; fi ;;
+        *) echo "$1" ;;
+    esac
+}
+# every rule that contains the address (first = the one that wins), for the device $2 (empty = any device)
+# prints "set <TAB> source <TAB> mark <TAB> applies(1|0)"
+dg_matches() {
+    dg_rules | while IFS="$(printf '\t')" read -r dm_set dm_src dm_mk; do
+        ipset test "$dm_set" "$1" >/dev/null 2>&1 || continue
+        dm_ap=1
+        if [ "$dm_src" != "-" ]; then
+            dm_ap=0; [ -n "$2" ] && [ "$dm_src" = "$2" ] && dm_ap=1
+        fi
+        printf '%s\t%s\t%s\t%s\n' "$dm_set" "$dm_src" "$dm_mk" "$dm_ap"
+    done
+}
+# the way of a packet from a device to an address: interface (with mark = through an ASN Manager rule)
+dg_route_dev() {     # IP DEVICE-IP [MARK]
+    if [ -n "$3" ]; then dr_r=$(ip route get "$1" from "$2" iif "$(nvram get lan_ifname 2>/dev/null || echo br0)" mark "$3" 2>/dev/null)
+    else dr_r=$(ip route get "$1" from "$2" iif "$(nvram get lan_ifname 2>/dev/null || echo br0)" 2>/dev/null); fi
+    [ -n "$dr_r" ] || dr_r=$(ip route get "$1" ${3:+mark "$3"} 2>/dev/null)
+    echo "$dr_r" | head -n 1 | sed -n 's/.* dev \([^ ]*\).*/\1/p'
+}
+dg_lan_probe() {     # an address in the LAN that no device uses (for "any device")
+    echo "$(nvram get lan_ipaddr 2>/dev/null | cut -d. -f1-3).250"
+}
+dg_devname() {       # name of a device (DHCP list, then custom client list)
+    dn_n=$(awk -v ip="$1" '$3 == ip && $4 != "*" { print $4; exit }' /var/lib/misc/dnsmasq.leases 2>/dev/null)
+    [ -n "$dn_n" ] || dn_n=$(nvram get custom_clientlist 2>/dev/null | tr '<' '\n' | awk -F'>' -v ip="$1" '$4 == ip { print $1; exit }')
+    echo "$dn_n"
+}
+
+# explain <domain|IP> [device IP]: which entry catches it, which way it takes, what DNS answered
+cli_explain() {
+    ex_t=$(echo "$1" | sed 's#^[a-z]*://##; s#/.*##; s#:[0-9]*$##' | tr 'A-Z' 'a-z')
+    ex_dev="$2"
+    [ -n "$ex_t" ] || { echo "Usage: explain <domain|IP> [device IP]"; return 1; }
+    if [ -n "$ex_dev" ] && ! is_valid_ip "$ex_dev"; then echo "Invalid device IP '$ex_dev'"; return 1; fi
+    nv_refresh
+    ex_probe=${ex_dev:-$(dg_lan_probe)}
+    echo "== $ex_t$([ -n "$ex_dev" ] && echo "   (device $ex_dev$( n=$(dg_devname "$ex_dev"); [ -n "$n" ] && echo " $n"))" || echo "   (any device)")"
+    if is_valid_ip "$ex_t"; then
+        ex_ips="$ex_t"
+    else
+        cu_norm_domain "$ex_t" >/dev/null || { echo "Not a domain or IPv4 address."; return 1; }
+        # the router's own DNS (port 53): the same way a device asks - this lookup also teaches the domain entries
+        ex_ips=$(nsl "$ex_t" 127.0.0.1 2>/dev/null | awk '/^Name:/ { f = 1; next } f' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | sort -u | head -n 6)
+        echo "DNS (asked like a device, via 127.0.0.1): ${ex_ips:-no IPv4 address}" | tr '\n' ' '; echo
+        # domain entries that cover the name (the name itself or a parent domain)
+        ex_any=0
+        if [ -s "$CUSTOM_FILE" ]; then
+            while IFS=: read -r ex_id ex_d ex_s ex_k ex_v; do
+                [ "$ex_k" = "dom" ] || continue
+                case "$ex_t" in "$ex_v"|*".$ex_v") ;; *) continue ;; esac
+                ex_any=1; ex_n=$(note_of "dom:$ex_v")
+                echo "Domain entry: *.$ex_v ($ex_id) -> $ex_d, ${ex_s:+only for $ex_s}${ex_s:-all devices}${ex_n:+ - \"$ex_n\"}; $(cu_learned "$ex_id" "$ex_d" "$ex_s") address(es) learned"
+            done < "$CUSTOM_FILE"
+        fi
+        [ $ex_any -eq 1 ] || echo "Domain entry: none covers $ex_t"
+        [ -n "$ex_ips" ] || return 0
+    fi
+    for ex_ip in $ex_ips; do
+        echo ""
+        echo "-- $ex_ip"
+        ex_as=$(asn_of_ip "$ex_ip" 2>/dev/null)
+        if [ -n "$ex_as" ]; then
+            ex_an=$(echo "$ex_as" | sed -n 's/^AS\([0-9]*\).*/\1/p')
+            ex_l=$(grep -m 1 "^${ex_an}:" "$ASN_FILE" 2>/dev/null | cut -d: -f2-)
+            if [ -n "$ex_l" ]; then ex_ls=${ex_l#*:}; echo "   Network: $ex_as   [on the list -> ${ex_l%%:*}${ex_ls:+, only for $ex_ls}]"
+            else echo "   Network: $ex_as   [not on the list]"; fi
+        else
+            echo "   Network: (look-up failed)"
+        fi
+        dg_matches "$ex_ip" "$ex_dev" > /tmp/asnmanager-ex.m
+        ex_win=""
+        if [ -s /tmp/asnmanager-ex.m ]; then
+            echo "   Rules that contain it (checked top to bottom, the first that applies wins):"
+            ex_i=0
+            while IFS="$(printf '\t')" read -r em_set em_src em_mk em_ap; do
+                ex_i=$((ex_i + 1))
+                ex_tag="       "
+                if [ "$em_ap" = "1" ] && [ -z "$ex_win" ]; then ex_win="$em_mk"; ex_tag="WINS > "; fi
+                ex_for="all devices"; [ "$em_src" != "-" ] && ex_for="only $em_src$( [ "$em_ap" = "1" ] || echo ' - not this device')"
+                echo "   $ex_tag$ex_i. $(dg_desc "$em_set" "$ex_ip") -> $(dg_target_of_mark "$em_mk")  [$ex_for]"
+            done < /tmp/asnmanager-ex.m
+        else
+            echo "   Rules: no ASN Manager entry contains this address"
+        fi
+        rm -f /tmp/asnmanager-ex.m
+        ex_dv=$(dg_route_dev "$ex_ip" "$ex_probe" "$ex_win")
+        if [ -n "$ex_win" ]; then
+            ex_want=$(dg_target_of_mark "$ex_win"); ex_got=$(dg_target_of_dev "$ex_dv")
+            if [ "$ex_got" = "$ex_want" ]; then echo "   Leaves via: $ex_dv ($ex_got)  [OK]"
+            else echo "   Leaves via: ${ex_dv:-?} (${ex_got:-?}) instead of $ex_want  [CHECK - interface down, failover or route missing?]"; fi
+        else
+            echo "   Leaves via: ${ex_dv:-?} ($(dg_target_of_dev "$ex_dv")) - the normal way (VPN Director / main route), no ASN Manager rule"
+        fi
+    done
+    return 0
+}
+
+# device <IP>: which rules apply to a device and where its traffic goes right now
+cli_device() {
+    dv_ip="$1"
+    is_valid_ip "$dv_ip" || { echo "Usage: device <IP of the device>"; return 1; }
+    nv_refresh
+    dv_n=$(dg_devname "$dv_ip")
+    echo "== Device $dv_ip${dv_n:+ ($dv_n)}"
+    dv_a=0; dv_d=0; dv_i=0; dv_own=""; dv_oth=0
+    while IFS=: read -r dv_asn dv_t dv_s; do
+        case "$dv_asn" in ''|*[!0-9]*) continue ;; esac
+        if [ -z "$dv_s" ]; then dv_a=$((dv_a + 1))
+        elif echo ",$dv_s," | grep -q ",$dv_ip,"; then dv_own="$dv_own
+   AS$dv_asn$( n=$(name_of "$dv_asn"); [ -n "$n" ] && echo " $n") -> $dv_t"
+        else dv_oth=$((dv_oth + 1)); fi
+    done < "$ASN_FILE"
+    if [ -s "$CUSTOM_FILE" ]; then
+        while IFS=: read -r dv_id dv_t dv_s dv_k dv_v; do
+            case "$dv_id" in C[0-9]*) ;; *) continue ;; esac
+            if [ -z "$dv_s" ]; then [ "$dv_k" = "dom" ] && dv_d=$((dv_d + 1)) || dv_i=$((dv_i + 1))
+            elif echo ",$dv_s," | grep -q ",$dv_ip,"; then dv_own="$dv_own
+   $([ "$dv_k" = "dom" ] && echo "*.$dv_v" || echo "IP $dv_v") ($dv_id) -> $dv_t"
+            else dv_oth=$((dv_oth + 1)); fi
+        done < "$CUSTOM_FILE"
+    fi
+    echo "Rules for all devices: $dv_a ASN(s), $dv_d domain(s), $dv_i IP range(s)"
+    echo "Rules only for this device:${dv_own:- none}"
+    [ $dv_oth -gt 0 ] && echo "Rules only for other devices (not for this one): $dv_oth"
+    # VPN Director (Merlin): "<enable>description>local IP>remote IP>interface" separated by "<"
+    dv_vd=$(cat /jffs/openvpn/vpndirector_rulelist 2>/dev/null | tr '<' '\n' | awk -F'>' -v ip="$dv_ip" '
+        function n(s,  a) { split(s, a, "."); return ((a[1] * 256 + a[2]) * 256 + a[3]) * 256 + a[4] }
+        function inc(c,  p, len, sz, b) { split(c, p, "/"); len = (p[2] == "" ? 32 : p[2]); sz = 2 ^ (32 - len); b = int(n(p[1]) / sz) * sz; return n(ip) >= b && n(ip) < b + sz }
+        NF >= 5 && ($3 == "" || inc($3)) {
+            printf "   %s%s: %s -> %s -> %s\n", ($1 == "1" ? "" : "(off) "), ($2 == "" ? "-" : $2), ($3 == "" ? "any" : $3), ($4 == "" ? "any" : $4), $5 }')
+    if [ -n "$dv_vd" ]; then echo "VPN Director rules for this device (or for all):"; echo "$dv_vd"
+    else echo "VPN Director rules for this device (or for all): none"; fi
+    dv_def=$(dg_route_dev 1.1.1.1 "$dv_ip")
+    echo "Normal way without an ASN Manager rule (test 1.1.1.1): ${dv_def:-?} ($(dg_target_of_dev "$dv_def"))"
+    echo ""
+    # current connections: destination, traffic, which rule, which interface (top 15 by bytes)
+    dv_ct=${DG_CT:-/proc/net/nf_conntrack}
+    [ -r "$dv_ct" ] || { echo "Connection table not readable."; return 0; }
+    awk -v ip="$dv_ip" '{
+        src = ""; dst = ""; dp = ""; b = 0; nb = 0
+        for (i = 1; i <= NF; i++) {
+            if ($i ~ /^src=/ && src == "") src = substr($i, 5)
+            else if ($i ~ /^dst=/ && dst == "") dst = substr($i, 5)
+            else if ($i ~ /^dport=/ && dp == "") dp = substr($i, 7)
+            else if ($i ~ /^bytes=/) { b += substr($i, 7); nb++ }
+        }
+        if (src != ip) next
+        if (dst ~ /^(10|127|192\.168|169\.254|172\.(1[6-9]|2[0-9]|3[01])|22[4-9]|2[3-5][0-9])\./) next
+        k = dst; by[k] += b; n[k]++; if (!(k in pt)) pt[k] = $3 "/" dp
+    } END { for (k in by) printf "%.0f\t%s\t%d\t%s\n", by[k], k, n[k], pt[k] }' "$dv_ct" 2>/dev/null |
+        sort -t "$(printf '\t')" -k1,1nr | head -n 15 > /tmp/asnmanager-dv.c
+    if [ ! -s /tmp/asnmanager-dv.c ]; then echo "No connections to the internet right now."; rm -f /tmp/asnmanager-dv.c; return 0; fi
+    echo "Current connections (top 15 by traffic):"
+    printf '   %-16s %-28s %9s  %-6s %s\n' "DESTINATION" "NAME" "TRAFFIC" "VIA" "RULE"
+    dg_rules > /tmp/asnmanager-dv.r
+    while IFS="$(printf '\t')" read -r dc_b dc_ip dc_n dc_pt; do
+        dc_nm=$(awk -F'\t' -v ip="$dc_ip" '$1 == ip { split($2, a, ","); print a[1]; exit }' "$TS_RT/sg_dns.txt" 2>/dev/null)
+        dc_set=""; dc_mk=""
+        while IFS="$(printf '\t')" read -r r_set r_src r_mk; do
+            [ "$r_src" = "-" ] || [ "$r_src" = "$dv_ip" ] || continue
+            ipset test "$r_set" "$dc_ip" >/dev/null 2>&1 && { dc_set=$r_set; dc_mk=$r_mk; break; }
+        done < /tmp/asnmanager-dv.r
+        dc_dev=$(dg_route_dev "$dc_ip" "$dv_ip" "$dc_mk")
+        dc_rule="normal way"; [ -n "$dc_set" ] && dc_rule="$(dg_desc "$dc_set" "$dc_ip") -> $(dg_target_of_mark "$dc_mk")"
+        printf '   %-16s %-28s %9s  %-6s %s\n' "$dc_ip" "$(echo "${dc_nm:--}" | cut -c1-28)" "$(fmt_bytes "$dc_b")" "$(dg_target_of_dev "$dc_dev")" "$dc_rule"
+    done < /tmp/asnmanager-dv.c
+    rm -f /tmp/asnmanager-dv.c /tmp/asnmanager-dv.r
+    [ "$(cat /proc/sys/net/netfilter/nf_conntrack_acct 2>/dev/null)" = "1" ] || echo "(traffic counters are off - turn on the traffic statistics to see the bytes)"
+    return 0
+}
+fmt_bytes() { awk -v b="$1" 'BEGIN { split("B KB MB GB TB", u, " "); i = 1; while (b >= 1024 && i < 5) { b /= 1024; i++ } if (i == 1) printf "%d %s", b, u[i]; else printf "%.1f %s", b, u[i] }'; }
+
+# dnschain: device -> port 53 -> dnsmasq -> its servers, and does a domain entry learn?
+cli_dnschain() {
+    echo "== DNS chain"
+    dc_l=$(netstat -lnup 2>/dev/null; netstat -lntp 2>/dev/null)
+    dc_prog() { echo "$dc_l" | awk -v p="$1" '{ m = split($4, q, ":"); if (q[m] == p) { n = split($NF, a, "/"); if (a[2] != "") { print a[2]; exit } } }'; }
+    set -- $(dns_health)
+    dc_53=$3; dc_dp=$4
+    echo "Port 53 (what the devices ask): ${dc_53:--}"
+    if [ "$dc_dp" = "0" ]; then echo "[FAIL] dnsmasq does not answer DNS - domain entries learn nothing"; return 1; fi
+    [ "$dc_dp" != "53" ] && echo "dnsmasq: port $dc_dp (behind $dc_53)" || echo "dnsmasq: port 53"
+    case "$2" in
+        ok)      [ "$dc_dp" != "53" ] && echo "[OK]   $dc_53 sends the lookups to dnsmasq" ;;
+        agh_*)   echo "[WARN] $dc_53 sends the lookups $([ "$2" = "agh_partly" ] && echo "partly ")to $7 instead of dnsmasq - domain entries learn only some addresses (fix: upstream 127.0.0.1:$dc_dp)" ;;
+        other)   echo "[WARN] $dc_53 answers DNS instead of dnsmasq - domain entries learn only if it fills the ipsets" ;;
+        *)       echo "[FAIL] $(cli_dns | head -n 1)" ;;
+    esac
+    dc_srv=$(grep '^server=' /etc/dnsmasq.conf 2>/dev/null | grep -v '^server=/' | cut -d= -f2)
+    if [ -n "$dc_srv" ]; then
+        for dc_s in $dc_srv; do
+            dc_h=${dc_s%%#*}; dc_p=53; case "$dc_s" in *#*) dc_p=${dc_s#*#} ;; esac
+            case "$dc_h" in
+                127.*|::1) dc_w=$(dc_prog "$dc_p"); [ -n "$dc_w" ] && echo "[OK]   dnsmasq forwards to $dc_s ($dc_w is listening)" || echo "[FAIL] dnsmasq forwards to $dc_s, but nothing listens there" ;;
+                *) echo "[INFO] dnsmasq forwards to $dc_s" ;;
+            esac
+        done
+    else
+        echo "[INFO] dnsmasq forwards to the DNS servers of the WAN connection (no server= line)"
+    fi
+    grep -q '^cache-size=0' /etc/dnsmasq.conf 2>/dev/null && echo "[INFO] dnsmasq cache: off (cache-size=0)"
+    dc_nd=$(grep -c '^ipset=/' /etc/dnsmasq.conf 2>/dev/null)
+    echo "[INFO] domain lines in dnsmasq: ${dc_nd:-0}"
+    # end-to-end: one lookup of a domain entry like a device, then: is the answer in the set of the entry?
+    dc_id=""; dc_v=""
+    [ -s "$CUSTOM_FILE" ] && while IFS=: read -r e_id e_d e_s e_k e_v; do
+        [ "$e_k" = "dom" ] || continue
+        for dc_q in "$e_v" "www.$e_v"; do
+            dc_a=$(nsl "$dc_q" 127.0.0.1 2>/dev/null | awk '/^Name:/ { f = 1; next } f' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 3)
+            [ -n "$dc_a" ] || continue
+            dc_hit=0; for x in $dc_a; do ipset test "ASNC_$e_id" "$x" >/dev/null 2>&1 && dc_hit=1; done
+            if [ $dc_hit -eq 1 ]; then echo "[OK]   learning test: $dc_q -> $(echo $dc_a | tr ' ' ',') is in the set of *.$e_v ($e_id)"
+            else echo "[WARN] learning test: $dc_q -> $(echo $dc_a | tr ' ' ',') is NOT in the set of *.$e_v ($e_id) - answered from a cache in front of dnsmasq, or dnsmasq is bypassed (clear the cache of AdGuard Home and test again)"; fi
+            dc_id=$e_id; break
+        done
+        [ -n "$dc_id" ] && break
+    done < "$CUSTOM_FILE"
+    [ -n "$dc_id" ] || echo "[INFO] learning test: no domain entry to test with"
+    echo "[INFO] suggestions by domain: $(sgd_state)$([ -s "$TS_RT/sg_dns.txt" ] && echo ", $(wc -l < "$TS_RT/sg_dns.txt") addresses with a known name")"
+    return 0
+}
+
+# diagnostic bundle: one text file with what is needed to analyse a problem; personal data masked
+DG_FILE=/tmp/asnmanager-diag.txt
+dg_section() { echo ""; echo "######## $1"; }
+cli_diagpack() {
+    nv_refresh
+    {
+        echo "ASN Manager diagnostic bundle"
+        echo "created:  $(date '+%Y-%m-%d %H:%M:%S %z')"
+        echo "version:  $SCRIPT_VERSION   page: $(sed -n 's/.*ASNmanager-WebUI v\([0-9.]*\).*/\1/p' "$WEBUI_SRC" 2>/dev/null | head -n 1)"
+        echo "router:   $(nvram get productid 2>/dev/null) firmware $(nvram get firmver 2>/dev/null).$(nvram get buildno 2>/dev/null)_$(nvram get extendno 2>/dev/null)   uptime: $(awk '{ printf "%d d %d h", $1 / 86400, ($1 % 86400) / 3600 }' /proc/uptime)"
+        echo "public IP addresses, MAC addresses, VPN server addresses and keys are masked"
+        dg_section "STATUS";            ipset_status_report 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | head -n 60
+        dg_section "ASN LIST";          cli_list 2>&1 | sed 's/\x1b\[[0-9;]*m//g'
+        dg_section "LEARNED (domain entries)"; cu_learned_report 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | awk '/^C[0-9]/ || /^\(/'
+        dg_section "SETTINGS";          backup_text 2>/dev/null | sed -n '/^\[SCHEDULE\]/,$p'
+        dg_section "DNS";               cli_dns 2>&1; cli_dnschain 2>&1
+        dg_section "ROUTING CHECK";     rc_print 2>&1 | head -n 150
+        dg_section "FAILOVER";          fo_show 2>&1
+        dg_section "INTERFACES";        ip -4 -o addr show 2>&1 | awk '{ print $2, $4 }'
+        dg_section "IP RULES";          ip rule show 2>&1
+        dg_section "ROUTE main";        ip route show table main 2>&1 | head -n 40
+        for dg_t in WAN1 WAN2 OVPN1 OVPN2 OVPN3 OVPN4 OVPN5 WGC1 WGC2 WGC3 WGC4 WGC5; do
+            dg_tb=$(get_target_info "$dg_t" | cut -d' ' -f1)
+            case "$dg_tb" in 254|253|'') continue ;; esac
+            dg_rt=$(ip route show table "$dg_tb" 2>/dev/null)
+            [ -n "$dg_rt" ] || ! ip rule show 2>/dev/null | grep -q "lookup $dg_tb\$" || dg_rt="(empty, but a rule points here)"
+            [ -n "$dg_rt" ] && { dg_section "ROUTE table $dg_tb ($dg_t)"; echo "$dg_rt" | head -n 20; }
+        done
+        dg_section "MANGLE PREROUTING"; iptables -t mangle -S PREROUTING 2>&1 | head -n 80
+        dg_section "MANGLE OUTPUT";     iptables -t mangle -S OUTPUT 2>&1 | head -n 40
+        dg_section "MANGLE FORWARD (first lines)"; iptables -t mangle -S FORWARD 2>&1 | head -n 20
+        dg_section "IPSETS";            ipset list -t 2>/dev/null | awk '/^Name:/ { n = $2 } /^Number of entries:/ { print n, $4 }' | grep -E '^ASN' | head -n 300
+        dg_section "DNSMASQ (excerpt)"; grep -vE '^(ipset=|dhcp-host=|address=)' /etc/dnsmasq.conf 2>/dev/null | grep -vE '^\s*(#|$)' | head -n 60
+        dg_section "VPN DIRECTOR";      cat /jffs/openvpn/vpndirector_rulelist 2>/dev/null | tr '<' '\n' | grep . | head -n 60
+        dg_section "STATISTICS";        ts_diag 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | head -n 60
+        dg_section "SYSTEM LOG (ASN Manager)"; grep -h 'ASNmanager' /tmp/syslog.log-1 /tmp/syslog.log 2>/dev/null | tail -n 100
+        dg_section "SYSTEM LOG (dnsmasq errors)"; grep -hE 'dnsmasq.*(fail|error|refused|warning)' /tmp/syslog.log 2>/dev/null | tail -n 30
+    } > "$DG_FILE.raw" 2>&1
+    dg_mask < "$DG_FILE.raw" > "$DG_FILE"; rm -f "$DG_FILE.raw"
+    if [ -d "$WEB_DIR" ]; then cp -f "$DG_FILE" "$WEB_DIR/diag.txt"; fi
+    echo "Diagnostic bundle written: $DG_FILE ($(wc -c < "$DG_FILE") bytes)$([ -d "$WEB_DIR" ] && echo " - download it in the WebUI (Diagnostics)")"
+}
+# masks: own public addresses, VPN servers, MAC addresses, global IPv6 addresses, WireGuard / OpenVPN keys
+dg_mask() {
+    dm_list=""
+    for dm_v in wan0_ipaddr wan0_gateway wan0_realip_ip wan1_ipaddr wan1_gateway wan1_realip_ip \
+                vpn_client1_addr vpn_client2_addr vpn_client3_addr vpn_client4_addr vpn_client5_addr \
+                wgc1_ep_addr wgc2_ep_addr wgc3_ep_addr wgc4_ep_addr wgc5_ep_addr ddns_hostname_x; do
+        dm_x=$(nvram get "$dm_v" 2>/dev/null); [ -n "$dm_x" ] && dm_list="$dm_list $dm_x"
+    done
+    [ -s "$EP_CACHE" ] && dm_list="$dm_list $(cut -d' ' -f1 "$EP_CACHE" | tr '\n' ' ')"
+    [ -f "$WEB_DIR/pubip.js" ] && dm_list="$dm_list $(grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' "$WEB_DIR/pubip.js" | tr '\n' ' ')"
+    awk -v list="$dm_list" '
+        BEGIN { n = split(list, L, " "); for (i = 1; i <= n; i++) if (L[i] !~ /^(0\.0\.0\.0|10\.|127\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/ && L[i] != "") { m++; S[m] = L[i] } }
+        {
+            for (i = 1; i <= m; i++) { while ((p = index($0, S[i])) > 0) $0 = substr($0, 1, p - 1) "<masked>" substr($0, p + length(S[i])) }
+            gsub(/[23][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F:]*:[0-9a-fA-F]*/, "<ipv6>")
+            gsub(/[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]/, "xx:xx:xx:xx:xx:xx")
+            gsub(/[A-Za-z0-9+\/]{43}=/, "<key>")
+            print
+        }'
+}
+
 # ---------- CLI actions ----------
 cli_list() {
     [ -s "$ASN_FILE" ] || [ -s "$CUSTOM_FILE" ] || { echo "ASN list is empty."; return 0; }
@@ -2500,6 +2844,10 @@ web_job() {
         update)   cli_update > "$OUT" 2>&1 ;;
         statssave) ts_save_mode "$a1" > "$OUT" 2>&1 ;;
         sghide)   sg_hide "$a1" "$a2" > "$OUT" 2>&1 ;;
+        explain)  cli_explain "$a1" "$a2" > "$OUT" 2>&1 ;;
+        device)   cli_device "$a1" > "$OUT" 2>&1 ;;
+        dnschain) cli_dnschain > "$OUT" 2>&1 ;;
+        diagpack) cli_diagpack > "$OUT" 2>&1 ;;
         speedtest) st_run "$a1" > "$OUT" 2>&1 ;;
         setting)  rs_setting "$a1" "$a2" > "$OUT" 2>&1 ;;
         failover) fbs=""; [ -n "$a2" ] && fbs="$a2"; [ -n "$a3" ] && fbs="${fbs:+$fbs,}$a3"
@@ -4746,6 +5094,10 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   import <replace|merge> <ASN:TARGET:SRC>[,...]  import entries
   status                             ipset status
   test <IP|domain>                   check which route a target takes
+  explain <IP|domain> [device IP]    which entry catches it, which rule wins, which interface it leaves through, DNS answer
+  device <IP>                        rules that apply to a device, its normal way, its current connections and their route
+  dnschain                           DNS chain (port 53 -> dnsmasq -> its servers) with a learning test of a domain entry
+  diag                               diagnostic bundle (/tmp/asnmanager-diag.txt, personal data masked) to attach to a bug report
   lookup <IP|domain>                 find the ASN of a target
   trace <IP|domain>                  traceroute
   ifaces                             public IP / country per interface
@@ -4823,6 +5175,10 @@ cli_main() {
         job)      cli_job "$1" ;;
         speedtest) st_cli "$1" ;;
         rulemode) rules_set_mode "$1" ;;
+        explain)  cli_explain "$1" "$2" ;;
+        device)   cli_device "$1" ;;
+        dnschain) cli_dnschain ;;
+        diag)     cli_diagpack ;;
         suggest)  case "$1" in
                       domains) sgd_set "$2" ;;
                       hide|unhide) sg_hide "$@" ;;
