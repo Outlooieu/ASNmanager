@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.4
+version=3.9.5
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.4"
+SCRIPT_VERSION="3.9.5"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -30,7 +30,7 @@ NC='\033[0m'
 # Entries are ASNs and / or domains (a domain covers every subdomain). The ASN holders were checked with RIPEstat
 # (as-overview) in 10/2026; ASNs that announce no prefixes (ipverse removes them after 90 days) are left out. "wide" = a large share of the internet goes through these networks (cloud, CDN, hosting) -
 # routing them moves far more than the one service, the menu and the page ask first.
-# Categories: stream, tvde, news, gaming, social, work, shop, bank, services, cloud, test
+# Categories: stream, tvde, news, gaming, social, work, shop, bank, services, smarthome, updates, cloud, test
 PRESET_DATA='stream|Netflix|2906 40027 netflix.com nflxvideo.net nflximg.net nflxext.com nflxso.net|
 stream|YouTube|43515 36040 youtube.com googlevideo.com ytimg.com youtu.be youtube-nocookie.com ggpht.com|
 stream|Disney+|disneyplus.com disney-plus.net bamgrid.com dssott.com disneystreaming.com|
@@ -132,6 +132,27 @@ shop|Etsy|etsy.com etsystatic.com|
 shop|IKEA|ikea.com|
 shop|Booking.com|booking.com bstatic.com|
 shop|Klarna|klarna.com|
+smarthome|Amazon Alexa / Echo|amazonalexa.com alexa.amazon.com alexa.amazon.de|
+smarthome|Google Nest|nest.com|
+smarthome|Ring|ring.com|
+smarthome|Philips Hue|meethue.com|
+smarthome|tado|tado.com|
+smarthome|Sonos|sonos.com|
+smarthome|Shelly|shelly.cloud|
+smarthome|Netatmo|netatmo.com netatmo.net|
+smarthome|Tuya / Smart Life|tuya.com tuyaeu.com tuyaus.com|
+smarthome|eufy|eufylife.com|
+smarthome|Roborock|roborock.com|
+smarthome|SwitchBot|switch-bot.com|
+smarthome|Home Assistant Cloud (Nabu Casa)|nabucasa.com|
+updates|Windows Update|windowsupdate.com update.microsoft.com delivery.mp.microsoft.com|
+updates|Apple software updates|updates.cdn-apple.com swcdn.apple.com mesu.apple.com swdist.apple.com|
+updates|Android / Google Play downloads|dl.google.com play.googleapis.com gvt1.com|
+updates|Steam game downloads|steamcontent.com steampipe.akamaized.net|
+updates|PlayStation downloads|dl.playstation.net|
+updates|Xbox downloads|assets1.xboxlive.com assets2.xboxlive.com dlassets.xboxlive.com|
+updates|Epic Games downloads|download.epicgames.com epicgames-download1.akamaized.net|
+updates|Linux (Debian / Ubuntu)|deb.debian.org security.debian.org archive.ubuntu.com security.ubuntu.com|
 cloud|Amazon AWS|16509 14618 7224 8987|wide
 cloud|Google (all networks)|15169 19527 36384 36492 41264 139070 396982 16550|wide
 cloud|Microsoft / Azure|8075 8068 8069 8070 3598|wide
@@ -155,7 +176,7 @@ PRESET_COUNT=$(preset_all | grep -c .)
 print_presets() {
     # grouped by category, numbered in the order of PRESET_DATA (the number is what "preset <n>" takes)
     preset_all | awk -F'|' '
-        BEGIN { split("stream:Streaming,tvde:TV & media libraries (DE / AT / CH),news:News,gaming:Gaming,social:Social & messaging,work:Tools & work,shop:Shopping & payment,bank:Banks (DE),services:Services (DE),cloud:Cloud & CDN (whole networks),test:Tests & IP check", c, ","); for (i in c) { split(c[i], kv, ":"); lbl[kv[1]] = kv[2] } }
+        BEGIN { split("stream:Streaming,tvde:TV & media libraries (DE / AT / CH),news:News,gaming:Gaming,social:Social & messaging,work:Tools & work,shop:Shopping & payment,bank:Banks (DE),services:Services (DE),smarthome:Smart home & IoT,updates:Updates & downloads,cloud:Cloud & CDN (whole networks),test:Tests & IP check", c, ","); for (i in c) { split(c[i], kv, ":"); lbl[kv[1]] = kv[2] } }
         {
             if ($1 != last) { printf "%s -- %s --\n", (NR > 1 ? "\n" : ""), ($1 in lbl ? lbl[$1] : $1); last = $1 }
             n = split($3, e, " "); na = 0; nd = 0; for (i = 1; i <= n; i++) if (e[i] ~ /^[0-9]+$/) na++; else nd++

@@ -9,7 +9,7 @@ ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to eas
  /_\ / __| \| | |  \/  | /_\ | \| | /_\ / __| __|| _ \
 / _ \__ \ .' | | |\/| |/ _ \| .' |/ _ \ (_ | _| |   /
 /_/ \_\___/_|\_| |_|  |_/_/ \_\_|\_/_/ \_\___|___||_|_\
-              === ASN MANAGER v3.9.4 ===
+              === ASN MANAGER v3.9.5 ===
 ================================================================
  ASNs
  [1]  Show ASN list & routing targets
@@ -84,7 +84,7 @@ Here is a short guide for each menu option of the ASN Manager:
 
 [3] Find ASN for domain / IP: Resolves a domain or IP address, identifies its ASN and lets you add it to or remove it from the list.
 
-[4] Add service presets: 110 predefined services in 9 categories - streaming, TV & media libraries (ARD, ZDF, arte, DW, ORF, SRF ...), news, gaming, social & messaging, tools & work, shopping & payment, cloud & CDN, tests - with their ASNs and / or domains (a domain covers every subdomain), added to an interface in one go. In the WebUI you pick the category first, then the service; below it shows every ASN and domain of the preset and marks those that are already on your list. The ASNs are checked against their holders (RIPEstat). Presets marked (!) / ⚠ are cloud, CDN or hosting networks that carry a large share of the internet - the menu and the page ask first. Own presets: put a file `presets.txt` into `/jffs/addons/asnmanager/` or into the `ASNmanager` folder of a USB device, one preset per line in the form `category|Name|ASNs and domains|` (add `wide` at the end for a whole cloud / CDN network), e.g. `bank|My bank|mybank.example|` - they show up after the built-in ones (categories: stream, tvde, news, gaming, social, work, shop, bank, services, cloud, test).
+[4] Add service presets: 131 predefined services in 11 categories - streaming, TV & media libraries (ARD, ZDF, arte, DW, ORF, SRF ...), news, gaming, social & messaging, tools & work, shopping & payment, smart home & IoT, updates & downloads, cloud & CDN, tests - with their ASNs and / or domains (a domain covers every subdomain), added to an interface in one go. In the WebUI you pick the category first, then the service; below it shows every ASN and domain of the preset and marks those that are already on your list. The ASNs are checked against their holders (RIPEstat). Presets marked (!) / ⚠ are cloud, CDN or hosting networks that carry a large share of the internet - the menu and the page ask first. Own presets: put a file `presets.txt` into `/jffs/addons/asnmanager/` or into the `ASNmanager` folder of a USB device, one preset per line in the form `category|Name|ASNs and domains|` (add `wide` at the end for a whole cloud / CDN network), e.g. `bank|My bank|mybank.example|` - they show up after the built-in ones (categories: stream, tvde, news, gaming, social, work, shop, bank, services, smarthome, updates, cloud, test).
 
 [5] Edit ASN: Change the target interface and the source devices of an entry that is already on the list.
 

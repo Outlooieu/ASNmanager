@@ -1,3 +1,9 @@
+## v3.9.5
+
+- Two new preset categories:
+  - **Smart home & IoT**: Amazon Alexa / Echo, Google Nest, Ring, Philips Hue, tado, Sonos, Shelly, Netatmo, Tuya / Smart Life, eufy, Roborock, SwitchBot, Home Assistant Cloud - such devices often have trouble through a VPN (slow voice commands, failed logins, clouds that block VPN addresses), the usual way is to route them via WAN
+  - **Updates & downloads**: Windows Update, Apple software updates, Android / Google Play downloads, Steam, PlayStation, Xbox and Epic game downloads, Debian / Ubuntu - large downloads that need no privacy, via WAN they do not load the tunnel
+
 ## v3.9.4
 
 - Service presets checked on a router: every main domain answers, the CDN domains were confirmed through typical subdomains (or public domain databases). Removed what could not be confirmed: `indazn.com` and `dazn-api.com` (DAZN) and `spotifycdn.net` (Spotify)
