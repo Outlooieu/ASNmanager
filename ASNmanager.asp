@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.6.5 -->
+<!-- ASNmanager-WebUI v3.6.6 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -62,8 +62,8 @@
 #asnm .asnm-link:hover { text-decoration: underline; }
 
 /* header */
-.asnm-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 16px; gap: 12px 20px; }
-.asnm-brand { display: flex; align-items: center; gap: 12px; flex: 1 1 280px; min-width: 0; }
+.asnm-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px; }
+.asnm-brand { display: flex; align-items: center; gap: 12px; }
 /* orbit animation around the logo: two dashed paths with glowing dots, drawn behind the logo */
 .asnm-logo-wrap { position: relative; width: 42px; height: 42px; flex: none; margin: 0 16px 0 8px; }
 .asnm-logo-wrap .asnm-logo { position: relative; z-index: 1; }
@@ -80,16 +80,16 @@
 .asnm-logo { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
              background: linear-gradient(135deg, #3b82f6, #06b6d4); font-weight: 800; font-size: 15px; color: #fff; letter-spacing: .5px;
              box-shadow: 0 6px 18px rgba(59,130,246,.35); }
-.asnm-title { font-size: 20px; font-weight: 700; white-space: nowrap; }
+.asnm-title { font-size: 20px; font-weight: 700; }
 .asnm-sub { color: var(--muted); font-size: 12px; }
-.asnm-meta { text-align: right; color: var(--muted); font-size: 11px; flex: 0 1 auto; margin-left: auto; }
-.asnm-meta-top { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px 8px; margin-bottom: 5px; }
+.asnm-meta { text-align: right; color: var(--muted); font-size: 11px; }
+.asnm-meta-top { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-bottom: 5px; }
 .asnm-chip { display: inline-block; padding: 3px 10px; border-radius: 999px; background: var(--card2); border: 1px solid var(--line);
              color: var(--text); font-weight: 600; font-size: 11px; }
 
 /* theme switch */
 .asnm-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--card2); border: 1px solid var(--line); }
-.asnm-seg span { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; cursor: pointer;
+.asnm-seg span { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px; cursor: pointer;
                  font-size: 11px; font-weight: 600; color: var(--muted); user-select: none; transition: background .15s, color .15s; }
 .asnm-seg span:hover { color: var(--text); }
 .asnm-seg span.asnm-on { background: var(--accent); color: #fff; }
@@ -417,7 +417,7 @@
 .asnm-rs-sub { margin: -2px 0 0 26px; font-size: 12px; color: var(--text2); display: flex; gap: 16px; flex-wrap: wrap; }
 .asnm-rs-sub label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
 .asnm-rs-det { margin-left: 26px; font-size: 11px; color: var(--muted); line-height: 1.5; }
-.asnm-back { display: inline-block; white-space: nowrap; margin-right: 8px; padding: 3px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--text2); font-size: 12px; font-weight: 600; text-decoration: none; }
+.asnm-back { display: inline-block; text-align: center; max-width: 112px; hyphens: manual; margin-right: 4px; padding: 3px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--text2); font-size: 12px; font-weight: 600; text-decoration: none; }
 .asnm-back:hover { border-color: var(--accent); color: var(--text); }
 .asnm-lr td { font-size: 12px; }
 .asnm-lr-list { margin: 6px 0; line-height: 22px; max-height: 180px; overflow-y: auto; }
@@ -432,7 +432,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.6.5';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.6.6';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -509,7 +509,7 @@ var ASNM_I18N = {
     perf_stats_asn: 'Per ASN (exact)', perf_stats_iface: 'Per interface (light)',
     tr_all: 'All traffic', tr_mode_iface: 'Counting per interface and device only (no ASN breakdown) - saves CPU.', tr_mode_change: 'Change',
     rs_s_smode: 'Statistics detail', rs_s_rules: 'Marking rules', rs_v_asn: 'per ASN', rs_v_iface: 'per interface', rs_v_comb: 'combined', rs_v_single: 'one per ASN',
-    back_router: '← Router', add_entries: 'Entries', kind_ip: 'IP', kind_dom: 'Domain', st_learned: '{n} learned', lr_tip: 'Show the learned addresses', lr_head: 'Addresses learned for *.{d}', lr_more: '... and {n} more (all of them: ASNmanager.sh custom learned {id})', lr_none: 'No address learned yet.', lr_note: 'dnsmasq only stores the addresses, not which subdomain they belong to. An address is removed 7 days after its last lookup; the addresses are saved and put back after a router restart.',
+    back_router: '← Network Map', add_entries: 'Entries', kind_ip: 'IP', kind_dom: 'Domain', st_learned: '{n} learned', lr_tip: 'Show the learned addresses', lr_head: 'Addresses learned for *.{d}', lr_more: '... and {n} more (all of them: ASNmanager.sh custom learned {id})', lr_none: 'No address learned yet.', lr_note: 'dnsmasq only stores the addresses, not which subdomain they belong to. An address is removed 7 days after its last lookup; the addresses are saved and put back after a router restart.',
     add_domnote: 'A domain also covers all its subdomains. It only works for devices that use the router as their DNS server (not with DoH or fixed DNS servers; IPv4 only). The router learns the addresses when a device looks the name up.',
     rc_nolearned: 'none learned', rc_tip_nolearned: 'No address has been learned for this domain yet. A device has to look the name up through the router\'s DNS server (dnsmasq). Not covered: devices with another DNS server or DoH, and names that an AdGuard Home in front answers without passing through dnsmasq.',
     lang_label: 'Language', lang_default: 'Default', lang_en: 'English', theme_label: 'Theme', theme_dark: 'Dark', theme_light: 'Light', theme_blue: 'Blue',
@@ -636,7 +636,7 @@ var ASNM_I18N = {
     perf_stats_asn: 'Pro ASN (genau)', perf_stats_iface: 'Pro Interface (leicht)',
     tr_all: 'Gesamter Verkehr', tr_mode_iface: 'Gezählt wird nur pro Interface und Gerät (ohne ASN-Aufteilung) - spart CPU.', tr_mode_change: 'Ändern',
     rs_s_smode: 'Statistik-Detail', rs_s_rules: 'Marker-Regeln', rs_v_asn: 'pro ASN', rs_v_iface: 'pro Interface', rs_v_comb: 'zusammengefasst', rs_v_single: 'einzeln pro ASN',
-    back_router: '← Router', add_entries: 'Einträge', kind_ip: 'IP', kind_dom: 'Domain', st_learned: '{n} gelernt', lr_tip: 'Gelernte Adressen anzeigen', lr_head: 'Für *.{d} gelernte Adressen', lr_more: '... und {n} weitere (alle: ASNmanager.sh custom learned {id})', lr_none: 'Noch keine Adresse gelernt.', lr_note: 'dnsmasq speichert nur die Adressen, nicht zu welcher Subdomain sie gehören. Eine Adresse wird 7 Tage nach ihrer letzten Abfrage entfernt; die Adressen werden gesichert und nach einem Router-Neustart wiederhergestellt.',
+    back_router: '← Netzwerk\u00adübersicht', add_entries: 'Einträge', kind_ip: 'IP', kind_dom: 'Domain', st_learned: '{n} gelernt', lr_tip: 'Gelernte Adressen anzeigen', lr_head: 'Für *.{d} gelernte Adressen', lr_more: '... und {n} weitere (alle: ASNmanager.sh custom learned {id})', lr_none: 'Noch keine Adresse gelernt.', lr_note: 'dnsmasq speichert nur die Adressen, nicht zu welcher Subdomain sie gehören. Eine Adresse wird 7 Tage nach ihrer letzten Abfrage entfernt; die Adressen werden gesichert und nach einem Router-Neustart wiederhergestellt.',
     add_domnote: 'Eine Domain gilt auch für alle Subdomains. Sie wirkt nur für Geräte, die den Router als DNS-Server nutzen (nicht bei DoH oder fest eingestelltem DNS; nur IPv4). Der Router lernt die Adressen, wenn ein Gerät den Namen auflöst.',
     rc_nolearned: 'nichts gelernt', rc_tip_nolearned: 'Für diese Domain wurde noch keine Adresse gelernt. Ein Gerät muss den Namen über den DNS-Server des Routers (dnsmasq) auflösen. Nicht erfasst werden Geräte mit anderem DNS-Server oder DoH und Namen, die ein davorgeschalteter AdGuard Home beantwortet, ohne dass sie über dnsmasq laufen.',
     lang_label: 'Sprache', lang_default: 'Standard', lang_en: 'English', theme_label: 'Design', theme_dark: 'Dunkel', theme_light: 'Hell', theme_blue: 'Blau',

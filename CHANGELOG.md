@@ -1,3 +1,8 @@
+## v3.6.6
+
+- WebUI header back to the earlier layout: title and description next to the logo, language and theme switches in the same row (the layout of 3.6.3 put them on a line of their own and cut them off on narrow screens); the switches are a bit narrower so the German labels fit as well
+- The link back to the router is called "Network Map" / "Netzwerkübersicht" (the page it opens) instead of "Router"
+
 ## v3.6.5
 
 - Fixed: since the ASN names were added, long names (e.g. "Deutsche Welle Anstalt des Oeffentlichen Rechts") made the first column of "Traffic per ASN / target" so wide that the numbers were pushed out of view on a phone. The name now sits on a second line under the ASN number and is cut with "..." when it is too long (the full name shows on hover)
