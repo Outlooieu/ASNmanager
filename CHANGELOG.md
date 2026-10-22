@@ -1,3 +1,9 @@
+## v3.6.7
+
+- Fixed: "Show ASN list" in the red routing banner did nothing when the ASN list was already open. It now opens the group of the affected entry, scrolls to it and highlights the row
+- The routing banner names the affected entries (e.g. "AS15169 (Google LLC)"), up to three
+- A collapsed group shows a red "n routing error(s)" badge in its header, so a failing entry is no longer hidden behind a green "online" group
+
 ## v3.6.6
 
 - WebUI header back to the earlier layout: title and description next to the logo, language and theme switches in the same row (the layout of 3.6.3 put them on a line of their own and cut them off on narrow screens); the switches are a bit narrower so the German labels fit as well

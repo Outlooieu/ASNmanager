@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.6.6 -->
+<!-- ASNmanager-WebUI v3.6.7 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -190,6 +190,9 @@
 .asnm-table tr.asnm-group td { background: var(--card2); color: var(--text); font-weight: 600; cursor: pointer; user-select: none;
                                border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .asnm-table tr.asnm-group:hover td { background: var(--group-hover); }
+.asnm-table tr.asnm-flash td { animation: asnm-flash 1.2s ease-in-out 3; }
+@keyframes asnm-flash { 50% { background: rgba(220, 38, 38, .18); } }
+.asnm-grc .asnm-badge { margin-left: 6px; }
 .asnm-table tr.asnm-failed td { background: rgba(248,113,113,.07); }
 .asnm-table tr.asnm-editing td { background: rgba(59,130,246,.08); }
 .asnm-arrow { display: inline-block; width: 0; height: 0; margin: 0 10px 1px 2px; vertical-align: middle; transition: transform .15s;
@@ -432,7 +435,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.6.6';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.6.7';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -464,7 +467,7 @@ var ASNM_I18N = {
     rc_tip_ok: 'Sample address {ip} goes via {dev} as intended.', rc_tip_wrong: 'Sample address {ip} goes via {got} instead of {dev}!',
     rc_tip_down: 'Target interface {dev} is offline.', rc_tip_noroute: 'No route found for {ip}.', rc_tip_norule: 'The rule is not active - click "Apply rules".',
     rc_tip_nosub: 'No subnets are loaded for this ASN.', rc_tip_seen: 'Traffic via {dev} since the previous check: {b}',
-    banner_rc: '{n} ASN(s) are not routed as intended - see the "Routing" column in the ASN list.',
+    banner_rc: 'Not routed as intended ({n}):',
     tr_live: 'Live', tr_live_tip: 'Current throughput, measured over the last ~{s} s', tr_live_off: 'only while counting is enabled', tr_live_wait: 'measuring...',
     sg_title: 'Suggestions: top destinations without a rule', sg_since: 'collected since {t}', sg_off: 'Suggestions need active counting.',
     sg_wait: 'Collecting data - the first evaluation appears after about a minute.', sg_empty: 'No destinations without a rule found yet.',
@@ -529,7 +532,7 @@ var ASNM_I18N = {
     lookup_title: 'Find ASN for a domain or IP', domain_ip: 'Domain / IP', btn_lookup: 'Look up', th_ip: 'IP', th_holder: 'Owner',
     btn_take: 'Add to form', btn_take_all: 'Add all to form', in_list: 'in list: {d}', lookup_err: 'lookup failed', lookup_running: 'Looking up...',
     th_pubip: 'External IP', btn_pubip_refresh: 'Refresh IPs', pubip_loading: 'checking...', pubip_none: '-',
-    expand_all: 'expand all', collapse_all: 'collapse all', group_sum: '{n} ASN(s), {s} subnets', group_failed: '{f} failed',
+    expand_all: 'expand all', collapse_all: 'collapse all', group_sum: '{n} ASN(s), {s} subnets', group_failed: '{f} failed', group_rc: '{n} routing error(s)',
     list_title: 'ASN list', btn_remove_sel: 'Remove selected', btn_remove_all: 'Remove all',
     ls_asn: 'ASNs', ls_ip: 'IP / CIDR ranges', ls_dom: 'Domains', ls_th_asn: 'ASN', ls_th_ip: 'IP / range', ls_th_dom: 'Domain', ls_th_learned: 'Learned',
     ls_empty_asn: 'No ASNs configured yet.', ls_empty_ip: 'No IP addresses or ranges yet - add them like ASNs, e.g. 181.209.202.0/24.', ls_empty_dom: 'No domains yet - add them like ASNs, e.g. *.googlevideo.com.',
@@ -591,7 +594,7 @@ var ASNM_I18N = {
     rc_tip_ok: 'Beispiel-Adresse {ip} geht wie geplant über {dev}.', rc_tip_wrong: 'Beispiel-Adresse {ip} geht über {got} statt über {dev}!',
     rc_tip_down: 'Ziel-Interface {dev} ist offline.', rc_tip_noroute: 'Für {ip} wurde keine Route gefunden.', rc_tip_norule: 'Die Regel ist nicht aktiv - "Regeln anwenden" klicken.',
     rc_tip_nosub: 'Für dieses ASN sind keine Subnetze geladen.', rc_tip_seen: 'Verkehr über {dev} seit der vorherigen Prüfung: {b}',
-    banner_rc: '{n} ASN(s) werden nicht wie geplant geroutet - siehe Spalte "Routing" in der ASN-Liste.',
+    banner_rc: 'Nicht wie geplant geroutet ({n}):',
     tr_live: 'Live', tr_live_tip: 'Aktueller Durchsatz, gemessen über die letzten ~{s} s', tr_live_off: 'nur bei aktiver Zählung', tr_live_wait: 'wird gemessen...',
     sg_title: 'Vorschläge: häufigste Ziele ohne Regel', sg_since: 'gesammelt seit {t}', sg_off: 'Vorschläge benötigen eine aktive Zählung.',
     sg_wait: 'Daten werden gesammelt - die erste Auswertung erscheint nach etwa einer Minute.', sg_empty: 'Noch keine Ziele ohne Regel gefunden.',
@@ -656,7 +659,7 @@ var ASNM_I18N = {
     lookup_title: 'ASN zu Domain oder IP finden', domain_ip: 'Domain / IP', btn_lookup: 'Suchen', th_ip: 'IP', th_holder: 'Inhaber',
     btn_take: 'Übernehmen', btn_take_all: 'Alle übernehmen', in_list: 'in Liste: {d}', lookup_err: 'Abfrage fehlgeschlagen', lookup_running: 'Suche läuft...',
     th_pubip: 'Externe IP', btn_pubip_refresh: 'IPs aktualisieren', pubip_loading: 'wird ermittelt...', pubip_none: '-',
-    expand_all: 'alle aufklappen', collapse_all: 'alle zuklappen', group_sum: '{n} ASN(s), {s} Subnetze', group_failed: '{f} fehlgeschlagen',
+    expand_all: 'alle aufklappen', collapse_all: 'alle zuklappen', group_sum: '{n} ASN(s), {s} Subnetze', group_failed: '{f} fehlgeschlagen', group_rc: '{n} Routing-Fehler',
     list_title: 'ASN-Liste', btn_remove_sel: 'Auswahl entfernen', btn_remove_all: 'Alle entfernen',
     ls_asn: 'ASNs', ls_ip: 'IP / CIDR-Bereiche', ls_dom: 'Domains', ls_th_asn: 'ASN', ls_th_ip: 'IP / Bereich', ls_th_dom: 'Domain', ls_th_learned: 'Gelernt',
     ls_empty_asn: 'Noch keine ASNs eingetragen.', ls_empty_ip: 'Noch keine IP-Adressen oder Bereiche - sie werden wie ASNs hinzugefügt, z. B. 181.209.202.0/24.', ls_empty_dom: 'Noch keine Domains - sie werden wie ASNs hinzugefügt, z. B. *.googlevideo.com.',
@@ -1109,7 +1112,8 @@ function asnmListSection(sec, entries, rcMap) {
                     '<span class="asnm-arrow' + (closed ? '' : ' asnm-open') + '"></span>' +
                     asnmEsc(asnmDestLabel(e.dest)) + (f && f.dev ? ' - ' + asnmEsc(f.dev) : '') + ' &nbsp; ' + st + asnmFoBadge(e.dest) +
                     '<span class="asnm-gsum">' + asnmEsc(t('ls_gsum_' + sec, { n: gi.n, s: gi.s, l: gi.l })) +
-                    (gi.f ? '<span class="asnm-badge asnm-bad">' + asnmEsc(t('group_failed', { f: gi.f })) + '</span>' : '') + '</span></td></tr>';
+                    (gi.f ? '<span class="asnm-badge asnm-bad">' + asnmEsc(t('group_failed', { f: gi.f })) + '</span>' : '') +
+                    '<span class="asnm-grc" data-grc="' + asnmEsc(gk) + '">' + asnmGroupRcHtml(gk, rcMap) + '</span></span></td></tr>';
             lastDest = e.dest;
         }
         if (closed) continue;
@@ -2728,6 +2732,49 @@ function asnmRcBadge(e, map) {
     return '<span class="asnm-badge ' + cls + '" title="' + asnmEsc(tip) + '">' + asnmEsc(txt) + '</span>';
 }
 
+function asnmRcFailed(r) { return r && r.state !== 'ok' && r.state !== 'warn' && r.state !== 'pending'; }
+
+// entries of the list whose routing check failed, in list order
+function asnmRcFailedEntries(map) {
+    var out = [], en = (ASNM.data && ASNM.data.entries) || [];
+    map = map || asnmRcMap();
+    for (var i = 0; i < en.length; i++) if (asnmRcFailed(map[asnmNormDest(en[i].dest) + '|' + en[i].asn])) out.push(en[i]);
+    return out;
+}
+
+function asnmRcLabel(e) {
+    if (e.kind === 'dom') return '*.' + e.value;
+    if (e.kind === 'ip') return e.value;
+    var n = e.name ? asnmAsName(e.name) : '';
+    return 'AS' + e.asn + (n ? ' (' + n + ')' : '');
+}
+
+// red badge in a group header: how many entries of the group fail the routing check
+function asnmGroupRcHtml(gk, map) {
+    var f = asnmRcFailedEntries(map), n = 0;
+    for (var i = 0; i < f.length; i++) if (asnmGroupKey(f[i]) === gk) n++;
+    return n ? '<span class="asnm-badge asnm-bad">✗ ' + asnmEsc(t('group_rc', { n: n })) + '</span>' : '';
+}
+
+// banner link: open the group of the first failing entry, scroll to it and highlight it
+function asnmRcGoto() {
+    asnmTab('asns');
+    var f = asnmRcFailedEntries();
+    if (!f.length) return;
+    for (var i = 0; i < f.length; i++) ASNM.collapsed[asnmGroupKey(f[i])] = false;
+    asnmSaveCollapsed();
+    asnmRenderList();
+    var first = null;
+    for (i = 0; i < f.length; i++) {
+        var td = document.getElementById('asnm_rc_' + f[i].asn), tr = td && td.parentNode;
+        if (!tr) continue;
+        if (!first) first = tr;
+        tr.className = (tr.className ? tr.className + ' ' : '') + 'asnm-flash';
+        (function (row) { setTimeout(function () { row.className = row.className.replace(/\s*asnm-flash/, ''); }, 4000); })(tr);
+    }
+    if (first && first.scrollIntoView) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 function asnmRcRender() {
     var d = ASNM_RC.data, st = document.getElementById('asnm_rc_state'), ban = document.getElementById('asnm_banner_rc');
     var ok = 0, warn = 0, fail = 0, i;
@@ -2741,7 +2788,12 @@ function asnmRcRender() {
         st.className = fail ? 'asnm-rc-bad' : (warn ? 'asnm-rc-warn' : 'asnm-rc-ok');
     }
     ban.style.display = (d && fail) ? 'flex' : 'none';
-    if (fail) document.getElementById('asnm_rc_banner_text').textContent = t('banner_rc', { n: fail });
+    if (fail) {
+        var fl = asnmRcFailedEntries(), names = [];
+        for (i = 0; i < fl.length && i < 3; i++) names.push(asnmRcLabel(fl[i]));
+        if (fl.length > 3) names.push('…');
+        document.getElementById('asnm_rc_banner_text').textContent = t('banner_rc', { n: fail }) + (names.length ? ' ' + names.join(', ') : '');
+    }
     // badges in the ASN list are updated in place (keeps ticked checkboxes and an open edit row)
     if (ASNM.data && ASNM.data.entries) {
         var map = asnmRcMap();
@@ -2749,6 +2801,8 @@ function asnmRcRender() {
             var el = document.getElementById('asnm_rc_' + ASNM.data.entries[i].asn);
             if (el) el.innerHTML = asnmRcBadge(ASNM.data.entries[i], map);
         }
+        var gb = document.querySelectorAll('[data-grc]');
+        for (i = 0; i < gb.length; i++) gb[i].innerHTML = asnmGroupRcHtml(gb[i].getAttribute('data-grc'), map);
     }
 }
 
@@ -3041,7 +3095,7 @@ function initial() {
     <a id="asnm_upd_notes" class="asnm-link" target="_blank" rel="noopener" data-i18n="upd_notes"></a>
     <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="upd_install" onclick="asnmUpdate();"/></div>
   <div id="asnm_banner_dns" class="asnm-banner asnm-banner-bad"><span id="asnm_dns_banner_text"></span></div>
-  <div id="asnm_banner_rc" class="asnm-banner asnm-banner-bad"><span id="asnm_rc_banner_text"></span><span class="asnm-spacer"></span><span class="asnm-link" data-i18n="rc_to_list" onclick="asnmTab('asns');"></span></div>
+  <div id="asnm_banner_rc" class="asnm-banner asnm-banner-bad"><span id="asnm_rc_banner_text"></span><span class="asnm-spacer"></span><span class="asnm-link" data-i18n="rc_to_list" onclick="asnmRcGoto();"></span></div>
   <div id="asnm_banner" class="asnm-banner"><span data-i18n-html="banner_pending"></span></div>
   <div id="asnm_banner_failed" class="asnm-banner asnm-banner-bad"></div>
   <div class="asnm-card">
