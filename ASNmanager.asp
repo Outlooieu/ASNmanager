@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.4.0 -->
+<!-- ASNmanager-WebUI v3.4.1 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -109,6 +109,7 @@
 .asnm-stat { background: var(--card2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .asnm-stat-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
 .asnm-stat-value { font-size: 20px; font-weight: 700; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asnm-stat-sub { display: block; margin-top: 2px; font-size: 11px; font-weight: 600; color: var(--muted); white-space: normal; }
 .asnm-stat-value.asnm-small { font-size: 13px; font-weight: 600; padding-top: 6px; }
 .asnm-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .asnm-spacer { flex: 1; }
@@ -400,7 +401,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.4.0';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.4.1';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -481,7 +482,7 @@ var ASNM_I18N = {
     add_domnote: 'A domain also covers all its subdomains. It only works for devices that use the router as their DNS server (not with DoH or fixed DNS servers; IPv4 only). The router learns the addresses when a device looks the name up.',
     rc_nolearned: 'none learned', rc_tip_nolearned: 'No address has been learned for this domain yet. A device has to look the name up through the router\'s DNS server (dnsmasq). Not covered: devices with another DNS server or DoH, and names that an AdGuard Home in front answers without passing through dnsmasq.',
     lang_label: 'Language', lang_default: 'Default', lang_en: 'English', theme_label: 'Theme', theme_dark: 'Dark', theme_light: 'Light', theme_blue: 'Blue',
-    stat_asns: 'ASNs', stat_subnets: 'Subnets', stat_ifaces: 'Interfaces online', stat_last: 'Last applied',
+    stat_asns: 'ASNs', stat_more: '+ {i} IP · {d} domains', stat_subnets: 'Subnets', stat_ifaces: 'Interfaces online', stat_last: 'Last applied',
     card_add_sub: 'Route an Autonomous System, an IP range or a domain through a WAN or VPN interface', card_list_sub: 'Click a group to expand or collapse it',
     status: 'Status', version: 'Version', last_applied: 'Rules last applied', auto_refresh: 'Auto-refresh of subnets', actions: 'Actions',
     btn_apply: 'Apply rules', btn_full: 'Reload all subnets', btn_full_tip: 'Download the subnets of every ASN again and rebuild all rules (the daily schedule does this anyway)', btn_reload: 'Reload data', btn_retry: 'Retry failed',
@@ -601,7 +602,7 @@ var ASNM_I18N = {
     add_domnote: 'Eine Domain gilt auch für alle Subdomains. Sie wirkt nur für Geräte, die den Router als DNS-Server nutzen (nicht bei DoH oder fest eingestelltem DNS; nur IPv4). Der Router lernt die Adressen, wenn ein Gerät den Namen auflöst.',
     rc_nolearned: 'nichts gelernt', rc_tip_nolearned: 'Für diese Domain wurde noch keine Adresse gelernt. Ein Gerät muss den Namen über den DNS-Server des Routers (dnsmasq) auflösen. Nicht erfasst werden Geräte mit anderem DNS-Server oder DoH und Namen, die ein davorgeschalteter AdGuard Home beantwortet, ohne dass sie über dnsmasq laufen.',
     lang_label: 'Sprache', lang_default: 'Standard', lang_en: 'English', theme_label: 'Design', theme_dark: 'Dunkel', theme_light: 'Hell', theme_blue: 'Blau',
-    stat_asns: 'ASNs', stat_subnets: 'Subnetze', stat_ifaces: 'Interfaces online', stat_last: 'Zuletzt angewendet',
+    stat_asns: 'ASNs', stat_more: '+ {i} IP · {d} Domains', stat_subnets: 'Subnetze', stat_ifaces: 'Interfaces online', stat_last: 'Zuletzt angewendet',
     card_add_sub: 'Ein Autonomes System, einen IP-Bereich oder eine Domain über ein WAN- oder VPN-Interface leiten', card_list_sub: 'Gruppe anklicken zum Auf- oder Zuklappen',
     status: 'Status', version: 'Version', last_applied: 'Regeln zuletzt angewendet', auto_refresh: 'Automatische Aktualisierung', actions: 'Aktionen',
     btn_apply: 'Regeln anwenden', btn_full: 'Alle neu laden', btn_full_tip: 'Die Subnetze aller ASNs neu herunterladen und alle Regeln neu aufbauen (der tägliche Zeitplan macht das ohnehin)', btn_reload: 'Daten neu laden', btn_retry: 'Fehlgeschlagene wiederholen',
@@ -840,7 +841,11 @@ function asnmRender() {
     for (var si = 0; si < d.entries.length; si++) if (d.entries[si].subnets > 0) subs += d.entries[si].subnets;
     for (var sj = 0; sj < d.ifaces.length; sj++) if (d.ifaces[sj].up) up++;
     for (var sk = 0; sk < d.ifaces.length; sk++) if (d.ifaces[sk].exists) used++;
-    document.getElementById('asnm_stat_asns').textContent = d.entries.filter(function (x) { return !x.kind; }).length;
+    // ASN tile: number of ASNs, below it the IP / CIDR and domain entries
+    var nA = 0, nI = 0, nD = 0;
+    for (var se = 0; se < d.entries.length; se++) { var sk2 = d.entries[se].kind; if (!sk2) nA++; else if (sk2 === 'ip') nI++; else if (sk2 === 'dom') nD++; }
+    document.getElementById('asnm_stat_asns').innerHTML = nA +
+        '<span class="asnm-stat-sub">' + asnmEsc(t('stat_more', { i: nI, d: nD })) + '</span>';
     document.getElementById('asnm_stat_subnets').textContent = subs.toLocaleString();
     document.getElementById('asnm_stat_ifaces').textContent = up + ' / ' + used;
 

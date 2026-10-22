@@ -1,3 +1,7 @@
+## v3.4.1
+
+- WebUI: the "ASNs" status tile also shows the other entries below the number of ASNs ("+ 1 IP · 4 Domains")
+
 ## v3.4.0
 
 - **Fixed: traffic could leave through the wrong target.** The marks of the targets overlapped: the routing rule of WGC1 (`0x6100/0x6100`) also matched the mark of WGC3 (`0x6300`), WGC2 matched it as well, WAN1 matched WAN2 (`0x8500`), OVPN1/OVPN2 matched OVPN3 and others. Whenever such a pair was in use, traffic meant for one target could go through another. Every target now has one exact value in the mark field `0xff00`; marks are set and the routing rules match with this mask (checked with test packets: the old WGC1 form matched every WGC3 packet, the new one none)
