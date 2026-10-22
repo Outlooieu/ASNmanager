@@ -1,3 +1,11 @@
+## v3.9.0
+
+- Service presets with **domains** and **categories**: 59 presets in 8 categories - Streaming (Netflix, YouTube, Disney+, Prime Video, Spotify, Twitch, DAZN, Paramount+, Crunchyroll, WOW / Sky, Joyn, RTL+, Zattoo, waipu.tv), TV & media libraries (ARD with the regional broadcasters, ZDF & 3sat, arte, Deutsche Welle, HbbTV, ORF, SRF), Gaming (Steam, Epic / Fortnite, PlayStation, Xbox Live, Nintendo, Riot, Blizzard, EA, Ubisoft, GeForce NOW, Discord), Social & messaging, Tools & work (Zoom, Teams, ChatGPT, Claude, GitHub, Apple), Shopping & payment, Cloud & CDN (whole networks, marked ⚠) and Tests (speed tests, IP check)
+- A preset now holds ASNs and / or domains; the domains become domain entries (covering every subdomain). Services without a network of their own (Disney+, Spotify, Prime Video ...) work through their domains
+- WebUI: choose the category first, then the service; below, every ASN and domain of the preset is shown, those already on the list are highlighted ("2 of 5 already on the list")
+- SSH menu: the presets are listed by category with the number of ASNs and domains; adding and removing a preset handles the domains as well
+- The preset numbers for `preset <n>` changed - see `ASNmanager.sh presets`
+
 ## v3.8.7
 
 - Fixed: the main source of the ASN subnets did not answer any more (404) - the ipverse repository was renamed in January 2026 (`asn-ip` -> `as-ip-blocks`) and the files are called `ipv4-aggregated.txt` now. Since then every ASN was loaded from the slower fallbacks (RIPEstat, HackerTarget). The new address is used now

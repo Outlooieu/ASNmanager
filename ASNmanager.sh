@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.8.7
+version=3.9.0
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.8.7"
+SCRIPT_VERSION="3.9.0"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -26,48 +26,90 @@ MAGENTA='\033[0;35m'
 NC='\033[0m'
 [ -t 1 ] || { CYAN=''; GREEN=''; YELLOW=''; RED=''; MAGENTA=''; NC=''; }
 
-# Service presets: one line per preset -> "Name|ASN ASN ...|wide" (single source for menu + WebUI)
-# The holders were checked with RIPEstat (as-overview) in 10/2026. "wide" = a large share of the internet goes through
-# these networks (cloud, CDN, hosting) - routing them moves far more than the one service, the menu and the page warn.
-PRESET_DATA='Amazon / AWS|16509 14618 7224 8987 38895|wide
-Google Services|15169 19527 22859 26910 36039 36384 36492 41264 139070 396982 16550|wide
-YouTube|43515 36040|
-Netflix|2906 40027|
-Cloudflare|13335 209242|wide
-Steam / Valve|32590|
-Meta / Facebook / IG / WhatsApp|32934 63293 54115 149642|
-Microsoft / Azure / Xbox|8075 8068 8069 8070 8071 8072 8073 8074 3598 6584|wide
-Apple / iCloud|714 6185 2709 1042|
-Telegram|62041 59930 44907 211157|
-Akamai CDN|20940 16625|wide
-Fastly CDN|54113|wide
-PlayStation / Sony Interactive|33353|
-TikTok / ByteDance|138699 396986|
-Hetzner & OVH Hosting|24940 16276|wide
-Twitch|46489 397153|
-Riot Games / LoL / Valorant|6507 62830|
-Epic Games (own network only)|4356|
-Nintendo|11278|
-Zoom|30103|
-DigitalOcean & Linode|14061 46652 63949|wide
-Oracle Cloud|31898|wide
-OpenAI / ChatGPT|401864|
-GitHub|36459|
-NVIDIA / GeForce NOW|11414 20347 60977|
-EA / Electronic Arts (own network only)|33572|
-Blizzard / Battle.net|57976 32163|
-Ubisoft|8361 22634 28759|'
+# Service presets: one line per preset -> "category|Name|entries|wide" (single source for menu + WebUI)
+# Entries are ASNs and / or domains (a domain covers every subdomain). The ASN holders were checked with RIPEstat
+# (as-overview) in 10/2026. "wide" = a large share of the internet goes through these networks (cloud, CDN, hosting) -
+# routing them moves far more than the one service, the menu and the page ask first.
+# Categories: stream, tvde, gaming, social, work, shop, cloud, test
+PRESET_DATA='stream|Netflix|2906 40027 netflix.com nflxvideo.net nflximg.net nflxext.com nflxso.net|
+stream|YouTube|43515 36040 youtube.com googlevideo.com ytimg.com youtu.be youtube-nocookie.com ggpht.com|
+stream|Disney+|disneyplus.com disney-plus.net bamgrid.com dssott.com disneystreaming.com|
+stream|Amazon Prime Video|primevideo.com aiv-cdn.net aiv-delivery.net amazonvideo.com pv-cdn.net|
+stream|Spotify|spotify.com scdn.co spotifycdn.com spotifycdn.net|
+stream|Twitch|46489 397153 twitch.tv ttvnw.net jtvnw.net|
+stream|DAZN|dazn.com indazn.com dazn-api.com|
+stream|Paramount+|paramountplus.com|
+stream|Crunchyroll|crunchyroll.com|
+stream|WOW / Sky|sky.de sky.com wowtv.de|
+stream|Joyn|joyn.de|
+stream|RTL+|rtl.de|
+stream|Zattoo|zattoo.com|
+stream|waipu.tv|waipu.tv|
+tvde|ARD Mediathek & regional broadcasters|ard.de ardmediathek.de daserste.de tagesschau.de ardaudiothek.de br.de wdr.de ndr.de swr.de hr.de mdr.de rbb-online.de sr-online.de radiobremen.de kika.de phoenix.de deutschlandfunk.de wdrmedien-a.akamaihd.net wdradaptiv-vh.akamaihd.net mediandr-a.akamaihd.net hrardmediathek-a.akamaihd.net odmdr-a.akamaihd.net pdodswr-a.akamaihd.net rbbmediapmdp-a.akamaihd.net srstorage01-a.akamaihd.net pmdonlinekika-a.akamaihd.net|
+tvde|ZDF Mediathek & 3sat|zdf.de zdfmediathek.de heute.de 3sat.de tvdlzdf-a.akamaihd.net nrodlzdf-a.akamaihd.net rodlzdf-a.akamaihd.net ssl.zdf.de.edgekey.net|
+tvde|arte|arte.tv arte.de arteconcert-a.akamaihd.net arteptweb-a.akamaihd.net arte.gl-systemhaus.de|
+tvde|Deutsche Welle|dw.com dw.de tvdownloaddw-a.akamaihd.net|
+tvde|HbbTV (ARD / ZDF red button)|hbbtv.zdf.de itv.ard.de cdn.hbbtvlive.de|
+tvde|ORF (Austria)|orf.at|
+tvde|SRF / SRG (Switzerland)|srf.ch srgssr.ch hdvodsrforigin-f.akamaihd.net srfvodhd-vh.akamaihd.net|
+gaming|Steam / Valve|32590 steampowered.com steamcommunity.com steamstatic.com steamcontent.com steamserver.net|
+gaming|Epic Games / Fortnite|4356 epicgames.com epicgames.dev unrealengine.com fortnite.com|
+gaming|PlayStation Network|33353 playstation.com playstation.net sonyentertainmentnetwork.com|
+gaming|Xbox Live|xbox.com xboxlive.com|
+gaming|Nintendo|11278 nintendo.com nintendo.net nintendo.de|
+gaming|Riot Games / LoL / Valorant|6507 62830 riotgames.com leagueoflegends.com|
+gaming|Blizzard / Battle.net|57976 32163 blizzard.com battle.net|
+gaming|EA / Electronic Arts|33572 ea.com|
+gaming|Ubisoft|8361 22634 28759 ubisoft.com ubi.com|
+gaming|NVIDIA GeForce NOW|11414 20347 60977 geforcenow.com nvidia.com|
+gaming|Discord|discord.com discord.gg discordapp.com discordapp.net discord.media|
+social|Meta / Facebook / Instagram / WhatsApp|32934 63293 54115 149642 facebook.com fbcdn.net instagram.com cdninstagram.com whatsapp.com whatsapp.net|
+social|TikTok|138699 396986 tiktok.com tiktokcdn.com tiktokv.com|
+social|Telegram|62041 59930 44907 211157 telegram.org t.me|
+social|X / Twitter|x.com twitter.com twimg.com|
+social|Snapchat|snapchat.com sc-cdn.net|
+social|Reddit|reddit.com redd.it redditmedia.com redditstatic.com|
+social|Signal|signal.org|
+social|Tinder|tinder.com gotinder.com|
+work|Zoom|30103 zoom.us zoom.com|
+work|Microsoft Teams|teams.microsoft.com teams.live.com|
+work|OpenAI / ChatGPT|401864 openai.com chatgpt.com oaiusercontent.com|
+work|Claude / Anthropic|claude.ai anthropic.com|
+work|GitHub|36459 github.com githubusercontent.com github.io githubassets.com|
+work|Apple / iCloud|714 6185 2709 1042|
+shop|Amazon shop|amazon.de amazon.com media-amazon.com ssl-images-amazon.com|
+shop|eBay|ebay.de ebay.com ebaystatic.com ebayimg.com|
+shop|PayPal|paypal.com paypalobjects.com|
+cloud|Amazon AWS|16509 14618 7224 8987 38895|wide
+cloud|Google (all networks)|15169 19527 22859 26910 36039 36384 36492 41264 139070 396982 16550|wide
+cloud|Microsoft / Azure|8075 8068 8069 8070 8071 8072 8073 8074 3598 6584|wide
+cloud|Cloudflare|13335 209242|wide
+cloud|Akamai CDN|20940 16625|wide
+cloud|Fastly CDN|54113|wide
+cloud|Hetzner & OVH|24940 16276|wide
+cloud|DigitalOcean & Linode|14061 46652 63949|wide
+cloud|Oracle Cloud|31898|wide
+test|Speed tests & IP check|speedtest.net ookla.com fast.com whatismyip.com wieistmeineip.de ipify.org|'
 PRESET_COUNT=$(echo "$PRESET_DATA" | grep -c .)
 
 print_presets() {
-    echo "$PRESET_DATA" | awk -F'|' '{ n=split($2,a," "); l=""; for(i=1;i<=n;i++) l=l (i>1?", ":"") "AS" a[i]; printf " [%d]%s %s%s (%s)\n", NR, (NR<10?" ":""), $1, ($3 == "wide" ? " (!)" : ""), l }'
+    # grouped by category, numbered in the order of PRESET_DATA (the number is what "preset <n>" takes)
+    echo "$PRESET_DATA" | awk -F'|' '
+        BEGIN { split("stream:Streaming,tvde:TV & media libraries (DE / AT / CH),gaming:Gaming,social:Social & messaging,work:Tools & work,shop:Shopping & payment,cloud:Cloud & CDN (whole networks),test:Tests & IP check", c, ","); for (i in c) { split(c[i], kv, ":"); lbl[kv[1]] = kv[2] } }
+        {
+            if ($1 != last) { printf "%s -- %s --\n", (NR > 1 ? "\n" : ""), ($1 in lbl ? lbl[$1] : $1); last = $1 }
+            n = split($3, e, " "); na = 0; nd = 0; for (i = 1; i <= n; i++) if (e[i] ~ /^[0-9]+$/) na++; else nd++
+            info = (na ? na " ASN" (na > 1 ? "s" : "") : "") (na && nd ? ", " : "") (nd ? nd " domain" (nd > 1 ? "s" : "") : "")
+            printf " [%d]%s %s%s  (%s)\n", NR, (NR < 10 ? " " : ""), $2, ($4 == "wide" ? " (!)" : ""), info }'
+    echo ""
     echo " (!) = a large share of the internet runs through these networks - routing them moves far more than this one service"
 }
 
-preset_wide() { [ "$(echo "$PRESET_DATA" | sed -n "${1}p" | cut -d'|' -f3)" = "wide" ]; }
+preset_wide() { [ "$(echo "$PRESET_DATA" | sed -n "${1}p" | cut -d'|' -f4)" = "wide" ]; }
+# the entries of a preset: ASNs and domains, separated by spaces
 preset_asns() {
     case "$1" in ''|*[!0-9]*) return 1 ;; esac
-    echo "$PRESET_DATA" | sed -n "${1}p" | cut -d'|' -f2
+    echo "$PRESET_DATA" | sed -n "${1}p" | cut -d'|' -f3
 }
 
 ensure_script() {
@@ -1393,7 +1435,7 @@ prompt_source_ip() {
 
 service_presets() {
     clear
-    echo -e "${YELLOW}--- Add ASN Service Presets ---${NC}"
+    echo -e "${YELLOW}--- Add service presets (ASNs and domains) ---${NC}"
     print_presets
     echo -e " [0]  Cancel"
     echo ""
@@ -1412,11 +1454,8 @@ service_presets() {
     [ "$SELECTED_DEST" = "CANCEL" ] && return
     prompt_source_ip
 
-    for asn in $PRESET_ASNS; do
-        sed -i "/^${asn}:/d" "$ASN_FILE"
-        echo "${asn}:${SELECTED_DEST}:${SELECTED_SRC_IP}" >> "$ASN_FILE"
-    done
-    sort -u "$ASN_FILE" -o "$ASN_FILE" 2>/dev/null
+    # ASNs and domains: the same way as "add" (a domain becomes a domain entry)
+    if [ -n "$SELECTED_SRC_IP" ]; then cli_add "$SELECTED_DEST" $PRESET_ASNS --src "$SELECTED_SRC_IP"; else cli_add "$SELECTED_DEST" $PRESET_ASNS; fi >/dev/null
     echo -e "${GREEN}Preset assigned successfully! Run option [7] to apply rules.${NC}"
     sleep 2
 }
@@ -1448,10 +1487,8 @@ remove_menu() {
             read -r p_rem
             REM_ASNS=$(preset_asns "$p_rem")
             [ -z "$REM_ASNS" ] && return
-            for asn in $REM_ASNS; do
-                sed -i "/^${asn}:/d" "$ASN_FILE"
-            done
-            echo -e "${GREEN}Preset ASNs removed! Run option [7] to apply rules.${NC}"
+            cli_remove $REM_ASNS >/dev/null
+            echo -e "${GREEN}Preset entries removed! Run option [7] to apply rules.${NC}"
             ;;
         3)
             echo -e "${RED}This removes ALL entries: $(grep -c . "$ASN_FILE" 2>/dev/null || echo 0) ASN(s) and $(grep -c . "$CUSTOM_FILE" 2>/dev/null || echo 0) IP / domain entry(ies), with their notes.${NC}"
@@ -2698,7 +2735,7 @@ web_export() {
         printf '],'
 
         printf '"presets":['
-        echo "$PRESET_DATA" | awk -F'|' '{ gsub(/["\\]/, "", $1); printf "%s{\"name\":\"%s\",\"asns\":\"%s\",\"wide\":%d}", (NR > 1 ? "," : ""), $1, $2, ($3 == "wide") }'
+        echo "$PRESET_DATA" | awk -F'|' '{ gsub(/["\\]/, "", $2); printf "%s{\"cat\":\"%s\",\"name\":\"%s\",\"items\":\"%s\",\"wide\":%d}", (NR > 1 ? "," : ""), $1, $2, $3, ($4 == "wide") }'
         printf ']}\n'
     } > "$out" && mv "$out" "$WEB_DIR/data.js"
     rm -f "$sets_tmp" "$fail_tmp" "$pend_tmp" "$nm_tmp" "$nt_tmp"

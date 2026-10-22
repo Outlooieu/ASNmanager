@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.8.7 -->
+<!-- ASNmanager-WebUI v3.9.0 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -347,6 +347,8 @@
 .asnm-ex { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; padding: 1px 5px; border-radius: 5px;
     background: var(--card2); border: 1px solid var(--line); color: var(--text); white-space: nowrap; }
 .asnm-s-formats { line-height: 1.9; }
+.asnm-preset-items { line-height: 2; margin: 2px 0 4px; }
+.asnm-ex.asnm-ex-on { border-color: var(--ok); color: var(--ok); }
 .asnm-dp-text { font-size: 12px; color: var(--text2); line-height: 1.55; margin: 0 0 12px; max-width: 760px; }
 .asnm-dp-row { align-items: center; gap: 12px; }
 #asnm .asnm-diag-dev { width: 260px; }
@@ -456,7 +458,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.8.7';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.9.0';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -518,7 +520,7 @@ var ASNM_I18N = {
     job_busy: 'Another job is still running ({a}). The page shows it until it is finished - then please repeat your action.',
     job_running: 'A job started earlier is still running ({a}) - the page shows it until it is finished.',
     act_apply: 'Apply rules', act_reload: 'Reload all subnets', act_retry: 'Retry failed ASNs', act_update: 'Update', act_import: 'Restore', act_add: 'Add entries', act_preset: 'Add preset',
-    act_remove: 'Remove', act_clear: 'Clear list', act_edit: 'Edit', act_schedule: 'Schedule', act_failover: 'Failover', act_statssave: 'USB saving', preset_legend: '⚠ = cloud, CDN or hosting: a large share of the internet runs through these networks, routing them moves far more than this one service. Services that run on such networks (e.g. Disney+, Spotify, Fortnite) have no preset - use domain entries for them.', preset_wide: '"{n}": a large share of the internet runs through these networks (cloud / CDN / hosting).\nRouting them moves the traffic of many other services and websites as well - not only this one.\n\nAdd anyway?', tool_done: '{a}: done - see the result below', tool_failed: '{a}: failed - see the output below', act_test: 'Test route', act_trace: 'Traceroute', act_ifaces: 'Public IPs', act_status: 'ipset status', act_lookup: 'Look-up', act_sghide: 'Hide suggestion', sg_hide: 'Hide this suggestion', sg_unhide: 'Show this suggestion again', sg_showhid: 'Show hidden ({n})',
+    act_remove: 'Remove', act_clear: 'Clear list', act_edit: 'Edit', act_schedule: 'Schedule', act_failover: 'Failover', act_statssave: 'USB saving', preset_cat: 'Category', preset_on: 'already on the list -> {t}', preset_have: '{n} of {m} already on the list (highlighted) - adding them again moves them to the chosen target', pcat_stream: 'Streaming', pcat_tvde: 'TV & media libraries (DE / AT / CH)', pcat_gaming: 'Gaming', pcat_social: 'Social & messaging', pcat_work: 'Tools & work', pcat_shop: 'Shopping & payment', pcat_cloud: 'Cloud & CDN (whole networks)', pcat_test: 'Tests & IP check', preset_legend: 'A preset adds ASNs and / or domains (a domain covers every subdomain). ⚠ = cloud, CDN or hosting: a large share of the internet runs through these networks, routing them moves far more than this one service.', preset_wide: '"{n}": a large share of the internet runs through these networks (cloud / CDN / hosting).\nRouting them moves the traffic of many other services and websites as well - not only this one.\n\nAdd anyway?', tool_done: '{a}: done - see the result below', tool_failed: '{a}: failed - see the output below', act_test: 'Test route', act_trace: 'Traceroute', act_ifaces: 'Public IPs', act_status: 'ipset status', act_lookup: 'Look-up', act_sghide: 'Hide suggestion', sg_hide: 'Hide this suggestion', sg_unhide: 'Show this suggestion again', sg_showhid: 'Show hidden ({n})',
     tab_asns: 'ASNs', tab_traffic: 'Traffic', tab_targets: 'Targets & failover', tab_diag: 'Diagnostics', tab_settings: 'Settings',
     sub_manual: 'Enter ASNs', sub_lookup: 'Find by domain / IP', sub_presets: 'Service presets', rc_to_list: 'Show ASN list',
     sp_th: 'Speed test', sp_btn: 'Test', sp_running: 'Speed test running - about 30 seconds...',
@@ -668,7 +670,7 @@ var ASNM_I18N = {
     job_busy: 'Es läuft noch ein anderer Auftrag ({a}). Die Seite zeigt ihn an, bis er fertig ist - danach bitte deine Aktion wiederholen.',
     job_running: 'Ein vorher gestarteter Auftrag läuft noch ({a}) - die Seite zeigt ihn an, bis er fertig ist.',
     act_apply: 'Regeln anwenden', act_reload: 'Alle Subnetze neu laden', act_retry: 'Fehlgeschlagene wiederholen', act_update: 'Update', act_import: 'Wiederherstellen', act_add: 'Einträge hinzufügen', act_preset: 'Vorlage hinzufügen',
-    act_remove: 'Entfernen', act_clear: 'Liste leeren', act_edit: 'Bearbeiten', act_schedule: 'Zeitplan', act_failover: 'Failover', act_statssave: 'USB-Sicherung', preset_legend: '⚠ = Cloud, CDN oder Hosting: über diese Netze läuft ein großer Teil des Internets, wer sie umleitet, leitet weit mehr als diesen einen Dienst um. Dienste, die auf solchen Netzen laufen (z. B. Disney+, Spotify, Fortnite), haben keine Vorlage - dafür Domain-Einträge nutzen.', preset_wide: '"{n}": Über diese Netze läuft ein großer Teil des Internets (Cloud / CDN / Hosting).\nWer sie umleitet, leitet auch den Verkehr vieler anderer Dienste und Webseiten mit um - nicht nur diesen einen.\n\nTrotzdem hinzufügen?', tool_done: '{a}: fertig - Ergebnis siehe unten', tool_failed: '{a}: fehlgeschlagen - siehe Ausgabe unten', act_test: 'Route testen', act_trace: 'Traceroute', act_ifaces: 'Öffentliche IPs', act_status: 'ipset-Status', act_lookup: 'Suche', act_sghide: 'Vorschlag ausblenden', sg_hide: 'Diesen Vorschlag ausblenden', sg_unhide: 'Wieder einblenden', sg_showhid: 'Ausgeblendete zeigen ({n})',
+    act_remove: 'Entfernen', act_clear: 'Liste leeren', act_edit: 'Bearbeiten', act_schedule: 'Zeitplan', act_failover: 'Failover', act_statssave: 'USB-Sicherung', preset_cat: 'Kategorie', preset_on: 'schon in der Liste -> {t}', preset_have: '{n} von {m} schon in der Liste (markiert) - erneutes Hinzufügen setzt sie auf das gewählte Ziel', pcat_stream: 'Streaming', pcat_tvde: 'TV & Mediatheken (DE / AT / CH)', pcat_gaming: 'Gaming', pcat_social: 'Social & Messenger', pcat_work: 'Tools & Arbeit', pcat_shop: 'Shopping & Bezahlen', pcat_cloud: 'Cloud & CDN (ganze Netze)', pcat_test: 'Tests & IP-Check', preset_legend: 'Eine Vorlage fügt ASNs und / oder Domains hinzu (eine Domain gilt für alle Unterdomains). ⚠ = Cloud, CDN oder Hosting: über diese Netze läuft ein großer Teil des Internets, wer sie umleitet, leitet weit mehr als diesen einen Dienst um.', preset_wide: '"{n}": Über diese Netze läuft ein großer Teil des Internets (Cloud / CDN / Hosting).\nWer sie umleitet, leitet auch den Verkehr vieler anderer Dienste und Webseiten mit um - nicht nur diesen einen.\n\nTrotzdem hinzufügen?', tool_done: '{a}: fertig - Ergebnis siehe unten', tool_failed: '{a}: fehlgeschlagen - siehe Ausgabe unten', act_test: 'Route testen', act_trace: 'Traceroute', act_ifaces: 'Öffentliche IPs', act_status: 'ipset-Status', act_lookup: 'Suche', act_sghide: 'Vorschlag ausblenden', sg_hide: 'Diesen Vorschlag ausblenden', sg_unhide: 'Wieder einblenden', sg_showhid: 'Ausgeblendete zeigen ({n})',
     tab_asns: 'ASNs', tab_traffic: 'Traffic', tab_targets: 'Ziele & Failover', tab_diag: 'Diagnose', tab_settings: 'Einstellungen',
     sub_manual: 'ASNs eingeben', sub_lookup: 'Per Domain / IP suchen', sub_presets: 'Dienst-Vorlagen', rc_to_list: 'Zur ASN-Liste',
     sp_th: 'Speedtest', sp_btn: 'Test', sp_running: 'Speedtest läuft - etwa 30 Sekunden...',
@@ -1104,14 +1106,45 @@ function asnmPickDevice(sel, inputId) {
     sel.selectedIndex = 0;
 }
 
+// presets: first the category, then the service; below, what it adds (ASNs and domains) and what is already on the list
+var ASNM_PCATS = ['stream', 'tvde', 'gaming', 'social', 'work', 'shop', 'cloud', 'test'];
+function asnmPresetCatSel() {
+    var c = 'stream';
+    try { c = localStorage.getItem('asnm_preset_cat') || 'stream'; } catch (e) {}
+    return ASNM_PCATS.indexOf(c) >= 0 ? c : 'stream';
+}
 function asnmRenderPresets() {
-    var sel = document.getElementById('asnm_preset'), keep = sel.value, html = '';
+    var cs = document.getElementById('asnm_preset_cat'), cur = cs.value || asnmPresetCatSel(), h = '', n = {}, i;
+    for (i = 0; i < ASNM.data.presets.length; i++) n[ASNM.data.presets[i].cat] = (n[ASNM.data.presets[i].cat] || 0) + 1;
+    for (i = 0; i < ASNM_PCATS.length; i++) if (n[ASNM_PCATS[i]])
+        h += '<option value="' + ASNM_PCATS[i] + '"' + (ASNM_PCATS[i] === cur ? ' selected="selected"' : '') + '>' + asnmEsc(t('pcat_' + ASNM_PCATS[i])) + ' (' + n[ASNM_PCATS[i]] + ')</option>';
+    cs.innerHTML = h;
+    asnmPresetCat(cs.value, true);
+}
+function asnmPresetCat(cat, keep) {
+    try { localStorage.setItem('asnm_preset_cat', cat); } catch (e) {}
+    var sel = document.getElementById('asnm_preset'), old = keep ? sel.value : '', html = '';
     for (var i = 0; i < ASNM.data.presets.length; i++) {
         var p = ASNM.data.presets[i];
-        html += '<option value="' + (i + 1) + '">' + (p.wide ? '⚠ ' : '') + asnmEsc(p.name) + ' (AS' + asnmEsc(p.asns.split(' ').join(', AS')) + ')</option>';
+        if (p.cat !== cat) continue;
+        html += '<option value="' + (i + 1) + '">' + (p.wide ? '⚠ ' : '') + asnmEsc(p.name) + '</option>';
     }
     sel.innerHTML = html;
-    if (keep) sel.value = keep;
+    if (old && sel.querySelector('option[value="' + old + '"]')) sel.value = old;
+    asnmPresetShow();
+}
+function asnmPresetShow() {
+    var box = document.getElementById('asnm_preset_items'), p = ASNM.data.presets[+document.getElementById('asnm_preset').value - 1];
+    if (!p) { box.innerHTML = ''; return; }
+    var have = {}, en = ASNM.data.entries || [], i, it = String(p.items).split(' '), h = [], on = 0;
+    for (i = 0; i < en.length; i++) have[en[i].kind === 'dom' ? 'd:' + en[i].value : (en[i].kind ? '' : 'a:' + en[i].asn)] = asnmNormDest(en[i].dest);
+    for (i = 0; i < it.length; i++) {
+        if (!it[i]) continue;
+        var isA = /^\d+$/.test(it[i]), k = (isA ? 'a:' : 'd:') + it[i], tg = have[k];
+        if (tg) on++;
+        h.push('<span class="asnm-ex' + (tg ? ' asnm-ex-on' : '') + '"' + (tg ? ' title="' + asnmEsc(t('preset_on', { t: tg })) + '"' : '') + '>' + asnmEsc(isA ? 'AS' + it[i] : it[i]) + '</span>');
+    }
+    box.innerHTML = h.join(' ') + (on ? ' <span class="asnm-muted">' + asnmEsc(t('preset_have', { n: on, m: h.length })) + '</span>' : '');
 }
 
 function asnmSrcCell(src) {
@@ -3413,7 +3446,9 @@ function initial() {
   </div>
     <div class="asnm-subpanel" id="asnm_sub_presets" style="display:none;">
     <div class="asnm-form">
-      <div class="asnm-field asnm-full"><span class="asnm-label" data-i18n="preset"></span><select id="asnm_preset"></select><span class="asnm-help" data-i18n="preset_legend"></span></div>
+      <div class="asnm-field"><span class="asnm-label" data-i18n="preset_cat"></span><select id="asnm_preset_cat" onchange="asnmPresetCat(this.value);"></select></div>
+      <div class="asnm-field"><span class="asnm-label" data-i18n="preset"></span><select id="asnm_preset" onchange="asnmPresetShow();"></select></div>
+      <div class="asnm-field asnm-full"><div class="asnm-preset-items" id="asnm_preset_items"></div><span class="asnm-help" data-i18n="preset_legend"></span></div>
       <div class="asnm-field"><span class="asnm-label" data-i18n="target"></span><select id="asnm_preset_dest"></select></div>
       <div class="asnm-field"><span class="asnm-label" data-i18n="src_ip"></span>
         <div class="asnm-inline"><input type="text" id="asnm_preset_src" maxlength="600" data-i18n-ph="ph_ip" autocomplete="off" style="flex:1 1 150px; min-width:0;" oninput="asnmDevMsRender('asnm_preset_ms','asnm_preset_src');"/>
