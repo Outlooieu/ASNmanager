@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.8.5
+version=3.8.6
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.8.5"
+SCRIPT_VERSION="3.8.6"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -26,43 +26,45 @@ MAGENTA='\033[0;35m'
 NC='\033[0m'
 [ -t 1 ] || { CYAN=''; GREEN=''; YELLOW=''; RED=''; MAGENTA=''; NC=''; }
 
-# Service presets: one line per preset -> "Name|ASN ASN ..." (single source for menu + WebUI)
-PRESET_DATA='Amazon / AWS|16509 14618
-Google Services|15169 8075 22577
-YouTube|43515 36040
-Netflix|2906 40027
-Cloudflare|13335 209242
-Steam / Valve|32590
-Meta / Facebook / IG / WhatsApp|32934 63293
-Microsoft / Azure / Xbox|8075 8068 8074 36444
-Apple / iCloud|714
-Telegram|62041 59930 44907 211157 20473
-Akamai CDN|20940 16625
-Fastly CDN|54113
-PlayStation / Sony|33494 19684 29237
-TikTok / ByteDance|138699 396986
-Hetzner & OVH Hosting|24940 16276
-Disney+ / Hulu|394464
-Spotify|8403 45102 23507
-Twitch|46489
-Riot Games / LoL / Valorant|6507
-Epic Games|32252 13488
-Nintendo|9003
-Zoom|20224 394622
-DigitalOcean & Linode|14061 63949
-Oracle Cloud|31898
-OpenAI / ChatGPT|398324
-GitHub|36459 19864
-NVIDIA / GeForce NOW|40676
-EA / Electronic Arts|29748
-Blizzard / Battle.net|57976
-Ubisoft|32499'
+# Service presets: one line per preset -> "Name|ASN ASN ...|wide" (single source for menu + WebUI)
+# The holders were checked with RIPEstat (as-overview) in 10/2026. "wide" = a large share of the internet goes through
+# these networks (cloud, CDN, hosting) - routing them moves far more than the one service, the menu and the page warn.
+PRESET_DATA='Amazon / AWS|16509 14618 7224 8987 38895|wide
+Google Services|15169 19527 22859 26910 36039 36384 36492 41264 139070 396982 16550|wide
+YouTube|43515 36040|
+Netflix|2906 40027|
+Cloudflare|13335 209242|wide
+Steam / Valve|32590|
+Meta / Facebook / IG / WhatsApp|32934 63293 54115 149642|
+Microsoft / Azure / Xbox|8075 8068 8069 8070 8071 8072 8073 8074 3598 6584|wide
+Apple / iCloud|714 6185 2709 1042|
+Telegram|62041 59930 44907 211157|
+Akamai CDN|20940 16625|wide
+Fastly CDN|54113|wide
+PlayStation / Sony Interactive|33353|
+TikTok / ByteDance|138699 396986|
+Hetzner & OVH Hosting|24940 16276|wide
+Twitch|46489 397153|
+Riot Games / LoL / Valorant|6507 62830|
+Epic Games (own network only)|4356|
+Nintendo|11278|
+Zoom|30103|
+DigitalOcean & Linode|14061 46652 63949|wide
+Oracle Cloud|31898|wide
+OpenAI / ChatGPT|401864|
+GitHub|36459|
+NVIDIA / GeForce NOW|11414 20347 60977|
+EA / Electronic Arts (own network only)|33572|
+Blizzard / Battle.net|57976 32163|
+Ubisoft|8361 22634 28759|'
 PRESET_COUNT=$(echo "$PRESET_DATA" | grep -c .)
 
 print_presets() {
-    echo "$PRESET_DATA" | awk -F'|' '{ n=split($2,a," "); l=""; for(i=1;i<=n;i++) l=l (i>1?", ":"") "AS" a[i]; printf " [%d]%s %s (%s)\n", NR, (NR<10?" ":""), $1, l }'
+    echo "$PRESET_DATA" | awk -F'|' '{ n=split($2,a," "); l=""; for(i=1;i<=n;i++) l=l (i>1?", ":"") "AS" a[i]; printf " [%d]%s %s%s (%s)\n", NR, (NR<10?" ":""), $1, ($3 == "wide" ? " (!)" : ""), l }'
+    echo " (!) = a large share of the internet runs through these networks - routing them moves far more than this one service"
 }
 
+preset_wide() { [ "$(echo "$PRESET_DATA" | sed -n "${1}p" | cut -d'|' -f3)" = "wide" ]; }
 preset_asns() {
     case "$1" in ''|*[!0-9]*) return 1 ;; esac
     echo "$PRESET_DATA" | sed -n "${1}p" | cut -d'|' -f2
@@ -1399,6 +1401,12 @@ service_presets() {
     read -r p_opt
     PRESET_ASNS=$(preset_asns "$p_opt")
     [ -z "$PRESET_ASNS" ] && return
+    if preset_wide "$p_opt"; then
+        echo -e "${YELLOW}Careful: a large share of the internet runs through these networks (cloud / CDN / hosting).${NC}"
+        echo -e "${YELLOW}Routing them moves the traffic of many other services and websites as well.${NC}"
+        echo -n "Add anyway? (y/N): "; read -r p_ok
+        case "$p_ok" in [Yy]*) ;; *) return ;; esac
+    fi
 
     prompt_destination
     [ "$SELECTED_DEST" = "CANCEL" ] && return
@@ -2690,7 +2698,7 @@ web_export() {
         printf '],'
 
         printf '"presets":['
-        echo "$PRESET_DATA" | awk -F'|' '{ gsub(/["\\]/, "", $1); printf "%s{\"name\":\"%s\",\"asns\":\"%s\"}", (NR > 1 ? "," : ""), $1, $2 }'
+        echo "$PRESET_DATA" | awk -F'|' '{ gsub(/["\\]/, "", $1); printf "%s{\"name\":\"%s\",\"asns\":\"%s\",\"wide\":%d}", (NR > 1 ? "," : ""), $1, $2, ($3 == "wide") }'
         printf ']}\n'
     } > "$out" && mv "$out" "$WEB_DIR/data.js"
     rm -f "$sets_tmp" "$fail_tmp" "$pend_tmp" "$nm_tmp" "$nt_tmp"

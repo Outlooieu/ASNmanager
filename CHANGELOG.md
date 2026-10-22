@@ -1,3 +1,10 @@
+## v3.8.6
+
+- Service presets corrected: every ASN was checked against its holder in RIPEstat. Wrong ones are gone (e.g. Microsoft in "Google Services", Vultr in "Telegram", Alibaba in "Spotify", foreign networks in PlayStation, Nintendo, Zoom, OpenAI, NVIDIA, EA, Ubisoft, Epic, GitHub, Microsoft) and the right ones added (Sony Interactive 33353, Nintendo 11278, Zoom 30103, OpenAI 401864, NVIDIA 11414 / 20347 / 60977, Ubisoft 8361 / 22634 / 28759, Apple 6185 / 2709 / 1042, more Google, Microsoft, Amazon, Meta, Twitch, Riot, Blizzard and DigitalOcean networks)
+- "Disney+ / Hulu" and "Spotify" removed: they have no network of their own (they stream through CDNs / cloud) - use domain entries. Epic Games and EA are marked "own network only" (their game servers run in the cloud)
+- Presets that route a large share of the internet (AWS, Google, Microsoft, Cloudflare, Akamai, Fastly, Hetzner / OVH, DigitalOcean / Linode, Oracle Cloud) are marked with ⚠ (SSH menu: "(!)") and ask before they are added
+- Note: the preset numbers on the command line (`preset <n>`) changed with this list - see `ASNmanager.sh presets`
+
 ## v3.8.5
 
 - The status data is loaded automatically when the page opens: if the data file of the router is older than 2 minutes, the page asks the router to write it again right away (interfaces online, subnets, devices, last apply ...) - no need to click "Reload data" first (suggested by AvalonOC)

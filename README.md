@@ -9,7 +9,7 @@ ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to eas
  /_\ / __| \| | |  \/  | /_\ | \| | /_\ / __| __|| _ \
 / _ \__ \ .' | | |\/| |/ _ \| .' |/ _ \ (_ | _| |   /
 /_/ \_\___/_|\_| |_|  |_/_/ \_\_|\_/_/ \_\___|___||_|_\
-              === ASN MANAGER v3.8.5 ===
+              === ASN MANAGER v3.8.6 ===
 ================================================================
  ASNs
  [1]  Show ASN list & routing targets
@@ -84,7 +84,7 @@ Here is a short guide for each menu option of the ASN Manager:
 
 [3] Find ASN for domain / IP: Resolves a domain or IP address, identifies its ASN and lets you add it to or remove it from the list.
 
-[4] Add service presets: A list of predefined services (Amazon, Netflix, gaming, streaming ...) to assign well-known ASNs to an interface in one go.
+[4] Add service presets: A list of predefined services (Amazon, Netflix, gaming, streaming ...) to assign well-known ASNs to an interface in one go. The ASNs are checked against their holders (RIPEstat). Presets marked (!) / ⚠ are cloud, CDN or hosting networks that carry a large share of the internet - routing them moves far more than the one service, so the menu and the page ask first. Services without a network of their own (Disney+, Spotify ...) have no preset; use domain entries for them.
 
 [5] Edit ASN: Change the target interface and the source devices of an entry that is already on the list.
 
