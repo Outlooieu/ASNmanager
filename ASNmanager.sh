@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.7.0
+version=3.7.1
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.7.0"
+SCRIPT_VERSION="3.7.1"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -2472,6 +2472,7 @@ web_job() {
         refresh)  echo "Data refreshed." > "$OUT" ;;
         update)   cli_update > "$OUT" 2>&1 ;;
         statssave) ts_save_mode "$a1" > "$OUT" 2>&1 ;;
+        sghide)   sg_hide "$a1" "$a2" > "$OUT" 2>&1 ;;
         speedtest) st_run "$a1" > "$OUT" 2>&1 ;;
         setting)  rs_setting "$a1" "$a2" > "$OUT" 2>&1 ;;
         failover) fbs=""; [ -n "$a2" ] && fbs="$a2"; [ -n "$a3" ] && fbs="${fbs:+$fbs,}$a3"
@@ -3271,9 +3272,40 @@ sgd_collect() {
     rm -f "$TS_RT/sgd_new.txt" "$TS_RT/sgd_fwd.txt"
 }
 
+# suggestions the user hid: "asn:<number>" / "dom:<domain>", one per line (flash, a few bytes per entry)
+sg_hidden_file() { echo "$ADDON_DIR/sg_hidden.txt"; }
+sg_hide() {             # hide|unhide KEY...
+    sh_mode=$1; shift
+    [ "$sh_mode" = "hide" ] || [ "$sh_mode" = "unhide" ] || { echo "Usage: suggest hide|unhide <ASN|domain>..."; return 1; }
+    sh_f=$(sg_hidden_file); mkdir -p "$ADDON_DIR"; touch "$sh_f"; sh_n=0
+    for sh_k in "$@"; do
+        case "$sh_k" in
+            asn:*) sh_k=${sh_k#asn:} ;;
+            [Aa][Ss][0-9]*) case "${sh_k#??}" in *[!0-9]*) ;; *) sh_k=${sh_k#??} ;; esac ;;
+        esac
+        case "$sh_k" in
+            '') ;;
+            dom:*) sh_v=$(cu_norm_domain "${sh_k#dom:}") || sh_v=""; [ -n "$sh_v" ] && sh_k="dom:$sh_v" || sh_k="" ;;
+            *[!0-9]*) sh_v=$(cu_norm_domain "$sh_k") || sh_v=""; [ -n "$sh_v" ] && sh_k="dom:$sh_v" || sh_k="" ;;
+            *) sh_k="asn:$sh_k" ;;
+        esac
+        [ -n "$sh_k" ] || { echo "Skipping invalid entry."; continue; }
+        grep -vxF "$sh_k" "$sh_f" > "$sh_f.new"; mv -f "$sh_f.new" "$sh_f"
+        [ "$sh_mode" = "hide" ] && echo "$sh_k" >> "$sh_f"
+        sh_n=$((sh_n + 1))
+    done
+    [ -s "$sh_f" ] || rm -f "$sh_f"
+    [ $sh_n -gt 0 ] || return 1
+    [ "$sh_mode" = "hide" ] && echo "$sh_n suggestion(s) hidden." || echo "$sh_n suggestion(s) shown again."
+    [ -d "$WEB_DIR" ] && [ -d "$TS_RT" ] && sg_export
+    return 0
+}
+sg_hidden_json() { printf ',"hidden":['; awk 'NF { printf "%s\"%s\"", (n++ ? "," : ""), $1 }' "$(sg_hidden_file)" 2>/dev/null; printf ']'; }
+
 # the domain part of suggest.js: ,"dlog":..,"dlist":[...]}  - base domains (zdf.de) by bytes, with their names and devices
 sgd_export() {
     sge_st=$(sgd_state)
+    sg_hidden_json
     if [ "$sge_st" = "off" ] || [ ! -s "$TS_RT/sg_dns.txt" ]; then
         printf ',"dlog":"%s","dtotal":0,"dnone":0,"dlist":[]}\n' "$sge_st"; return 0
     fi
@@ -4696,6 +4728,7 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   stats saving on | off              save the numbers hourly on the USB device (default) / keep them in RAM only
   stats mode asn | iface             statistics per ASN (exact) / per interface and device only (cheaper for the CPU)
   suggest domains on | off           suggestions by domain as well (dnsmasq writes its lookups to a file in RAM)
+  suggest hide|unhide <ASN|domain>   hide a suggestion / show it again ("suggest hidden" lists them)
   rulemode combined | single         marking rules: one combined set per target (fast) / one rule per ASN (apply the rules afterwards)
   stats diag                         where do the statistics hang? (loop, lock, hook, timing)
   stats repair                       statistics do not count: clean temporary files, set up the counting again (numbers are kept)
@@ -4763,7 +4796,12 @@ cli_main() {
         job)      cli_job "$1" ;;
         speedtest) st_cli "$1" ;;
         rulemode) rules_set_mode "$1" ;;
-        suggest)  case "$1" in domains) sgd_set "$2" ;; *) echo "Usage: suggest domains on | off"; false ;; esac ;;
+        suggest)  case "$1" in
+                      domains) sgd_set "$2" ;;
+                      hide|unhide) sg_hide "$@" ;;
+                      hidden) cat "$(sg_hidden_file)" 2>/dev/null ;;
+                      *) echo "Usage: suggest domains on | off | hide <ASN|domain>... | unhide <ASN|domain>... | hidden"; false ;;
+                  esac ;;
         custom)   cli_custom "$@" ;;
         backup)
             case "$1" in

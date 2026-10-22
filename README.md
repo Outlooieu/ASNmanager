@@ -9,7 +9,7 @@ ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to eas
  /_\ / __| \| | |  \/  | /_\ | \| | /_\ / __| __|| _ \
 / _ \__ \ .' | | |\/| |/ _ \| .' |/ _ \ (_ | _| |   /
 /_/ \_\___/_|\_| |_|  |_/_/ \_\_|\_/_/ \_\___|___||_|_\
-              === ASN MANAGER v3.7.0 ===
+              === ASN MANAGER v3.7.1 ===
 ================================================================
  ASNs
  [1]  Show ASN list & routing targets
@@ -263,7 +263,7 @@ At the bottom of the "Traffic per ASN" card (while counting is enabled) a list s
 
 An ASN that is on the list only for some devices stays suggested for the other devices that use it ("on the list for: Laptop (WGC1)"); **Add** then extends the device list of that rule instead of replacing it. The busiest destinations are looked up first with one batch request for up to 100 networks per minute (ip-api.com), so even hundreds of destinations are resolved within a few minutes; the notice shows how much traffic is still waiting and whether look-ups currently fail.
 
-Filters above the list: how many ASNs to show (10 / 20 / 50 / 100, the router keeps the 100 largest), a **device** (shows only ASNs this device uses, with its own traffic, and preselects it) and a **search** for ASN number or name. A counter shows "x of y ASNs". Like the traffic table, the suggestions are a collapsible section of the traffic card and start collapsed; the section headers show how many entries they hold. ASNs that are already on the list are hidden.
+Filters above the list: how many ASNs to show (10 / 20 / 50 / 100, the router keeps the 100 largest), a **device** (shows only ASNs this device uses, with its own traffic, and preselects it) and a **search** for ASN number or name. A counter shows "x of y ASNs". Like the traffic table, the suggestions are a collapsible section of the traffic card and start collapsed; the section headers show how many entries they hold. ASNs that are already on the list are hidden. A suggestion you are not interested in can be hidden with the crossed-out eye next to **Add**; **Show hidden (n)** lists those again, each with a button to bring it back (kept on the router, also from the command line: `ASNmanager.sh suggest hide 32934` / `suggest unhide 32934`, domains likewise).
 
 How it works: every minute the router reads its connection table (`/proc/net/nf_conntrack`) and adds up the new bytes per destination address and device. For this the kernel switch `nf_conntrack_acct` is turned on while counting runs (and restored when it is turned off). The busiest destination addresses are looked up via ip-api.com (fallbacks: ipinfo.io, RIPEstat) - at most 10 per minute, cached per /24 network, in the background. Everything stays in RAM and starts over after a reboot or when counting is turned off.
 

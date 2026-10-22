@@ -1,3 +1,8 @@
+## v3.7.1
+
+- New: suggestions can be hidden. Every row has a button with a crossed-out eye next to "Add"; a hidden ASN or domain no longer shows up and is not counted. "Show hidden (n)" above the list shows them again (greyed out) with a button to bring a suggestion back. The choice is kept on the router (`/jffs/addons/asnmanager/sg_hidden.txt`), so it is the same in every browser. Command line: `ASNmanager.sh suggest hide|unhide <ASN|domain>...`, `suggest hidden`
+- The target and device fields of the suggestions are a little narrower, so the row fits with the new button
+
 ## v3.7.0
 
 - New: suggestions **by domain**. A switch above the suggestions changes between "by ASN" and "by domain". The domain view groups the traffic without a rule by the domain the devices looked up (e.g. `zdf.de`, with the names below it such as `nrodl.zdf.de`), with traffic, devices, target, device choice, note and a one-click "Add" (puts the main domain on the list - it covers every subdomain). Domains and ASNs already on the list are hidden

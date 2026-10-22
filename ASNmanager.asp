@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.7.0 -->
+<!-- ASNmanager-WebUI v3.7.1 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -325,11 +325,11 @@
 .asnm-sg-clrow { display: flex; justify-content: space-between; gap: 8px; line-height: 18px; }
 .asnm-sg-clrow span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #asnm_sg .asnm-table th:not(:first-child), #asnm_sg .asnm-table td:not(:first-child) { padding-left: 6px; padding-right: 6px; }
-#asnm .asnm-sg-sel { width: 104px; }
+#asnm .asnm-sg-sel { width: 96px; }
 #asnm .asnm-sg-note { width: 130px; height: 32px !important; }
 #asnm_sg_tbl th { white-space: nowrap; }
 #asnm_sg_tbl td.num { white-space: nowrap; }
-#asnm_sg_tbl .asnm-ms-btn { width: 128px; }
+#asnm_sg_tbl .asnm-ms-btn { width: 116px; }
 .asnm-sg-foot { margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.5; }
 /* collapsible sections inside the traffic card */
 .asnm-sec { margin-top: 12px; border-top: 1px solid var(--line); }
@@ -344,6 +344,14 @@
 .asnm-sec-body { padding: 2px 0 8px; }
 /* suggestions: filter bar and multi-device selection */
 .asnm-sg-since { font-size: 11px; color: var(--muted); margin: 0 0 8px; }
+.asnm-sg-x { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin-left: 4px; padding: 0;
+    vertical-align: middle; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
+.asnm-sg-x:hover { color: var(--text); border-color: var(--muted); }
+.asnm-sg-x svg { width: 15px; height: 15px; }
+.asnm-table tr.asnm-sg-hid td { opacity: .5; }
+.asnm-table tr.asnm-sg-hid td:last-child { opacity: 1; }
+.asnm-sg-showhid { cursor: pointer; }
+.asnm-nowrap { white-space: nowrap; }
 .asnm-sg-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 10px; }
 .asnm-sg-top .asnm-sg-since { margin: 0 0 0 auto; }
 .asnm-sg-domoff { font-size: 12px; color: var(--text2); line-height: 1.55; max-width: 720px; }
@@ -439,7 +447,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.7.0';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.7.1';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -499,7 +507,7 @@ var ASNM_I18N = {
     job_busy: 'Another job is still running ({a}). The page shows it until it is finished - then please repeat your action.',
     job_running: 'A job started earlier is still running ({a}) - the page shows it until it is finished.',
     act_apply: 'Apply rules', act_reload: 'Reload all subnets', act_retry: 'Retry failed ASNs', act_update: 'Update', act_import: 'Restore', act_add: 'Add entries', act_preset: 'Add preset',
-    act_remove: 'Remove', act_clear: 'Clear list', act_edit: 'Edit', act_schedule: 'Schedule', act_failover: 'Failover', act_statssave: 'USB saving',
+    act_remove: 'Remove', act_clear: 'Clear list', act_edit: 'Edit', act_schedule: 'Schedule', act_failover: 'Failover', act_statssave: 'USB saving', act_sghide: 'Hide suggestion', sg_hide: 'Hide this suggestion', sg_unhide: 'Show this suggestion again', sg_showhid: 'Show hidden ({n})',
     tab_asns: 'ASNs', tab_traffic: 'Traffic', tab_targets: 'Targets & failover', tab_diag: 'Diagnostics', tab_settings: 'Settings',
     sub_manual: 'Enter ASNs', sub_lookup: 'Find by domain / IP', sub_presets: 'Service presets', rc_to_list: 'Show ASN list',
     sp_th: 'Speed test', sp_btn: 'Test', sp_running: 'Speed test running - about 30 seconds...',
@@ -634,7 +642,7 @@ var ASNM_I18N = {
     job_busy: 'Es läuft noch ein anderer Auftrag ({a}). Die Seite zeigt ihn an, bis er fertig ist - danach bitte deine Aktion wiederholen.',
     job_running: 'Ein vorher gestarteter Auftrag läuft noch ({a}) - die Seite zeigt ihn an, bis er fertig ist.',
     act_apply: 'Regeln anwenden', act_reload: 'Alle Subnetze neu laden', act_retry: 'Fehlgeschlagene wiederholen', act_update: 'Update', act_import: 'Wiederherstellen', act_add: 'Einträge hinzufügen', act_preset: 'Vorlage hinzufügen',
-    act_remove: 'Entfernen', act_clear: 'Liste leeren', act_edit: 'Bearbeiten', act_schedule: 'Zeitplan', act_failover: 'Failover', act_statssave: 'USB-Sicherung',
+    act_remove: 'Entfernen', act_clear: 'Liste leeren', act_edit: 'Bearbeiten', act_schedule: 'Zeitplan', act_failover: 'Failover', act_statssave: 'USB-Sicherung', act_sghide: 'Vorschlag ausblenden', sg_hide: 'Diesen Vorschlag ausblenden', sg_unhide: 'Wieder einblenden', sg_showhid: 'Ausgeblendete zeigen ({n})',
     tab_asns: 'ASNs', tab_traffic: 'Traffic', tab_targets: 'Ziele & Failover', tab_diag: 'Diagnose', tab_settings: 'Einstellungen',
     sub_manual: 'ASNs eingeben', sub_lookup: 'Per Domain / IP suchen', sub_presets: 'Dienst-Vorlagen', rc_to_list: 'Zur ASN-Liste',
     sp_th: 'Speedtest', sp_btn: 'Test', sp_running: 'Speedtest läuft - etwa 30 Sekunden...',
@@ -1443,6 +1451,7 @@ function asnmJobDone(job) {
         asnmUpdCheck(false);                                                                                          // refresh the notice
     }
     if (job.action === 'statssave') asnmTrLoad();
+    if (job.action === 'sghide') asnmSgLoad();
     asnmRcLoad(false);                                                                                                // "apply" runs a routing check
     asnmFoLoad();
 
@@ -2366,7 +2375,7 @@ function asnmTrSaveMode(mode) {
 }
 
 /* ---------- suggestions from the traffic without a rule ---------- */
-var ASNM_SG = { data: null, added: {}, sel: {}, auto: {}, tgt: {}, f: { n: 10, dev: '', q: '' }, sig: '', fsig: '', open: '', dirty: false, clOpen: {}, note: {}, view: 'asn' };
+var ASNM_SG = { data: null, added: {}, sel: {}, auto: {}, tgt: {}, f: { n: 10, dev: '', q: '' }, sig: '', fsig: '', open: '', dirty: false, clOpen: {}, note: {}, view: 'asn', loc: {}, showHid: false };
 try { if (localStorage.getItem('asnm_sgview_' + ASNM_NS) === 'dom') ASNM_SG.view = 'dom'; } catch (e) {}
 
 // suggestions by ASN or by domain; a domain row is keyed "d:<domain>" (selection, target, note, "added")
@@ -2383,6 +2392,19 @@ function asnmSgDomSet(on) {
 function asnmSgList(d) { return !d ? [] : (ASNM_SG.view === 'dom' ? (d.dlist || []) : (d.list || [])); }
 function asnmSgKey(r) { return r.d !== undefined ? 'd:' + r.d : r.asn; }
 function asnmSgHidden(r, listed) { return r.d !== undefined ? !!ASNM_SG.added['d:' + r.d] : !!((listed[r.asn] && !r.on) || ASNM_SG.added[r.asn]); }
+// hidden suggestions: kept on the router ("hidden" in suggest.js); loc = a click that the router has not confirmed yet
+function asnmSgHidKey(r) { return r.d !== undefined ? 'dom:' + r.d : 'asn:' + r.asn; }
+function asnmSgIsHid(r) {
+    var k = asnmSgHidKey(r);
+    if (ASNM_SG.loc.hasOwnProperty(k)) return ASNM_SG.loc[k];
+    return ((ASNM_SG.data && ASNM_SG.data.hidden) || []).indexOf(k) >= 0;
+}
+function asnmSgHide(key, on) {
+    var r = asnmSgRow(key);
+    if (!r) return;
+    var k = asnmSgHidKey(r);
+    if (asnmSend('sghide', [on ? 'hide' : 'unhide', k])) { ASNM_SG.loc[k] = on; ASNM_SG.open = ''; asnmSgRender(true); }
+}
 function asnmSgViewSeg() {
     var v = ASNM_SG.view;
     return '<span class="asnm-seg-label">' + asnmEsc(t('sgv_label')) + '</span><div class="asnm-seg">' +
@@ -2408,6 +2430,7 @@ function asnmSgLoad() {
         var d = null;
         try { d = JSON.parse(txt); } catch (e) {}
         ASNM_SG.data = d;
+        if (d) for (var k in ASNM_SG.loc) if (((d.hidden || []).indexOf(k) >= 0) === ASNM_SG.loc[k]) delete ASNM_SG.loc[k];
         asnmSgRender(false);
     }, function () { ASNM_SG.data = null; asnmSgRender(false); });
 }
@@ -2447,11 +2470,13 @@ function asnmSgRows() {
     for (var i = 0; i < list.length; i++) {
         var r = list[i], b = r.b, txt;
         if (asnmSgHidden(r, listed)) continue;
+        var hid = asnmSgIsHid(r);
+        if (hid && !ASNM_SG.showHid) continue;
         if (f.dev) { b = 0; for (var c = 0; c < r.cl.length; c++) if (r.cl[c][0] === f.dev) b = r.cl[c][1]; if (!b) continue; }
         if (r.d !== undefined) { txt = r.d; for (var k = 0; k < (r.subs || []).length; k++) txt += ' ' + r.subs[k][0]; }
         else txt = 'as' + r.asn + ' ' + (r.name || '');
         if (q && txt.toLowerCase().indexOf(q) < 0) continue;
-        out.push({ r: r, b: b });
+        out.push({ r: r, b: b, hid: hid });
     }
     out.sort(function (x, y) { return y.b - x.b; });
     return out;
@@ -2471,7 +2496,8 @@ function asnmSgTargetOptions(selected) {
 function asnmSgDevLabel(ip) { var n = asnmDeviceName(ip); return (n ? n + ' - ' : '') + ip; }
 
 function asnmSgFilterBar(d) {
-    var f = ASNM_SG.f, tot = {}, ips = [], i, c, h, list = asnmSgList(d);
+    var f = ASNM_SG.f, tot = {}, ips = [], i, c, h, list = asnmSgList(d), listed = asnmSgListed(), nh = 0;
+    for (i = 0; i < list.length; i++) if (!asnmSgHidden(list[i], listed) && asnmSgIsHid(list[i])) nh++;
     for (i = 0; i < list.length; i++) for (c = 0; c < list[i].cl.length; c++) {
         var ip = list[i].cl[c][0];
         if (!(ip in tot)) { tot[ip] = 0; ips.push(ip); }
@@ -2485,8 +2511,11 @@ function asnmSgFilterBar(d) {
          '<option value="">' + asnmEsc(t('sg_all_dev_f')) + '</option>';
     for (i = 0; i < ips.length; i++) h += '<option value="' + asnmEsc(ips[i]) + '"' + (f.dev === ips[i] ? ' selected="selected"' : '') + '>' + asnmEsc(asnmSgDevLabel(ips[i])) + '</option>';
     h += '</select></label><input type="text" class="asnm-sg-q" autocomplete="off" placeholder="' + asnmEsc(t(ASNM_SG.view === 'dom' ? 'sgd_f_q' : 'sg_f_q')) + '" value="' + asnmEsc(f.q) + '" ' +
-         'oninput="ASNM_SG.f.q = this.value; asnmSgRender(true);"/><span class="asnm-sg-count" id="asnm_sg_count"></span>';
-    return { html: h, sig: ips.join(',') + '|' + ASNM_LANG + '|' + ASNM_SG.view };
+         'oninput="ASNM_SG.f.q = this.value; asnmSgRender(true);"/>';
+    if (nh) h += '<label class="asnm-sg-showhid"><input type="checkbox"' + (ASNM_SG.showHid ? ' checked="checked"' : '') +
+                 ' onchange="ASNM_SG.showHid = this.checked; asnmSgRender(true);"/>' + asnmEsc(t('sg_showhid', { n: nh })) + '</label>';
+    h += '<span class="asnm-sg-count" id="asnm_sg_count"></span>';
+    return { html: h, sig: ips.join(',') + '|' + ASNM_LANG + '|' + ASNM_SG.view + '|' + nh + '|' + ASNM_SG.showHid };
 }
 
 function asnmMsLabel(asn) {
@@ -2560,7 +2589,7 @@ function asnmSgRender(force) {
     var box = document.getElementById('asnm_sg'), cnt = document.getElementById('asnm_sec_sg_cnt');
     if (!box) return;
     var tr = ASNM_TR.data, d = ASNM_SG.data, listed = asnmSgListed(), n = 0, i, dom = ASNM_SG.view === 'dom', list = asnmSgList(d);
-    for (i = 0; i < list.length; i++) if (!asnmSgHidden(list[i], listed)) n++;
+    for (i = 0; i < list.length; i++) if (!asnmSgHidden(list[i], listed) && !asnmSgIsHid(list[i])) n++;
     cnt.textContent = (tr && tr.state === 'enabled' && d && d.acct) ? t('sec_cnt', { n: n }) : '';
     cnt.style.display = cnt.textContent ? '' : 'none';
     if (!ASNM_TR.open || !(ASNM_TR.sec && ASNM_TR.sec.sg)) return;
@@ -2568,7 +2597,8 @@ function asnmSgRender(force) {
     var ae = document.activeElement;
     if (!force && (ASNM_SG.open || (ae && box.contains(ae) && (ae.tagName === 'SELECT' || ae.tagName === 'INPUT')))) { ASNM_SG.dirty = true; return; }
     var sig = JSON.stringify(d ? [d.list, d.dlist, d.dlog, d.dnone, d.pending, d.acct, d.since] : null) + '|' + (tr ? tr.state : '') + '|' + JSON.stringify(ASNM_SG.f) + '|' +
-              JSON.stringify(ASNM_SG.added) + '|' + JSON.stringify(listed) + '|' + ASNM_LANG + '|' + ASNM_SG.view;
+              JSON.stringify(ASNM_SG.added) + '|' + JSON.stringify(listed) + '|' + ASNM_LANG + '|' + ASNM_SG.view + '|' +
+              JSON.stringify(d ? d.hidden : null) + JSON.stringify(ASNM_SG.loc) + ASNM_SG.showHid;
     if (!force && sig === ASNM_SG.sig) return;
     ASNM_SG.sig = sig; ASNM_SG.dirty = false;
     var msg = '';
@@ -2602,7 +2632,7 @@ function asnmSgRender(force) {
     document.getElementById('asnm_sg_count').textContent = t(dom ? 'sgd_f_count' : 'sg_f_count', { x: shown.length, y: rows.length }) +
         (tot > list.length ? t('sg_f_total', { n: tot }) : '');
     if (!shown.length) {
-        if (n) html = t(dom ? 'sgd_nomatch' : 'sg_nomatch');
+        if (n || ASNM_SG.showHid) html = t(dom ? 'sgd_nomatch' : 'sg_nomatch');
         else if (dom) html = list.length ? t('sg_empty') : t('sgd_empty');
         else html = d.pending ? asnmSgPendingText(d) : t('sg_empty');
         html = '<div class="asnm-muted">' + asnmEsc(html) + '</div>';
@@ -2641,13 +2671,18 @@ function asnmSgRender(force) {
             } else {
                 first = '<b>AS' + a + '</b><span class="asnm-sg-name asnm-dev" title="' + asnmEsc(r.name) + '">' + asnmEsc(r.name || '-') + '</span>';
             }
-            html += '<tr><td>' + first + onTxt + '</td>' +
+            var hidBtn = shown[i].hid
+                ? '<button type="button" class="asnm-sg-x" title="' + asnmEsc(t('sg_unhide')) + '" aria-label="' + asnmEsc(t('sg_unhide')) + '" onclick="asnmSgHide(\'' + a + '\', false);">' +
+                  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>'
+                : '<button type="button" class="asnm-sg-x" title="' + asnmEsc(t('sg_hide')) + '" aria-label="' + asnmEsc(t('sg_hide')) + '" onclick="asnmSgHide(\'' + a + '\', true);">' +
+                  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.1 10.1 0 0 1 12 19c-6.5 0-10-7-10-7a18.4 18.4 0 0 1 5.06-5.94M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M2 2l20 20"/></svg></button>';
+            html += '<tr' + (shown[i].hid ? ' class="asnm-sg-hid"' : '') + '><td>' + first + onTxt + '</td>' +
                     '<td class="num">' + asnmFmtBytes(shown[i].b) + '</td><td class="asnm-sg-cl" title="' + asnmEsc(allNames.join('\n')) + '">' + (clOpen ? who.join('') : who.join(', ')) + '</td>' +
                     '<td><select id="asnm_sg_t_' + a + '" class="input_option asnm-sg-sel" onchange="ASNM_SG.tgt[\'' + a + '\'] = this.value;" onblur="asnmSgFlush();">' +
                     asnmSgTargetOptions(ASNM_SG.tgt[key] || def) + '</select></td>' +
                     '<td>' + asnmMsHtml({ asn: key, cl: r.cl }) + '</td>' +
                     '<td><input type="text" id="asnm_sg_n_' + a + '" class="asnm-sg-note" maxlength="60" value="' + asnmEsc(ASNM_SG.note[key] || '') + '" placeholder="' + asnmEsc(t('hint_optional')) + '" oninput="ASNM_SG.note[\'' + a + '\'] = this.value;" onblur="asnmSgFlush();" onkeydown="if (event.keyCode === 13) { asnmSgAdd(\'' + a + '\'); return false; }"/></td>' +
-                    '<td><input type="button" class="button_gen asnm-small-btn asnm-btn asnm-primary" value="' + asnmEsc(t('sg_add')) + '" onclick="asnmSgAdd(\'' + a + '\');"/></td></tr>';
+                    '<td class="asnm-nowrap"><input type="button" class="button_gen asnm-small-btn asnm-btn asnm-primary" value="' + asnmEsc(t('sg_add')) + '" onclick="asnmSgAdd(\'' + a + '\');"/>' + hidBtn + '</td></tr>';
         }
         html += '</table>';
         if (!dom && d.pending) html += '<div class="asnm-sg-foot">' + asnmEsc(asnmSgPendingText(d)) + '</div>';
