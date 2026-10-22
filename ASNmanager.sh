@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.8.0
+version=3.8.1
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.8.0"
+SCRIPT_VERSION="3.8.1"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -2237,16 +2237,17 @@ cli_dnschain() {
 # diagnostic bundle: one text file with what is needed to analyse a problem; personal data masked
 DG_FILE=/tmp/asnmanager-diag.txt
 dg_section() { echo ""; echo "######## $1"; }
-cli_diagpack() {
+cli_diagpack() {       # [full] = domains in clear text
+    DG_FULL=0; [ "$1" = "full" ] && DG_FULL=1
     nv_refresh
     {
         echo "ASN Manager diagnostic bundle"
         echo "created:  $(date '+%Y-%m-%d %H:%M:%S %z')"
         echo "version:  $SCRIPT_VERSION   page: $(sed -n 's/.*ASNmanager-WebUI v\([0-9.]*\).*/\1/p' "$WEBUI_SRC" 2>/dev/null | head -n 1)"
         echo "router:   $(nvram get productid 2>/dev/null) firmware $(nvram get firmver 2>/dev/null).$(nvram get buildno 2>/dev/null)_$(nvram get extendno 2>/dev/null)   uptime: $(awk '{ printf "%d d %d h", $1 / 86400, ($1 % 86400) / 3600 }' /proc/uptime)"
-        echo "public IP addresses, MAC addresses, VPN server addresses and keys are masked"
+        echo "masked: public IP addresses, VPN servers and tunnel addresses, MAC addresses, IPv6, keys, notes, VPN Director descriptions$([ $DG_FULL -eq 1 ] && echo " - domains in clear text" || echo ", domains (domain-NN.<ending>)")"
         dg_section "STATUS";            ipset_status_report 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | head -n 60
-        dg_section "ASN LIST";          cli_list 2>&1 | sed 's/\x1b\[[0-9;]*m//g'
+        dg_section "ASN LIST";          cli_list 2>&1 | sed 's/\x1b\[[0-9;]*m//g; s/  # .*$//'
         dg_section "LEARNED (domain entries)"; cu_learned_report 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | awk '/^C[0-9]/ || /^\(/'
         dg_section "SETTINGS";          backup_text 2>/dev/null | sed -n '/^\[SCHEDULE\]/,$p'
         dg_section "DNS";               cli_dns 2>&1; cli_dnschain 2>&1
@@ -2267,12 +2268,18 @@ cli_diagpack() {
         dg_section "MANGLE FORWARD (first lines)"; iptables -t mangle -S FORWARD 2>&1 | head -n 20
         dg_section "IPSETS";            ipset list -t 2>/dev/null | awk '/^Name:/ { n = $2 } /^Number of entries:/ { print n, $4 }' | grep -E '^ASN' | head -n 300
         dg_section "DNSMASQ (excerpt)"; grep -vE '^(ipset=|dhcp-host=|address=)' /etc/dnsmasq.conf 2>/dev/null | grep -vE '^\s*(#|$)' | head -n 60
-        dg_section "VPN DIRECTOR";      cat /jffs/openvpn/vpndirector_rulelist 2>/dev/null | tr '<' '\n' | grep . | head -n 60
+        dg_section "VPN DIRECTOR";      cat /jffs/openvpn/vpndirector_rulelist 2>/dev/null | tr '<' '\n' | grep . | awk -F'>' 'BEGIN { OFS = ">" } NF >= 5 { $2 = "-" } { print }' | head -n 60
         dg_section "STATISTICS";        ts_diag 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | head -n 60
         dg_section "SYSTEM LOG (ASN Manager)"; grep -h 'ASNmanager' /tmp/syslog.log-1 /tmp/syslog.log 2>/dev/null | tail -n 100
         dg_section "SYSTEM LOG (dnsmasq errors)"; grep -hE 'dnsmasq.*(fail|error|refused|warning)' /tmp/syslog.log 2>/dev/null | tail -n 30
     } > "$DG_FILE.raw" 2>&1
-    dg_mask < "$DG_FILE.raw" > "$DG_FILE"; rm -f "$DG_FILE.raw"
+    # domains of the entries -> domain-NN.<ending> (the same name everywhere in the file), longest first
+    : > "$DG_FILE.dom"
+    if [ $DG_FULL -eq 0 ] && [ -s "$CUSTOM_FILE" ]; then
+        awk -F: '$4 == "dom" && $5 != "" { print length($5) "\t" $5 }' "$CUSTOM_FILE" | sort -t "$(printf '\t')" -k1,1nr | cut -f2 |
+            awk '{ n = split($0, p, "."); printf "%s\tdomain-%02d.%s\n", $0, NR, p[n] }' > "$DG_FILE.dom"
+    fi
+    dg_mask "$DG_FILE.dom" < "$DG_FILE.raw" > "$DG_FILE"; rm -f "$DG_FILE.raw" "$DG_FILE.dom"
     # the router's web server delivers only some file types from /www/ext (.js, .htm ...): the page fetches .htm
     if [ -d "$WEB_DIR" ]; then rm -f "$WEB_DIR/diag.txt"; cp -f "$DG_FILE" "$WEB_DIR/diag.htm"; fi
     echo "Diagnostic bundle written: $DG_FILE ($(wc -c < "$DG_FILE") bytes)$([ -d "$WEB_DIR" ] && echo " - download it in the WebUI (Diagnostics)")"
@@ -2287,10 +2294,27 @@ dg_mask() {
     done
     [ -s "$EP_CACHE" ] && dm_list="$dm_list $(cut -d' ' -f1 "$EP_CACHE" | tr '\n' ' ')"
     [ -f "$WEB_DIR/pubip.js" ] && dm_list="$dm_list $(grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' "$WEB_DIR/pubip.js" | tr '\n' ' ')"
-    awk -v list="$dm_list" '
-        BEGIN { n = split(list, L, " "); for (i = 1; i <= n; i++) if (L[i] !~ /^(0\.0\.0\.0|10\.|127\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/ && L[i] != "") { m++; S[m] = L[i] } }
+    # the addresses of the VPN client tunnels (given by the VPN provider) - private, but they point to the provider
+    dm_tun=$(ip -4 -o addr show 2>/dev/null | awk '$2 ~ /^(wgc[0-9]|tun1[0-9])$/ { split($4, a, "/"); printf "%s ", a[1] }')
+    awk -v list="$dm_list" -v tun="$dm_tun" -v domf="${1:-/dev/null}" '
+        BEGIN {
+            n = split(list, L, " "); for (i = 1; i <= n; i++) if (L[i] !~ /^(0\.0\.0\.0|10\.|127\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/ && L[i] != "") { m++; S[m] = L[i]; R[m] = "<masked>" }
+            n = split(tun, T, " "); for (i = 1; i <= n; i++) if (T[i] != "") { m++; S[m] = T[i]; R[m] = "<tunnel-ip>" }
+            while ((getline l < domf) > 0) { split(l, d, "\t"); nd++; D[nd] = d[1]; DR[nd] = d[2] }
+        }
+        # replace whole names only: "zdf.de" also in "nrodl.zdf.de", but not inside "heute-zdf.de"
+        function dom(s, a, b,   o, p, c) {
+            o = ""
+            while ((p = index(s, a)) > 0) {
+                c = (p > 1) ? substr(s, p - 1, 1) : ""
+                if (c ~ /[A-Za-z0-9-]/) { o = o substr(s, 1, p + length(a) - 1); s = substr(s, p + length(a)); continue }
+                o = o substr(s, 1, p - 1) b; s = substr(s, p + length(a))
+            }
+            return o s
+        }
         {
-            for (i = 1; i <= m; i++) { while ((p = index($0, S[i])) > 0) $0 = substr($0, 1, p - 1) "<masked>" substr($0, p + length(S[i])) }
+            for (i = 1; i <= m; i++) { while ((p = index($0, S[i])) > 0) $0 = substr($0, 1, p - 1) R[i] substr($0, p + length(S[i])) }
+            for (i = 1; i <= nd; i++) if (index($0, D[i])) $0 = dom($0, D[i], DR[i])
             gsub(/[23][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F:]*:[0-9a-fA-F]*/, "<ipv6>")
             gsub(/[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]/, "xx:xx:xx:xx:xx:xx")
             gsub(/[A-Za-z0-9+\/]{43}=/, "<key>")
@@ -2888,7 +2912,7 @@ web_job() {
         explain)  cli_explain "$a1" "$a2" > "$OUT" 2>&1 ;;
         device)   cli_device "$a1" > "$OUT" 2>&1 ;;
         dnschain) cli_dnschain > "$OUT" 2>&1 ;;
-        diagpack) cli_diagpack > "$OUT" 2>&1 ;;
+        diagpack) cli_diagpack "$a1" > "$OUT" 2>&1 ;;
         speedtest) st_run "$a1" > "$OUT" 2>&1 ;;
         setting)  rs_setting "$a1" "$a2" > "$OUT" 2>&1 ;;
         failover) fbs=""; [ -n "$a2" ] && fbs="$a2"; [ -n "$a3" ] && fbs="${fbs:+$fbs,}$a3"
@@ -5146,7 +5170,7 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   explain <IP|domain> [device IP]    which entry catches it, which rule wins, which interface it leaves through, DNS answer
   device <IP>                        rules that apply to a device, its normal way, its current connections and their route
   dnschain                           DNS chain (port 53 -> dnsmasq -> its servers) with a learning test of a domain entry
-  diag                               diagnostic bundle (/tmp/asnmanager-diag.txt, personal data masked) to attach to a bug report
+  diag [full]                        diagnostic bundle (/tmp/asnmanager-diag.txt, personal data masked) to attach to a bug report; full = domains in clear text
   lookup <IP|domain>                 find the ASN of a target
   trace <IP|domain>                  traceroute
   ifaces                             public IP / country per interface
@@ -5227,7 +5251,7 @@ cli_main() {
         explain)  cli_explain "$1" "$2" ;;
         device)   cli_device "$1" ;;
         dnschain) cli_dnschain ;;
-        diag)     cli_diagpack ;;
+        diag)     cli_diagpack "$1" ;;
         suggest)  case "$1" in
                       domains) sgd_set "$2" ;;
                       hide|unhide) sg_hide "$@" ;;

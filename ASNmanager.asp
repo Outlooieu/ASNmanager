@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.8.0 -->
+<!-- ASNmanager-WebUI v3.8.1 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -351,6 +351,7 @@
 .asnm-dp-row { align-items: center; gap: 12px; }
 #asnm .asnm-diag-dev { width: 260px; }
 .asnm-sg-none { margin-top: 6px; }
+.asnm-dp-full { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); cursor: pointer; }
 .asnm-sg-x { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin-left: 4px; padding: 0;
     vertical-align: middle; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
 .asnm-sg-x:hover { color: var(--text); border-color: var(--muted); }
@@ -454,7 +455,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.8.0';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.8.1';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -578,7 +579,8 @@ var ASNM_I18N = {
     diag_dev_help: 'Check device: the rules for this device, its normal way (VPN Director) and its current connections with name, traffic, rule and interface.',
     btn_dnschain: 'Check DNS chain', act_explain: 'Explain', act_device: 'Check device', act_dnschain: 'DNS chain', act_diagpack: 'Diagnostic bundle',
     dp_title: 'Diagnostic bundle', dp_sub: 'Everything needed to analyse a problem, in one text file',
-    dp_text: 'Collects version, entries, settings, DNS chain, routing check, ip rules, routing tables, marking rules, set sizes, VPN Director and the last messages of ASN Manager in the system log. Public IP addresses, VPN servers, MAC addresses and keys are masked - please look over the file before you share it. To report a problem: download it and attach it to a new issue on GitHub (drag it into the text field).',
+    dp_text: 'Collects version, entries, settings, DNS chain, routing check, ip rules, routing tables, marking rules, set sizes, VPN Director and the last messages of ASN Manager in the system log. Masked: public IP addresses, VPN servers and tunnel addresses, MAC addresses, IPv6 addresses and keys; notes and VPN Director descriptions are left out, and the domains of your entries become domain-01.de, domain-02.com ... (the same name everywhere in the file). Left in: local addresses (192.168.x.x), ASN numbers and the router model. Please look over the file before you share it. To report a problem: download it and attach it to a new issue on GitHub (drag it into the text field).',
+    dp_full: 'Domains in clear text (only if a domain rule is the problem)',
     btn_dp: 'Create bundle', dp_missing: 'The bundle was not found on the router - please create it again.', dp_download: 'Download', dp_github: 'Report on GitHub',
     dp_issue_title: 'Problem: ', dp_issue_body: 'ASN Manager v{v}\n\nWhat does not work / what did you expect?\n\n\nPlease attach the diagnostic bundle ({f}) here: drag the file into this text field.',
     btn_ipset: 'ipset status', btn_pubip: 'Public IPs', output_default: 'Output of apply, tests and checks appears here.',
@@ -726,7 +728,8 @@ var ASNM_I18N = {
     diag_dev_help: 'Gerät prüfen: die Regeln für dieses Gerät, sein normaler Weg (VPN Director) und seine aktuellen Verbindungen mit Name, Traffic, Regel und Interface.',
     btn_dnschain: 'DNS-Kette prüfen', act_explain: 'Erklären', act_device: 'Gerät prüfen', act_dnschain: 'DNS-Kette', act_diagpack: 'Diagnose-Paket',
     dp_title: 'Diagnose-Paket', dp_sub: 'Alles zur Analyse eines Problems in einer Textdatei',
-    dp_text: 'Sammelt Version, Einträge, Einstellungen, DNS-Kette, Routing-Prüfung, ip rules, Routing-Tabellen, Markierungsregeln, Set-Größen, VPN Director und die letzten Meldungen von ASN Manager im Systemprotokoll. Öffentliche IP-Adressen, VPN-Server, MAC-Adressen und Schlüssel werden unkenntlich gemacht - bitte die Datei vor dem Weitergeben ansehen. Um ein Problem zu melden: herunterladen und an ein neues Issue auf GitHub anhängen (Datei in das Textfeld ziehen).',
+    dp_text: 'Sammelt Version, Einträge, Einstellungen, DNS-Kette, Routing-Prüfung, ip rules, Routing-Tabellen, Markierungsregeln, Set-Größen, VPN Director und die letzten Meldungen von ASN Manager im Systemprotokoll. Unkenntlich gemacht: öffentliche IP-Adressen, VPN-Server und Tunnel-Adressen, MAC-Adressen, IPv6-Adressen und Schlüssel; Notizen und VPN-Director-Beschreibungen fehlen, und die Domains deiner Einträge werden zu domain-01.de, domain-02.com ... (in der ganzen Datei derselbe Name). Lesbar bleiben: lokale Adressen (192.168.x.x), ASN-Nummern und das Routermodell. Bitte die Datei vor dem Weitergeben ansehen. Um ein Problem zu melden: herunterladen und an ein neues Issue auf GitHub anhängen (Datei in das Textfeld ziehen).',
+    dp_full: 'Domains im Klartext (nur wenn eine Domain-Regel das Problem ist)',
     btn_dp: 'Paket erstellen', dp_missing: 'Das Paket wurde auf dem Router nicht gefunden - bitte neu erstellen.', dp_download: 'Herunterladen', dp_github: 'Auf GitHub melden',
     dp_issue_title: 'Problem: ', dp_issue_body: 'ASN Manager v{v}\n\nWas funktioniert nicht / was hast du erwartet?\n\n\nBitte hier das Diagnose-Paket ({f}) anhängen: die Datei in dieses Textfeld ziehen.',
     btn_ipset: 'ipset-Status', btn_pubip: 'Öffentliche IPs', output_default: 'Hier erscheint die Ausgabe von Anwenden, Tests und Prüfungen.',
@@ -1768,6 +1771,10 @@ function asnmDiagPackReady() {
 }
 
 // the file is fetched like the other data files and handed to the browser as a download (works on phones too)
+function asnmDiagPack() {
+    document.getElementById('asnm_output').textContent = t('running_x', { a: t('btn_dp') });
+    asnmSend('diagpack', [document.getElementById('asnm_dp_full').checked ? 'full' : '']);
+}
 function asnmDiagDownload(name) {
     asnmGet('diag.htm', function (txt) {
         try {
@@ -3469,7 +3476,8 @@ function initial() {
     <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg><div class="asnm-card-titles"><h3 data-i18n="dp_title"></h3><div class="asnm-card-sub" data-i18n="dp_sub"></div></div></div>
     <div class="asnm-dp-text" data-i18n="dp_text"></div>
     <div class="asnm-row asnm-dp-row">
-      <input type="button" class="button_gen asnm-btn asnm-primary" data-i18n-value="btn_dp" onclick="asnmTool('diagpack');"/>
+      <input type="button" class="button_gen asnm-btn asnm-primary" data-i18n-value="btn_dp" onclick="asnmDiagPack();"/>
+      <label class="asnm-dp-full"><input type="checkbox" id="asnm_dp_full"/><span data-i18n="dp_full"></span></label>
       <span id="asnm_dp_links" style="display:none;"><a class="asnm-link" id="asnm_dp_dl" href="#" data-i18n="dp_download"></a> &middot;
         <a class="asnm-link" id="asnm_dp_gh" href="#" target="_blank" rel="noopener" data-i18n="dp_github"></a></span>
     </div>

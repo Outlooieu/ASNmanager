@@ -1,3 +1,7 @@
+## v3.8.1
+
+- Diagnostic bundle anonymised further: the domains of your entries become `domain-01.de`, `domain-02.com` ... (the same placeholder everywhere in the file, the ending is kept), notes and the descriptions of the VPN Director rules are left out, and the tunnel addresses of the VPN clients are masked as well. A checkbox "Domains in clear text" (`ASNmanager.sh diag full`) keeps the domains for the case that a domain rule is the problem. The page says what is masked and what stays readable (local addresses, ASN numbers, router model)
+
 ## v3.8.0
 
 - Fixed: "Download" of the diagnostic bundle failed ("request cannot be completed") - the router's web server does not deliver .txt files from the add-on folder. The page now fetches the bundle like its other data files and hands it to the browser as a download (works on phones as well)

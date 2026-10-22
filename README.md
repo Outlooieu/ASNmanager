@@ -9,7 +9,7 @@ ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to eas
  /_\ / __| \| | |  \/  | /_\ | \| | /_\ / __| __|| _ \
 / _ \__ \ .' | | |\/| |/ _ \| .' |/ _ \ (_ | _| |   /
 /_/ \_\___/_|\_| |_|  |_/_/ \_\_|\_/_/ \_\___|___||_|_\
-              === ASN MANAGER v3.8.0 ===
+              === ASN MANAGER v3.8.1 ===
 ================================================================
  ASNs
  [1]  Show ASN list & routing targets
@@ -134,7 +134,7 @@ Layout: the **overview** (status tiles, routing check, "Apply rules", notices) i
 - **ASNs** - the ASN list and one "Add ASNs" card with three ways: enter ASNs, find them by domain / IP, service presets
 - **Traffic** - statistics, live throughput and suggestions (the card opens by itself in this tab)
 - **Targets & failover** - interfaces with external IP, speed test and the failover chains
-- **Diagnostics** - **Explain** a domain or IP (DNS answer, every entry that contains each address, which rule wins - also for one device -, the interface it leaves through), **Check device** (its rules, its normal way through the VPN Director, its current connections with name, traffic, rule and interface), **Check DNS chain** (port 53 -> dnsmasq -> its servers, with a learning test of a domain entry), route test, traceroute, ipset status, public IPs, and the **diagnostic bundle**: one text file with everything needed to analyse a problem (public addresses, VPN servers, MAC addresses and keys masked) - download it and attach it to an issue on GitHub
+- **Diagnostics** - **Explain** a domain or IP (DNS answer, every entry that contains each address, which rule wins - also for one device -, the interface it leaves through), **Check device** (its rules, its normal way through the VPN Director, its current connections with name, traffic, rule and interface), **Check DNS chain** (port 53 -> dnsmasq -> its servers, with a learning test of a domain entry), route test, traceroute, ipset status, public IPs, and the **diagnostic bundle**: one text file with everything needed to analyse a problem (public addresses, VPN servers and tunnel addresses, MAC addresses, IPv6 and keys masked; notes and VPN Director descriptions left out; the domains of your entries become domain-01.de ... unless you tick "Domains in clear text") - download it and attach it to an issue on GitHub
 - **Settings** - display (unit for data rates), performance (marking rules, statistics detail), auto-refresh schedule, backup & restore
 
 The tabs show small counters (number of ASNs, statistics on, active failovers). The page always starts on the ASNs tab.
