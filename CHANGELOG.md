@@ -1,3 +1,7 @@
+## v3.6.1
+
+- WebUI: the sentence form of "Enter ASNs" is laid out as a tidy grid - the words "Route / via / Note" in one column, the fields aligned next to them, target and devices side by side; each hint sits right under its field. On a phone the words become labels above the fields
+
 ## v3.6.0
 
 - WebUI: new layout of "Enter ASNs" - it reads like a sentence: "Route [entries] via [target] for [devices]", with the note and the Add button in one line below. Enter in the entries or note field adds right away. Known devices are picked from the list; typing IP addresses is behind the link "type IP addresses" below the sentence. On narrow screens the parts wrap
