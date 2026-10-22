@@ -1,3 +1,7 @@
+## v3.8.4
+
+- The status line under the buttons no longer shows the last output line of a diagnostic tool (e.g. "[INFO] suggestions by domain: on ..." after "Check DNS chain"). For the tools of the Diagnostics tab and the look-up it now says "<tool>: done - see the result below" or "... failed"; the full output is in the output box as before
+
 ## v3.8.3
 
 - The routing check line ("68 OK · 0 warnings · 0 errors", "Check now") moved to Diagnostics as well. The status card shows it only when there are warnings or errors
