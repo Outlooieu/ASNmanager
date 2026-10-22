@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.8.1 -->
+<!-- ASNmanager-WebUI v3.8.2 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -351,6 +351,7 @@
 .asnm-dp-row { align-items: center; gap: 12px; }
 #asnm .asnm-diag-dev { width: 260px; }
 .asnm-sg-none { margin-top: 6px; }
+.asnm-diag-sys { margin: 0 0 14px; padding: 0 0 10px; border-bottom: 1px solid var(--line); }
 .asnm-dp-full { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); cursor: pointer; }
 .asnm-sg-x { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin-left: 4px; padding: 0;
     vertical-align: middle; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
@@ -455,7 +456,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.8.1';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.8.2';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -550,6 +551,7 @@ var ASNM_I18N = {
     note_ph: 'Note, e.g. ZDF Mediathek', note_lbl: 'Note', add_note_lbl: 'Note (optional)', add_s1: 'Route', add_s2: 'via', add_s3: 'for', add_note_ph: 'optional, e.g. ZDF Mediathek', add_src_type: 'type IP addresses', add_src_hide: 'hide IP field', add_note_help: 'Shown under the entry - with several entries in one go, under each of them',
     c_clear_type: 'Remove ALL entries ({a} ASNs, {i} IP ranges, {d} domains) from the list?\nActive routing stays until you click "Apply rules".\n\nType {w} to confirm:', clear_word: 'DELETE', clear_wrong: 'Not removed - the word did not match.',
     dns_lbl: 'DNS / DHCP', dns_ok: 'dnsmasq OK', dns_ok_agh: 'dnsmasq OK (port {port}, behind {p})', dns_other: '{p} answers DNS instead of dnsmasq', dns_other_long: '{p} answers DNS (and DHCP) instead of dnsmasq. The devices are fine, but the domain entries learn nothing unless {p} fills the ipset sets of the dnsmasq ipset= lines. IP and ASN entries are not affected.', dns_dhcp_ok: 'DHCP OK', dns_dhcp_off: 'DHCP off in the router',
+    sched_err: 'the cron job is missing - the subnets are not refreshed (apply the rules once)',
     dns_agh: '{p} bypasses dnsmasq (asks {up})', dns_mirror: '{p} fills the domain sets itself',
     dns_agh_long: '{p} sends the lookups straight to {up} instead of dnsmasq (port {port}). DNS works, but the domain entries learn (almost) nothing and the suggestions by domain stay empty. Fix: in {p} -> Settings -> DNS settings -> Upstream DNS servers, replace {up} with 127.0.0.1:{port} (dnsmasq passes the lookups on to the same server).',
     dns_agh_partly_long: '{p} shares the lookups between dnsmasq (port {port}) and {up}. DNS works, but the domain entries learn only the addresses of the lookups that happen to go through dnsmasq. Fix: in {p} -> Settings -> DNS settings -> Upstream DNS servers, keep only 127.0.0.1:{port} (dnsmasq passes the lookups on to {up}).',
@@ -699,6 +701,7 @@ var ASNM_I18N = {
     note_ph: 'Notiz, z. B. ZDF Mediathek', note_lbl: 'Notiz', add_note_lbl: 'Notiz (optional)', add_s1: 'Leite', add_s2: 'über', add_s3: 'für', add_note_ph: 'optional, z. B. ZDF Mediathek', add_src_type: 'IP-Adressen eintippen', add_src_hide: 'IP-Feld ausblenden', add_note_help: 'Steht unter dem Eintrag - bei mehreren Einträgen auf einmal unter jedem davon',
     c_clear_type: 'ALLE Einträge ({a} ASNs, {i} IP-Bereiche, {d} Domains) aus der Liste entfernen?\nDas aktive Routing bleibt bestehen, bis du "Regeln anwenden" klickst.\n\nZum Bestätigen {w} eintippen:', clear_word: 'LÖSCHEN', clear_wrong: 'Nicht entfernt - das Wort stimmte nicht.',
     dns_lbl: 'DNS / DHCP', dns_ok: 'dnsmasq OK', dns_ok_agh: 'dnsmasq OK (Port {port}, hinter {p})', dns_other: '{p} beantwortet DNS statt dnsmasq', dns_other_long: '{p} beantwortet DNS (und DHCP) statt dnsmasq. Die Geräte funktionieren, aber die Domain-Einträge lernen nichts, solange {p} die ipset-Mengen der dnsmasq-Zeilen nicht selbst füllt. IP- und ASN-Einträge sind nicht betroffen.', dns_dhcp_ok: 'DHCP OK', dns_dhcp_off: 'DHCP im Router aus',
+    sched_err: 'der Cron-Eintrag fehlt - die Subnetze werden nicht aktualisiert (einmal Regeln anwenden)',
     dns_agh: '{p} umgeht dnsmasq (fragt {up})', dns_mirror: '{p} füllt die Domain-Listen selbst',
     dns_agh_long: '{p} schickt die Anfragen direkt an {up} statt an dnsmasq (Port {port}). DNS funktioniert, aber die Domain-Einträge lernen (fast) nichts, und die Vorschläge nach Domain bleiben leer. Abhilfe: in {p} -> Einstellungen -> DNS-Einstellungen -> Upstream-DNS-Server {up} durch 127.0.0.1:{port} ersetzen (dnsmasq gibt die Anfragen an denselben Server weiter).',
     dns_agh_partly_long: '{p} verteilt die Anfragen auf dnsmasq (Port {port}) und {up}. DNS funktioniert, aber die Domain-Einträge lernen nur die Adressen der Anfragen, die zufällig über dnsmasq laufen. Abhilfe: in {p} -> Einstellungen -> DNS-Einstellungen -> Upstream-DNS-Server nur 127.0.0.1:{port} stehen lassen (dnsmasq gibt die Anfragen an {up} weiter).',
@@ -971,6 +974,8 @@ function asnmRender() {
 
     document.getElementById('asnm_schedule_info').innerHTML = asnmEsc(t('every', { n: d.schedule.interval, t: d.schedule.time })) + ' ' +
         (d.cron ? '<span class="asnm-badge asnm-ok">' + asnmEsc(t('cron_on')) + '</span>' : '<span class="asnm-badge asnm-warn">' + asnmEsc(t('cron_off')) + '</span>');
+    // the status card shows it only when something is wrong (the full line is in Diagnostics)
+    document.getElementById('asnm_sched_err').style.display = d.cron ? 'none' : '';
     document.getElementById('asnm_sched_int').value = d.schedule.interval;
     document.getElementById('asnm_sched_time').value = d.schedule.time;
 
@@ -3325,8 +3330,7 @@ function initial() {
       <div class="asnm-stat"><div class="asnm-stat-label" data-i18n="stat_ifaces"></div><div class="asnm-stat-value" id="asnm_stat_ifaces">-</div></div>
       <div class="asnm-stat"><div class="asnm-stat-label" data-i18n="stat_last"></div><div class="asnm-stat-value asnm-small" id="asnm_last_apply">-</div></div>
     </div>
-    <div class="asnm-kv"><span data-i18n="auto_refresh"></span>: <b id="asnm_schedule_info">-</b></div>
-    <div class="asnm-kv"><span data-i18n="dns_lbl"></span>: <b id="asnm_dns_state">-</b></div>
+    <div class="asnm-kv" id="asnm_sched_err" style="display:none;"><span data-i18n="auto_refresh"></span>: <b class="asnm-rc-warn" data-i18n="sched_err"></b></div>
     <div class="asnm-kv"><span data-i18n="rc_title"></span>: <b id="asnm_rc_state">-</b>
       <span class="asnm-link" style="margin-left: 8px;" data-i18n="rc_now" onclick="asnmRcCheck();"></span></div>
     <div class="asnm-row">
@@ -3450,6 +3454,10 @@ function initial() {
   <div class="asnm-tabpanel" id="asnm_tab_diag" role="tabpanel" style="display:none;">
   <div class="asnm-card">
     <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg><div class="asnm-card-titles"><h3 data-i18n="diag_title"></h3></div></div>
+    <div class="asnm-diag-sys">
+      <div class="asnm-kv"><span data-i18n="dns_lbl"></span>: <b id="asnm_dns_state">-</b></div>
+      <div class="asnm-kv"><span data-i18n="auto_refresh"></span>: <b id="asnm_schedule_info">-</b></div>
+    </div>
     <div class="asnm-form">
       <div class="asnm-field asnm-full"><span class="asnm-label" data-i18n="domain_ip"></span>
         <div class="asnm-inline">

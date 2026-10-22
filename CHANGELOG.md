@@ -1,3 +1,7 @@
+## v3.8.2
+
+- Status card: only problems. The lines "Auto-refresh of subnets" and "DNS / DHCP" moved to the Diagnostics tab (top of the card); in the status card a line appears only when the cron job of the auto-refresh is missing, and a DNS problem shows as before as a banner above the status card. The routing check line stays
+
 ## v3.8.1
 
 - Diagnostic bundle anonymised further: the domains of your entries become `domain-01.de`, `domain-02.com` ... (the same placeholder everywhere in the file, the ending is kept), notes and the descriptions of the VPN Director rules are left out, and the tunnel addresses of the VPN clients are masked as well. A checkbox "Domains in clear text" (`ASNmanager.sh diag full`) keeps the domains for the case that a domain rule is the problem. The page says what is masked and what stays readable (local addresses, ASN numbers, router model)
