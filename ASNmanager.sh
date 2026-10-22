@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.6.2
+version=3.6.3
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.6.2"
+SCRIPT_VERSION="3.6.3"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -343,7 +343,6 @@ CU_BEGIN="# ASNmanager domains begin"
 CU_END="# ASNmanager domains end"
 CU_GROUPS="/tmp/asnmanager-domgroups.txt"      # RAM: "target|sources <TAB> ipset <TAB> domains"
 CU_STATUS="/tmp/asnmanager-custom.status"      # RAM: "id <TAB> ok|down"
-UGROUPS_FILE="/tmp/asn_groups.txt"             # RAM, written by the worker: "target|sources <TAB> combined ipset"
 
 cu_is_cidr() {
     cic_ip=${1%%/*}; cic_p=32
@@ -390,6 +389,7 @@ cu_list() {
     while IFS=: read -r cl_id cl_d cl_s cl_k cl_v; do
         [ -n "$cl_id" ] || continue
         cl_x=""; [ "$cl_k" = "dom" ] && cl_x="  ($(cu_learned "$cl_id" "$cl_d" "$cl_s") learned)"
+        cl_nt=$(note_of "$cl_k:$cl_v"); [ -n "$cl_nt" ] && cl_x="$cl_x  # $cl_nt"
         [ "$cl_k" = "dom" ] && cl_v="*.${cl_v}"
         printf "%-5s %-6s -> %-6s %s\n" "$cl_id" "$cl_k" "$cl_d" "$cl_v${cl_s:+  [Src: $cl_s]}$cl_x"
     done < "$CUSTOM_FILE"
@@ -469,20 +469,6 @@ cu_rules_add() {          # SET TARGET SOURCES
         iptables -t mangle -I PREROUTING 1 -m set --match-set "$1" dst -m mark --mark "0/$MARK_MASK" -j MARK --set-mark "$cra_fw"
         iptables -t mangle -I OUTPUT 1 -m set --match-set "$1" dst -m mark --mark "0/$MARK_MASK" -j MARK --set-mark "$cra_fw"
     fi
-}
-# the combined set of a target + source group (the worker made it for the ASNs; created here if only custom entries use the group)
-cu_group_set() {          # TARGET SOURCES -> prints the set name
-    cgs_key="${1}|${2}"
-    cgs_name=$(awk -F'\t' -v k="$cgs_key" '$1 == k { print $2; exit }' "$UGROUPS_FILE" 2>/dev/null)
-    if [ -z "$cgs_name" ]; then
-        cgs_name="ASNU_${1}_x$(echo "$cgs_key" | md5sum | cut -c1-6)"
-        printf '%s\t%s\n' "$cgs_key" "$cgs_name" >> "$UGROUPS_FILE"
-    fi
-    if ! ipset list -n 2>/dev/null | grep -qx "$cgs_name"; then
-        ipset create "$cgs_name" hash:net family inet hashsize 1024 maxelem 524288 2>/dev/null
-        cu_rules_add "$cgs_name" "$1" "$2"
-    fi
-    echo "$cgs_name"
 }
 
 cu_apply_ip() {
@@ -1369,10 +1355,14 @@ remove_menu() {
             echo -e "${GREEN}Preset ASNs removed! Run option [7] to apply rules.${NC}"
             ;;
         3)
-            > "$ASN_FILE"
-            [ -f "$CUSTOM_FILE" ] && : > "$CUSTOM_FILE"
-            > "$STATS_FILE"
-            echo -e "${GREEN}All entries cleared.${NC}"
+            echo -e "${RED}This removes ALL entries: $(grep -c . "$ASN_FILE" 2>/dev/null || echo 0) ASN(s) and $(grep -c . "$CUSTOM_FILE" 2>/dev/null || echo 0) IP / domain entry(ies), with their notes.${NC}"
+            echo -n "Type DELETE to confirm: "; read -r cl_word
+            if [ "$cl_word" = "DELETE" ]; then
+                cli_clear >/dev/null; > "$STATS_FILE"
+                echo -e "${GREEN}All entries cleared. Run option [7] to remove the active rules.${NC}"
+            else
+                echo "Nothing removed."
+            fi
             ;;
     esac
     sleep 2
@@ -1872,7 +1862,8 @@ cli_list() {
     [ -s "$ASN_FILE" ] || [ -s "$CUSTOM_FILE" ] || { echo "ASN list is empty."; return 0; }
     while IFS=':' read -r asn dest src_ip; do
         [ -z "$asn" ] && continue
-        printf "AS%-10s -> %-6s %s\n" "$asn" "$dest" "${src_ip:+[Src: $src_ip]}"
+        cl_nm=$(name_of "$asn"); cl_nt=$(note_of "$asn")
+        printf "AS%-10s -> %-6s %s%s%s\n" "$asn" "$dest" "${cl_nm:+$cl_nm  }" "${src_ip:+[Src: $src_ip]}" "${cl_nt:+  # $cl_nt}"
     done < "$ASN_FILE"
     [ -s "$CUSTOM_FILE" ] && cu_list
     return 0
@@ -3850,7 +3841,6 @@ fo_info() {   # table fwmark prio - same values as the worker
     esac
 }
 fo_tname() { case "$1" in 254) echo main ;; 253) echo default ;; 255) echo local ;; *) echo "$1" ;; esac; }
-fo_chain() { sed -n "s/^$1=//p" "$FO_CONF" 2>/dev/null | head -n 1; }
 
 fo_probe() {
     [ "$1" = "BLOCK" ] && return 0
@@ -4715,12 +4705,15 @@ while true; do
         remove) remove_menu ;;
         apply)
             clear
-            echo -e "${YELLOW}--- Rebuilding Worker & Fetching Subnets ---${NC}"
-            if rebuild_worker; then
-                "$WORKER_SCRIPT" force
-                mark_applied
-                echo -e "\n${GREEN}Finished! Rules updated.${NC}"
-            fi
+            echo -e "${YELLOW}--- Build & apply routing rules ---${NC}"
+            echo -e " [1] Apply rules (from the saved subnets, only new ASNs are downloaded - fast)"
+            echo -e " [2] Reload all subnets and apply (downloads every ASN again)"
+            echo -e " [0] Cancel"
+            echo -n "Select [1]: "; read -r ap_opt
+            case "${ap_opt:-1}" in
+                1) echo ""; cli_apply smart ;;
+                2) echo ""; cli_apply force ;;
+            esac
             echo "" && echo -n "Press Enter to return..." && read -r _
             ;;
         ipset)

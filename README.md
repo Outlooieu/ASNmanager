@@ -9,14 +9,14 @@ ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to eas
  /_\ / __| \| | |  \/  | /_\ | \| | /_\ / __| __|| _ \
 / _ \__ \ .' | | |\/| |/ _ \| .' |/ _ \ (_ | _| |   /
 /_/ \_\___/_|\_| |_|  |_/_/ \_\_|\_/_/ \_\___|___||_|_\
-              === ASN MANAGER v3.1.8 ===
+              === ASN MANAGER v3.6.3 ===
 ================================================================
  ASNs
  [1]  Show ASN list & routing targets
  [2]  Add ASN(s), IP/CIDR ranges or domains
  [3]  Find ASN for domain / IP (find, add & delete)
  [4]  Add service presets (AWS, Netflix, Gaming, Streaming ...)
- [5]  Edit entry (target / source devices)
+ [5]  Edit ASN (target / source devices)
  [6]  Remove ASN or service preset
  Rules & automation
  [7]  Build & apply routing rules
@@ -43,11 +43,11 @@ Select an option [1-20, e]:
 
 Key Features:
 
-Multi-Interface Routing: Assign specific ASNs directly to WAN1, WAN2, OpenVPN clients (tun11–15), or WireGuard clients (wgc1–5).
+Multi-Interface Routing: Assign specific ASNs - and single IPs, CIDR ranges or domains - directly to WAN1, WAN2, OpenVPN clients (tun11–15), or WireGuard clients (wgc1–5), for all devices or only for chosen ones.
 
 Automated IP Subnet Fetching: Automatically queries and aggregates IPv4 prefixes from multiple reliable sources (Amazon IP ranges, IPverse, RIPE Stat, HackerTarget, and BGPView).
 
-Chunked Engine: Automatically splits large ASN lists into manageable chunks (max 3,000 entries per ipset table) to maintain high performance and prevent kernel limits.
+Low CPU load: all ASNs of a target share one ipset and one marking rule, so the router checks every packet only once per target. Every target has its own exact firewall mark, and IP / domain entries take precedence over ASNs.
 
 Auto-Refresh Scheduling: Built-in configuration to automatically re-fetch and update IP subnets via cron jobs and persistent startup scripts (services-start).
 
@@ -86,13 +86,13 @@ Here is a short guide for each menu option of the ASN Manager:
 
 [4] Add service presets: A list of predefined services (Amazon, Netflix, gaming, streaming ...) to assign well-known ASNs to an interface in one go.
 
-[5] Edit ASN: Change the target interface and the source devices of an ASN that is already on the list.
+[5] Edit ASN: Change the target interface and the source devices of an entry that is already on the list.
 
-[6] Remove ASN or service preset: Delete single ASNs, complete service presets or reset the whole list.
+[6] Remove ASN or service preset: Delete single ASNs, complete service presets or reset the whole list (you type DELETE to confirm).
 
 **Rules & automation**
 
-[7] Build & apply routing rules: Fetches the current IP subnets of the configured ASNs, splits them into chunks and applies the ipset and firewall rules.
+[7] Build & apply routing rules: [1] builds the rules from the saved subnets and downloads only new ASNs (only the IP / domain entries are applied if the ASN list is unchanged); [2] downloads the subnets of every ASN again first.
 
 [8] Auto-refresh schedule: Sets up the cron job that refreshes the IP ranges in the background (every X days at a chosen time).
 
@@ -194,7 +194,7 @@ The check runs every 5 minutes (cron job `ASN_Check`, only while the WebUI is in
 
 ## Backup & restore
 
-A backup (`asn_manager_backup_<date>.conf`) contains **everything that is configured**: the ASN list (targets and source devices), the auto-refresh schedule, the failover chains and the settings (traffic statistics on / off, statistics detail, marking rules, USB saving on / off, WebUI tab location). The WebUI download is created by the router, so it is the same file as the one from the SSH menu. If the router does not deliver that file (for example because the script on the router is older than the page), the page saves a **basic backup** itself - ASN list, schedule, failover chains and the statistics settings - and tells you so.
+A backup (`asn_manager_backup_<date>.conf`) contains **everything that is configured**: the ASN list (targets and source devices), the IP / CIDR and domain entries, the notes, the auto-refresh schedule, the failover chains and the settings (traffic statistics on / off, statistics detail, marking rules, USB saving on / off, WebUI tab location). The WebUI download is created by the router, so it is the same file as the one from the SSH menu. If the router does not deliver that file (for example because the script on the router is older than the page), the page saves a **basic backup** itself - ASN list, schedule, failover chains and the statistics settings - and tells you so.
 
 **Restore asks what to restore** - only the parts that are in the file are offered:
 - WebUI (Settings tab, "Import"): pick the file, then tick the parts. For the ASN list choose *replace the current list* or *merge into it*; the failover chains of the backup replace the current ones (chains that are not in the backup are removed).
@@ -207,11 +207,11 @@ Older backups (only the ASN list, or list + schedule) still work, also plain lis
 
 Besides ASNs the list takes **single IP addresses, CIDR ranges and domains** - for traffic that no ASN rule catches, for example a video server of a cache inside your provider's network (a Google Global Cache in the provider's AS, so `AS15169` does not match it). Type them in the same field as ASNs, mixed and separated by commas: `AS15169, 181.209.202.0/24, *.googlevideo.com`. Target interface and source devices work as for ASNs (also several devices); the entries are shown in sections of their own below the ASNs ("IP / CIDR ranges" and "Domains") and have an ID (`C1`, `C2` ...) for edit and remove. Command line: `ASNmanager.sh add WGC3 181.209.202.0/24 '*.googlevideo.com' --src 192.168.50.30,192.168.50.94`, `ASNmanager.sh custom list`, `ASNmanager.sh remove C1` (or remove by value: `remove googlevideo.com`).
 
-**IP / CIDR** (`/8` to `/32`): the range joins the marking set of its target like the subnets of an ASN (survives every refresh and re-apply, because the list is the source). **Domains**: `*.example.com` and `example.com` mean the same - the domain and all its subdomains. The router's DNS server (dnsmasq) puts every address it resolves for these names into an ipset of its own (one per target and device group), and the marking rule uses that set. So the addresses follow the DNS answers by themselves, however often they change - nothing to refresh. ASN Manager writes the needed lines into a marked block in `/jffs/configs/dnsmasq.conf.add` (other content stays untouched) and restarts dnsmasq **only when that block changes or a domain set is new**; removing the last domain removes the block.
+**IP / CIDR** (`/8` to `/32`): every range has a set and a marking rule of its own, above the ASN rules - a range wins over an ASN that contains it (survives every refresh and re-apply, because the list is the source). **Domains**: `*.example.com` and `example.com` mean the same - the domain and all its subdomains. The router's DNS server (dnsmasq) puts every address it resolves for these names into an ipset of its own (one per target and device group), and the marking rule uses that set. So the addresses follow the DNS answers by themselves, however often they change - nothing to refresh. ASN Manager writes the needed lines into a marked block in `/jffs/configs/dnsmasq.conf.add` (other content stays untouched) and restarts dnsmasq **only when that block changes**; removing the last domain removes the block.
 
 What to know about domains:
 - It only works for devices that use the **router as their DNS server**. A browser with "Secure DNS" (DoH), or a device with a fixed DNS server (many TV boxes and streaming devices use 8.8.8.8), asks someone else and the router never sees the answer.
-- If **AdGuard Home** (or another DNS server) answers the devices directly and only forwards to dnsmasq for some names, only the names that pass through the router's dnsmasq are learned. AdGuard Home has an ipset option of its own, which ASN Manager does not use yet.
+- If **AdGuard Home** (or another DNS server) answers the devices in front of dnsmasq, only names that reach dnsmasq are learned. With the AdGuardHome installer for Asuswrt-Merlin the `ipset=` lines are taken over by AdGuard Home, so the domain entries keep learning; check with `ASNmanager.sh custom learned`. The DNS / DHCP check in the overview shows whether dnsmasq is still running behind it (it moves to port 553).
 - dnsmasq only adds an address when it fetches the answer from its upstream server, **not when it answers from its cache**. That is why the cache is emptied when a domain set is created (SIGHUP, dnsmasq keeps running; nothing to do when the cache is off, e.g. behind AdGuard Home): the names are learned at the next lookup. dnsmasq is restarted only when the `ipset=` lines change. Devices have a DNS cache of their own - restarting the app or browser helps.
 - IPv4 only. A learned address expires 7 days after its last lookup (each lookup starts the time again, so addresses in use stay). It is not lost by applying the rules, and it survives a router restart: the addresses are saved on the USB device (hourly), on the flash (every 6 hours and at shutdown) and put back at boot. `custom save` saves right away. Connections that were already open before the address was learned stay where they are.
 - Each entry has a row of its own in "Traffic per ASN / target" (IP ranges and domains alike; in the light statistics mode everything is counted per interface only). If an address is in a custom entry and in an ASN, the custom entry wins - for the routing as well (since v3.4.0), also when the ASN points to another target: e.g. `*.zdf.de` -> WGC3 for one device while Akamai (AS20940) stays on WAN1.
@@ -308,10 +308,15 @@ All functions can also be used without the menu, e.g. for your own scripts:
 ```
 ASNmanager.sh list
 ASNmanager.sh add WGC1 AS13335 15169 --src 192.168.1.50
+ASNmanager.sh add WGC3 '*.zdf.de' 181.209.202.0/24 --note "ZDF Mediathek"
+ASNmanager.sh note 13335 Cloudflare via VPN
+ASNmanager.sh custom list
+ASNmanager.sh custom learned
 ASNmanager.sh preset 4 OVPN1
 ASNmanager.sh edit 13335 WAN2
 ASNmanager.sh remove 13335
 ASNmanager.sh apply
+ASNmanager.sh apply full
 ASNmanager.sh retry
 ASNmanager.sh lookup netflix.com
 ASNmanager.sh test netflix.com
@@ -321,6 +326,8 @@ ASNmanager.sh stats show
 ASNmanager.sh stats mode iface
 ASNmanager.sh rulemode combined
 ASNmanager.sh webui location vpn
+ASNmanager.sh names
+ASNmanager.sh dns
 ASNmanager.sh rescue
 ASNmanager.sh help
 ```
@@ -331,3 +338,4 @@ Without arguments the interactive menu starts.
 
 - Round country flags: [circle-flags](https://github.com/HatScripts/circle-flags) by HatScripts, MIT License (downloaded once per country by the router)
 - IP geolocation / ASN lookup: ip-api.com, with ipinfo.io and RIPEstat as fallback
+- ASN names (holders): RIPEstat (looked up once per ASN)

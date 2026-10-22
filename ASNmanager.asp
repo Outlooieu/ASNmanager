@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.6.2 -->
+<!-- ASNmanager-WebUI v3.6.3 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -62,8 +62,8 @@
 #asnm .asnm-link:hover { text-decoration: underline; }
 
 /* header */
-.asnm-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px; }
-.asnm-brand { display: flex; align-items: center; gap: 12px; }
+.asnm-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 16px; gap: 12px 20px; }
+.asnm-brand { display: flex; align-items: center; gap: 12px; flex: 1 1 280px; min-width: 0; }
 /* orbit animation around the logo: two dashed paths with glowing dots, drawn behind the logo */
 .asnm-logo-wrap { position: relative; width: 42px; height: 42px; flex: none; margin: 0 16px 0 8px; }
 .asnm-logo-wrap .asnm-logo { position: relative; z-index: 1; }
@@ -80,10 +80,10 @@
 .asnm-logo { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
              background: linear-gradient(135deg, #3b82f6, #06b6d4); font-weight: 800; font-size: 15px; color: #fff; letter-spacing: .5px;
              box-shadow: 0 6px 18px rgba(59,130,246,.35); }
-.asnm-title { font-size: 20px; font-weight: 700; }
+.asnm-title { font-size: 20px; font-weight: 700; white-space: nowrap; }
 .asnm-sub { color: var(--muted); font-size: 12px; }
-.asnm-meta { text-align: right; color: var(--muted); font-size: 11px; }
-.asnm-meta-top { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 5px; }
+.asnm-meta { text-align: right; color: var(--muted); font-size: 11px; flex: 0 1 auto; margin-left: auto; }
+.asnm-meta-top { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px 8px; margin-bottom: 5px; }
 .asnm-chip { display: inline-block; padding: 3px 10px; border-radius: 999px; background: var(--card2); border: 1px solid var(--line);
              color: var(--text); font-weight: 600; font-size: 11px; }
 
@@ -110,10 +110,13 @@
 .asnm-stat-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
 .asnm-stat-value { font-size: 20px; font-weight: 700; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .asnm-asname { color: var(--text2); font-weight: 500; margin-left: 4px; }
+#asnm_list .asnm-asname { display: block; margin: 1px 0 0; font-size: 12px; color: var(--muted); max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#asnm_list .asnm-src-list .asnm-dev { display: block; }
 .asnm-note { margin-top: 3px; font-size: 11px; color: var(--muted); font-style: italic; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .asnm-note-lbl { font-style: normal; font-weight: 600; }
-.asnm-note-in { margin-top: 6px; width: 200px; }
-.asnm-btn.asnm-danger-text { color: var(--bad) !important; }
+.asnm-note-in { width: 200px; }
+.asnm-edit-lbl { display: block; margin: 8px 0 4px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+#asnm .button_gen.asnm-danger-text { color: var(--bad) !important; }
 .asnm-stat-sub { display: block; margin-top: 2px; font-size: 11px; font-weight: 600; color: var(--muted); white-space: normal; }
 .asnm-stat-value.asnm-small { font-size: 13px; font-weight: 600; padding-top: 6px; }
 .asnm-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -319,8 +322,11 @@
 .asnm-sg-clrow { display: flex; justify-content: space-between; gap: 8px; line-height: 18px; }
 .asnm-sg-clrow span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #asnm_sg .asnm-table th:not(:first-child), #asnm_sg .asnm-table td:not(:first-child) { padding-left: 6px; padding-right: 6px; }
-#asnm .asnm-sg-sel { width: 120px; }
-#asnm .asnm-sg-note { width: 150px; height: 32px !important; }
+#asnm .asnm-sg-sel { width: 104px; }
+#asnm .asnm-sg-note { width: 130px; height: 32px !important; }
+#asnm_sg_tbl th { white-space: nowrap; }
+#asnm_sg_tbl td.num { white-space: nowrap; }
+#asnm_sg_tbl .asnm-ms-btn { width: 128px; }
 .asnm-sg-foot { margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.5; }
 /* collapsible sections inside the traffic card */
 .asnm-sec { margin-top: 12px; border-top: 1px solid var(--line); }
@@ -411,7 +417,7 @@
 .asnm-rs-sub { margin: -2px 0 0 26px; font-size: 12px; color: var(--text2); display: flex; gap: 16px; flex-wrap: wrap; }
 .asnm-rs-sub label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
 .asnm-rs-det { margin-left: 26px; font-size: 11px; color: var(--muted); line-height: 1.5; }
-.asnm-back { display: inline-block; margin-right: 8px; padding: 3px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--text2); font-size: 12px; font-weight: 600; text-decoration: none; }
+.asnm-back { display: inline-block; white-space: nowrap; margin-right: 8px; padding: 3px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--text2); font-size: 12px; font-weight: 600; text-decoration: none; }
 .asnm-back:hover { border-color: var(--accent); color: var(--text); }
 .asnm-lr td { font-size: 12px; }
 .asnm-lr-list { margin: 6px 0; line-height: 22px; max-height: 180px; overflow-y: auto; }
@@ -425,7 +431,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.6.2';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.6.3';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -439,7 +445,7 @@ var ASNM_I18N = {
     tr_on: 'active', tr_off: 'off', tr_btn_disable: 'Disable', tr_btn_reset: 'Disable & reset', tr_btn_enable: 'Enable',
     tr_th_name: 'ASN / target', tr_th_down: 'Download', tr_th_up: 'Upload', tr_th_pk: 'Packets', tr_th_share: 'Share', tr_show: 'Show details', tr_hide: 'Hide details', tr_sum: 'Total {b} · {n} ASN(s)', tr_toggle_tip: 'Click to expand or collapse', tr_th_share_tip: 'Share of the total traffic. In expanded rows: share of the row above.',
     tr_hint: 'Click a row to see the interfaces and devices behind it', tr_dev_1: '1 device', tr_dev_n: '{n} devices',
-    tr_other: 'Not assigned to an ASN', tr_by_iface: 'By interface', tr_by_client: 'By client (all interfaces)', tr_unknown: 'Other addresses (no counter rule)', tr_unknown_hint: 'Traffic from IP addresses that have no counter rule of their own, e.g. a device that connected a moment ago or sits behind another router. Show them on the router with: asnstats.sh unknown', tr_total: 'Total', tr_split_asn: 'Via ASN rules', tr_split_other: 'Not assigned',
+    tr_other: 'Not assigned to an ASN', tr_by_iface: 'By interface', tr_by_client: 'By client (all interfaces)', tr_unknown: 'Other addresses (no counter rule)', tr_unknown_hint: 'Traffic from IP addresses that have no counter rule of their own, e.g. a device that connected a moment ago or sits behind another router. Show them on the router with: asnstats.sh unknown', tr_total: 'Total', tr_split_asn: 'Via rules', tr_split_other: 'Not assigned',
     tr_no_clients: 'No client traffic yet', tr_empty: 'No traffic counted yet.', tr_off_hint: 'Counting is off. Click "Enable" to start.',
     tr_gone: 'removed from list', tr_c_reset: 'Disable counting and delete all statistics?', tr_working: 'Applying...',
     tr_note: 'IPv4, forwarded traffic only (no router own traffic). Updates every {s} s.', tr_saved_usb: 'Counts survive a reboot - saved hourly on the USB device: {p} (last change: {t})', tr_no_usb: 'No USB device found - the numbers are only kept in RAM and are lost on a reboot. Connect a USB device (folder ASNmanager) or turn saving off.',
@@ -532,7 +538,7 @@ var ASNM_I18N = {
     at_time: 'At time', time_fmt: '(HH:MM, 24h)', btn_save_schedule: 'Save schedule',
     diag_title: 'Diagnostics', btn_test: 'Test route', btn_trace: 'Traceroute', router_checks: 'Router checks',
     btn_ipset: 'ipset status', btn_pubip: 'Public IPs', output_default: 'Output of apply, tests and checks appears here.',
-    backup_title: 'Backup & restore', backup_export: 'Export', backup_export_desc: 'Download ASN list, schedule, failover chains and settings as .conf file',
+    backup_title: 'Backup & restore', backup_export: 'Export', backup_export_desc: 'Download the list (ASNs, IP ranges, domains, notes), schedule, failover chains and settings as .conf file',
     btn_export: 'Download backup', backup_import: 'Import', backup_import_desc: 'You choose what is restored. Compatible with backups from the terminal menu',
     btn_import: 'Choose file...', import_found: '{n} valid entries found in {file}{bad}.', import_bad: ', {n} invalid lines ignored',
     import_sched: ' Schedule: every {i} day(s) at {t}.', btn_replace: 'Replace list', btn_merge: 'Merge into list', btn_cancel: 'Cancel',
@@ -566,7 +572,7 @@ var ASNM_I18N = {
     tr_on: 'aktiv', tr_off: 'aus', tr_btn_disable: 'Deaktivieren', tr_btn_reset: 'Deaktivieren und zurücksetzen', tr_btn_enable: 'Aktivieren',
     tr_th_name: 'ASN / Ziel', tr_th_down: 'Download', tr_th_up: 'Upload', tr_th_pk: 'Pakete', tr_th_share: 'Anteil', tr_show: 'Details anzeigen', tr_hide: 'Details ausblenden', tr_sum: 'Gesamt {b} · {n} ASN(s)', tr_toggle_tip: 'Klicken zum Auf- oder Zuklappen', tr_th_share_tip: 'Anteil am Gesamt-Traffic. In aufgeklappten Zeilen: Anteil der übergeordneten Zeile.',
     tr_hint: 'Zeile anklicken, um die Interfaces und Geräte dahinter zu sehen', tr_dev_1: '1 Gerät', tr_dev_n: '{n} Geräte',
-    tr_other: 'Keinem ASN zugeordnet', tr_by_iface: 'Nach Interface', tr_by_client: 'Nach Client (alle Interfaces)', tr_unknown: 'Sonstige Adressen (ohne eigene Zählregel)', tr_unknown_hint: 'Traffic von IP-Adressen ohne eigene Zählregel, z. B. ein Gerät, das sich gerade erst verbunden hat oder hinter einem anderen Router hängt. Anzeige auf dem Router mit: asnstats.sh unknown', tr_total: 'Gesamt', tr_split_asn: 'Über ASN-Regeln', tr_split_other: 'Nicht zugeordnet',
+    tr_other: 'Keinem ASN zugeordnet', tr_by_iface: 'Nach Interface', tr_by_client: 'Nach Client (alle Interfaces)', tr_unknown: 'Sonstige Adressen (ohne eigene Zählregel)', tr_unknown_hint: 'Traffic von IP-Adressen ohne eigene Zählregel, z. B. ein Gerät, das sich gerade erst verbunden hat oder hinter einem anderen Router hängt. Anzeige auf dem Router mit: asnstats.sh unknown', tr_total: 'Gesamt', tr_split_asn: 'Über Regeln', tr_split_other: 'Nicht zugeordnet',
     tr_no_clients: 'Noch kein Client-Traffic', tr_empty: 'Noch kein Traffic gezählt.', tr_off_hint: 'Die Zählung ist aus. Mit "Aktivieren" starten.',
     tr_gone: 'aus Liste entfernt', tr_c_reset: 'Zählung deaktivieren und alle Statistikdaten löschen?', tr_working: 'Wird umgesetzt...',
     tr_note: 'Nur IPv4 und weitergeleiteter Traffic (ohne Router-Eigenverkehr). Aktualisiert alle {s} s.', tr_saved_usb: 'Die Zählstände überleben einen Neustart - stündlich gesichert auf dem USB-Gerät: {p} (letzte Änderung: {t})', tr_no_usb: 'Kein USB-Gerät gefunden - die Zahlen liegen nur im Arbeitsspeicher und gehen bei einem Neustart verloren. USB-Gerät anschließen (Ordner ASNmanager) oder die Sicherung ausschalten.',
@@ -659,7 +665,7 @@ var ASNM_I18N = {
     at_time: 'Um', time_fmt: '(HH:MM, 24h)', btn_save_schedule: 'Zeitplan speichern',
     diag_title: 'Diagnose', btn_test: 'Route testen', btn_trace: 'Traceroute', router_checks: 'Router-Prüfungen',
     btn_ipset: 'ipset-Status', btn_pubip: 'Öffentliche IPs', output_default: 'Hier erscheint die Ausgabe von Anwenden, Tests und Prüfungen.',
-    backup_title: 'Sicherung & Wiederherstellung', backup_export: 'Export', backup_export_desc: 'ASN-Liste, Zeitplan, Failover-Ketten und Einstellungen als .conf-Datei herunterladen',
+    backup_title: 'Sicherung & Wiederherstellung', backup_export: 'Export', backup_export_desc: 'Liste (ASNs, IP-Bereiche, Domains, Notizen), Zeitplan, Failover-Ketten und Einstellungen als .conf-Datei herunterladen',
     btn_export: 'Sicherung herunterladen', backup_import: 'Import', backup_import_desc: 'Du wählst, was wiederhergestellt wird. Kompatibel mit Sicherungen aus dem Terminal-Menü',
     btn_import: 'Datei wählen...', import_found: '{n} gültige Einträge in {file} gefunden{bad}.', import_bad: ', {n} ungültige Zeilen ignoriert',
     import_sched: ' Zeitplan: alle {i} Tag(e) um {t}.', btn_replace: 'Liste ersetzen', btn_merge: 'Zur Liste hinzufügen', btn_cancel: 'Abbrechen',
@@ -818,8 +824,8 @@ function asnmGet(file, ok, fail) {
 
 function asnmFmtTime(ts) {
     if (!ts) return t('never');
-    var d = new Date(ts * 1000);
-    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+    var d = new Date(ts * 1000), loc = ASNM_LANG === 'de' ? 'de-DE' : undefined;
+    return d.toLocaleDateString(loc) + ' ' + d.toLocaleTimeString(loc);
 }
 
 function asnmNormDest(id) { return id === 'WAN' ? 'WAN1' : id; }
@@ -876,7 +882,7 @@ function asnmRender() {
     document.getElementById('asnm_generated').textContent = asnmFmtTime(d.generated);
     document.getElementById('asnm_banner').style.display = d.pending ? 'flex' : 'none';
     var subs = 0, up = 0, used = 0;
-    for (var si = 0; si < d.entries.length; si++) if (d.entries[si].subnets > 0) subs += d.entries[si].subnets;
+    for (var si = 0; si < d.entries.length; si++) if (!d.entries[si].kind && d.entries[si].subnets > 0) subs += d.entries[si].subnets;
     for (var sj = 0; sj < d.ifaces.length; sj++) if (d.ifaces[sj].up) up++;
     for (var sk = 0; sk < d.ifaces.length; sk++) if (d.ifaces[sk].exists) used++;
     // ASN tile: number of ASNs, below it the IP / CIDR and domain entries
@@ -1109,7 +1115,7 @@ function asnmListSection(sec, entries, rcMap) {
 
         if (ASNM.editing === e.asn) {
             html += '<tr class="asnm-editing"><td></td><td>' + asnmEntryCell(e) +
-                '<br/><input type="text" id="asnm_edit_note" class="input_15_table asnm-note-in" maxlength="60" value="' + asnmEsc(e.note || '') + '" placeholder="' + asnmEsc(t('note_ph')) + '"/></td>' +
+                '<label class="asnm-edit-lbl" for="asnm_edit_note">' + asnmEsc(t('note_lbl')) + '</label><input type="text" id="asnm_edit_note" class="input_15_table asnm-note-in" maxlength="60" value="' + asnmEsc(e.note || '') + '" placeholder="' + asnmEsc(t('note_ph')) + '"/></td>' +
                 '<td colspan="4"><select id="asnm_edit_dest" class="input_option">' + asnmTargetOptions(asnmNormDest(e.dest)) + '</select><br/>' +
                 '<input type="text" id="asnm_edit_src" class="input_15_table" maxlength="600" style="margin-top:6px;width:230px;" oninput="asnmDevMsRender(\'asnm_edit_ms\',\'asnm_edit_src\');" value="' + asnmEsc(e.src) + '" placeholder="' + asnmEsc(t('src_empty')) + '"/>' +
                 '<div class="asnm-ms" id="asnm_edit_ms" style="margin:6px 0 0 6px;vertical-align:top;"></div></td>' +
@@ -3190,7 +3196,7 @@ function initial() {
         <div class="asnm-field"><span class="asnm-label" data-i18n="refresh_every"></span>
           <div class="asnm-inline"><input type="text" id="asnm_sched_int" class="asnm-w-sm" maxlength="2"/><span class="asnm-muted"><span data-i18n="days"></span> <span data-i18n="days_range"></span></span></div></div>
         <div class="asnm-field"><span class="asnm-label" data-i18n="at_time"></span>
-          <div class="asnm-inline"><input type="text" id="asnm_sched_time" class="asnm-w-md" maxlength="5" placeholder="04:30"/><span class="asnm-muted" data-i18n="time_fmt"></span></div></div>
+          <input type="text" id="asnm_sched_time" class="asnm-w-md" maxlength="5" placeholder="04:30"/><span class="asnm-help" data-i18n="time_fmt"></span></div>
       </div>
       <div class="asnm-row" style="margin-top:14px;"><input type="button" class="button_gen asnm-btn" data-i18n-value="btn_save_schedule" onclick="asnmSaveSchedule();"/></div>
     </div>

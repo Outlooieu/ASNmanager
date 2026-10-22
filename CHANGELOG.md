@@ -1,3 +1,14 @@
+## v3.6.3
+
+Review of the whole tool:
+- SSH menu [7] "Build & apply routing rules" works like the WebUI now: [1] apply from the saved subnets (fast, also when the list has only IP / domain entries - before it refused with "ASN list is empty"), [2] reload all subnets
+- SSH menu [6] -> [3] "Clear ALL" asks you to type DELETE and also removes the notes (before it cleared everything at once without asking)
+- `list` (command line) shows the ASN names and the notes; `custom list` shows the notes
+- WebUI: the header no longer squeezes title and description into a narrow column; the ASN name sits under the ASN number (it was cut at hyphens), the device name under its IP; the note field in "Edit" has a label
+- WebUI: the "Subnets" tile counts the subnets of the ASNs only (it disagreed with the list summary because IP ranges were added); dates follow the language of the page
+- WebUI: "Remove all" is shown in red as intended; the suggestions table fits again (narrower dropdowns, no wrapped traffic numbers); the schedule hint no longer runs out of its card; the backup text names IP / domain entries and notes; "Via ASN rules" is now "Via rules" (it includes IP / domain entries)
+- Unused code removed; README updated (menu, features, IP / domain entries, AdGuard Home, command line)
+
 ## v3.6.2
 
 - Suggestions: every row has a note field; the note is saved with the ASN when you click "Add" (Enter in the field adds too). The target dropdown is narrower so the row still fits
