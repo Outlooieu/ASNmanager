@@ -1,3 +1,7 @@
+## v3.8.3
+
+- The routing check line ("68 OK · 0 warnings · 0 errors", "Check now") moved to Diagnostics as well. The status card shows it only when there are warnings or errors
+
 ## v3.8.2
 
 - Status card: only problems. The lines "Auto-refresh of subnets" and "DNS / DHCP" moved to the Diagnostics tab (top of the card); in the status card a line appears only when the cron job of the auto-refresh is missing, and a DNS problem shows as before as a banner above the status card. The routing check line stays

@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.8.2 -->
+<!-- ASNmanager-WebUI v3.8.3 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -456,7 +456,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.8.2';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.8.3';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -3003,6 +3003,13 @@ function asnmRcRender() {
         st.className = fail ? 'asnm-rc-bad' : (warn ? 'asnm-rc-warn' : 'asnm-rc-ok');
     }
     ban.style.display = (d && fail) ? 'flex' : 'none';
+    // the status card shows the routing check only with warnings or errors (or while it runs after "Check now" there)
+    var se = document.getElementById('asnm_rc_err');
+    if (se) {
+        var show = !!(d && d.results && (warn || fail)) && !ASNM_RC.checking;
+        se.style.display = show ? '' : 'none';
+        if (show) { var stx = document.getElementById('asnm_rc_err_txt'); stx.textContent = st.textContent; stx.className = st.className; }
+    }
     if (fail) {
         var fl = asnmRcFailedEntries(), names = [];
         for (i = 0; i < fl.length && i < 3; i++) names.push(asnmRcLabel(fl[i]));
@@ -3331,7 +3338,7 @@ function initial() {
       <div class="asnm-stat"><div class="asnm-stat-label" data-i18n="stat_last"></div><div class="asnm-stat-value asnm-small" id="asnm_last_apply">-</div></div>
     </div>
     <div class="asnm-kv" id="asnm_sched_err" style="display:none;"><span data-i18n="auto_refresh"></span>: <b class="asnm-rc-warn" data-i18n="sched_err"></b></div>
-    <div class="asnm-kv"><span data-i18n="rc_title"></span>: <b id="asnm_rc_state">-</b>
+    <div class="asnm-kv" id="asnm_rc_err" style="display:none;"><span data-i18n="rc_title"></span>: <b id="asnm_rc_err_txt"></b>
       <span class="asnm-link" style="margin-left: 8px;" data-i18n="rc_now" onclick="asnmRcCheck();"></span></div>
     <div class="asnm-row">
       <input type="button" class="button_gen asnm-btn asnm-primary" data-i18n-value="btn_apply" onclick="asnmApply();"/>
@@ -3457,6 +3464,8 @@ function initial() {
     <div class="asnm-diag-sys">
       <div class="asnm-kv"><span data-i18n="dns_lbl"></span>: <b id="asnm_dns_state">-</b></div>
       <div class="asnm-kv"><span data-i18n="auto_refresh"></span>: <b id="asnm_schedule_info">-</b></div>
+      <div class="asnm-kv"><span data-i18n="rc_title"></span>: <b id="asnm_rc_state">-</b>
+        <span class="asnm-link" style="margin-left: 8px;" data-i18n="rc_now" onclick="asnmRcCheck();"></span></div>
     </div>
     <div class="asnm-form">
       <div class="asnm-field asnm-full"><span class="asnm-label" data-i18n="domain_ip"></span>
