@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.5.0
+version=3.5.1
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.5.0"
+SCRIPT_VERSION="3.5.1"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -4494,7 +4494,11 @@ cli_main() {
         retry)    cli_apply cache ;;
         edit)     cli_edit "$@" ;;
         note)     cli_note "$@" ;;
-        names)    names_fill 200; [ -s "$NAMES_FILE" ] && sed 's/\t/  /' "$NAMES_FILE" ;;
+        names)    names_fill 200
+                  [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1
+                  cut -d: -f1 "$ASN_FILE" 2>/dev/null | grep -E '^[0-9]+$' | sort -n -u | while read -r nm_a; do
+                      nm_n=$(name_of "$nm_a"); printf 'AS%-10s %s\n' "$nm_a" "${nm_n:-(no name found - tried again in a day)}"
+                  done ;;
         dns)      cli_dns ;;
         import)   cli_import "$@" ;;
         status)   ipset_status_report ;;
@@ -4546,7 +4550,11 @@ cli_main() {
             esac ;;
         check)
             case "$1" in
-                run) proc_reap; cu_learned_save >/dev/null 2>&1; dns_export >/dev/null 2>&1; rc_run_once; names_fill 8 >/dev/null 2>&1 ;;
+                run) proc_reap; cu_learned_save >/dev/null 2>&1; dns_export >/dev/null 2>&1; rc_run_once
+                     # new ASN names: write the page data again so they show up without a manual refresh
+                     nm_before=$(md5sum "$NAMES_FILE" 2>/dev/null | cut -c1-32)
+                     names_fill 12 >/dev/null 2>&1
+                     [ "$(md5sum "$NAMES_FILE" 2>/dev/null | cut -c1-32)" != "$nm_before" ] && [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1 ;;
                 *)   rc_print ;;
             esac ;;
         update)

@@ -1,3 +1,7 @@
+## v3.5.1
+
+- Fixed: ASN names that were looked up in the background only showed up after "Reload data". The page data is now written again as soon as new names arrive (up to 12 per routing check). `names` also refreshes the page data and lists every ASN with its name, or says that none was found
+
 ## v3.5.0
 
 - **Names of the ASNs**: the list shows who an ASN belongs to ("AS14061 DigitalOcean, LLC", hover for the full RIPE name), the traffic statistics too. The names are looked up once per ASN (RIPEstat, at most 8 per routing check; a new ASN right after adding it; known names from the suggestions and from "Find by domain / IP" are taken over) and kept in `/jffs/addons/asnmanager/asn_names.txt`. Command line: `names` looks up all missing names now
