@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.7.8
+version=3.7.9
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.7.8"
+SCRIPT_VERSION="3.7.9"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -3747,14 +3747,18 @@ sgd_export() {
         FILENAME == ARGV[1] { n3 = split($0, a, ":"); if (a[1] !~ /^[0-9]+$/) next
                               if (n3 < 3 || a[3] == "") { listed[a[1]] = 1; next }
                               m3 = split(a[3], ss, ","); for (j = 1; j <= m3; j++) acov[a[1] "|" ss[j]] = 1; next }
-        FILENAME == ARGV[2] { asn[$1] = $2; next }
+        FILENAME == ARGV[2] { asn[$1] = $2; anm[$1] = $3; next }
         FILENAME == ARGV[3] { names[$1] = $2; next }
         {
             split($1, k, "|"); ip = k[1]; cl = k[2]; b = $2
             if (cl in self) next
             split(ip, q, "."); net = q[1] "." q[2] "." q[3]
             if (net in asn) { an = asn[net]; if (an in listed) next; if ((an "|" cl) in acov) next }
-            if (!(ip in names)) { none += b; nonen[ip] = 1; next }
+            if (!(ip in names)) {
+                none += b; nonen[ip] = 1; nb[ip] += b; nnet[ip] = net
+                cb2[ip "|" cl] += b; if (cb2[ip "|" cl] > topb[ip]) { topb[ip] = cb2[ip "|" cl]; topc[ip] = cl }
+                next
+            }
             split(names[ip], nn, ","); fn = nn[1]
             # covered by a domain entry (the name itself or one of its parents)?
             kk = split(fn, p, "."); cv = 0; ond = ""
@@ -3786,11 +3790,15 @@ sgd_export() {
             }
             nn2 = 0; for (i in nonen) nn2++
             printf "N\t%.0f\t%d\n", none, nn2
+            # addresses without a name: the busiest, with their network and the device that used them most
+            for (i in nb) printf "U\t%.0f\t[\"%s\",%.0f,\"%s\",\"%s\",\"%s\"]\n", nb[i], i, nb[i], asn[nnet[i]], anm[nnet[i]], topc[i]
         }' "$ASN_FILE" "$TS_RT/sg_asn.txt" "$TS_RT/sg_dns.txt" "$TS_RT/sg_pairs.txt" > "$TS_RT/sgd_rows.txt" 2>/dev/null
     sge_none=$(awk -F'\t' '$1 == "N" { print $2; exit }' "$TS_RT/sgd_rows.txt"); sge_nonen=$(awk -F'\t' '$1 == "N" { print $3; exit }' "$TS_RT/sgd_rows.txt")
-    sge_tot=$(grep -vc '^N' "$TS_RT/sgd_rows.txt")
+    sge_tot=$(grep -vcE '^(N|U)' "$TS_RT/sgd_rows.txt")
     printf ',"dlog":"%s","dtotal":%d,"dnone":%.0f,"dnoneips":%d,"dlist":[' "$sge_st" "${sge_tot:-0}" "${sge_none:-0}" "${sge_nonen:-0}"
-    grep -v '^N' "$TS_RT/sgd_rows.txt" | sort -t "$sge_tab" -k1,1nr | head -n 100 | cut -f2- | awk '{ printf "%s%s", (NR > 1 ? "," : ""), $0 }'
+    grep -vE '^(N|U)' "$TS_RT/sgd_rows.txt" | sort -t "$sge_tab" -k1,1nr | head -n 100 | cut -f2- | awk '{ printf "%s%s", (NR > 1 ? "," : ""), $0 }'
+    printf '],"dnolist":['
+    grep '^U' "$TS_RT/sgd_rows.txt" | cut -f2- | sort -t "$sge_tab" -k1,1nr | head -n 15 | cut -f2 | awk '{ printf "%s%s", (NR > 1 ? "," : ""), $0 }'
     printf ']}\n'
     rm -f "$TS_RT/sgd_rows.txt"
 }

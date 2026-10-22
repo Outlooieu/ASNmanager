@@ -1,3 +1,7 @@
+## v3.7.9
+
+- Suggestions by domain: the line "... of traffic went to n addresses without a known name" can be opened - it lists the 15 busiest of these addresses with their network (ASN) and the device that used them most, with a hint: a device with a lot of traffic there probably asks its own DNS server (TV sticks with 8.8.8.8, "Private DNS" on Android, "secure DNS" in browsers). The text now also says that this counts since the collection started, so traffic from before the suggestions by domain were turned on is included
+
 ## v3.7.8
 
 - A domain entry learns at once: a device that looked the name up before the entry existed keeps the answer in its cache, so dnsmasq saw no new lookup and the entry stayed at "nothing learned" (and the routing check warned) until the cache ran out. When the suggestions by domain are on, the addresses already looked up under the domain (last 2 days) now go into its sets when the rules are applied - e.g. right after "Add" in the domain suggestions

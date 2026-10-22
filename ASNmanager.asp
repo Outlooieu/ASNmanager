@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.7.8 -->
+<!-- ASNmanager-WebUI v3.7.9 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -350,6 +350,7 @@
 .asnm-dp-text { font-size: 12px; color: var(--text2); line-height: 1.55; margin: 0 0 12px; max-width: 760px; }
 .asnm-dp-row { align-items: center; gap: 12px; }
 #asnm .asnm-diag-dev { width: 260px; }
+.asnm-sg-none { margin-top: 6px; }
 .asnm-sg-x { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin-left: 4px; padding: 0;
     vertical-align: middle; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
 .asnm-sg-x:hover { color: var(--text); border-color: var(--muted); }
@@ -453,7 +454,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.7.8';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.7.9';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -497,7 +498,9 @@ var ASNM_I18N = {
     sgd_turn_on: 'Turn on suggestions by domain', sgd_turn_off: 'Turn off suggestions by domain',
     sgd_off_confirm: 'Turn off suggestions by domain?\ndnsmasq is restarted once and the collected names are deleted.',
     sgd_empty: 'No names collected yet - domains show up about a minute after a device looked them up.',
-    sgd_none: '{b} of traffic went to {n} address(es) without a known name (looked up before the collection started, answered from a cache, or not through the router - e.g. "secure DNS" in a browser).',
+    sgd_none: '{b} of traffic (since the collection started) went to {n} address(es) without a known name (looked up before the suggestions by domain were turned on, answered from a cache, or not through the router - e.g. "secure DNS" in a browser).',
+    sgd_none_show: 'Show the largest', sgd_none_hide: 'Hide', sgd_none_ip: 'Address', sgd_none_net: 'Network', sgd_none_dev: 'Used most by',
+    sgd_none_tip: 'A device with a lot of traffic here probably asks its own DNS server (e.g. 8.8.8.8 on many TV sticks, "Private DNS" on Android, "secure DNS" in Chrome / Firefox). Traffic counted before the suggestions by domain were turned on has no names either - it leaves this list over time.',
     sgd_ext: 'The lookup log of another add-on (e.g. Diversion) is read, dnsmasq is left as it is.',
     sgd_note: 'Names from the lookups dnsmasq answered, evaluated every minute. Suggested is the main domain (zdf.de) - it covers every subdomain; the names below it were looked up. Large networks (CDNs) serve many names from one address: the latest lookup counts. Domains and ASNs already in the list are hidden. "Add" puts the domain on the list - then apply the rules.',
     sg_note: 'Estimate from the connection table of the router, evaluated every minute (very short connections can be missed). Destination addresses are looked up via ip-api.com (at most 10 per minute). ASNs that are already in the list are hidden. "Add" puts the ASN on the list - then apply the rules.',
@@ -643,7 +646,9 @@ var ASNM_I18N = {
     sgd_turn_on: 'Vorschläge nach Domain einschalten', sgd_turn_off: 'Vorschläge nach Domain ausschalten',
     sgd_off_confirm: 'Vorschläge nach Domain ausschalten?\ndnsmasq wird einmal neu gestartet, die gesammelten Namen werden gelöscht.',
     sgd_empty: 'Noch keine Namen gesammelt - Domains erscheinen etwa eine Minute, nachdem ein Gerät sie abgefragt hat.',
-    sgd_none: '{b} Traffic gingen an {n} Adresse(n) ohne bekannten Namen (vor Beginn der Erfassung abgefragt, aus einem Zwischenspeicher beantwortet oder nicht über den Router - z. B. "Sicheres DNS" im Browser).',
+    sgd_none: '{b} Traffic (seit Beginn der Sammlung) gingen an {n} Adresse(n) ohne bekannten Namen (abgefragt, bevor die Vorschläge nach Domain eingeschaltet waren, aus einem Zwischenspeicher beantwortet oder nicht über den Router - z. B. "Sicheres DNS" im Browser).',
+    sgd_none_show: 'Die größten anzeigen', sgd_none_hide: 'Ausblenden', sgd_none_ip: 'Adresse', sgd_none_net: 'Netz', sgd_none_dev: 'Am meisten genutzt von',
+    sgd_none_tip: 'Ein Gerät mit viel Traffic hier fragt wahrscheinlich einen eigenen DNS-Server (z. B. 8.8.8.8 bei vielen TV-Sticks, "Privates DNS" bei Android, "Sicheres DNS" in Chrome / Firefox). Traffic, der gezählt wurde, bevor die Vorschläge nach Domain eingeschaltet waren, hat ebenfalls keine Namen - er verschwindet mit der Zeit aus dieser Liste.',
     sgd_ext: 'Gelesen wird das Abfrage-Protokoll eines anderen Add-ons (z. B. Diversion), dnsmasq bleibt unverändert.',
     sgd_note: 'Namen aus den Anfragen, die dnsmasq beantwortet hat, jede Minute ausgewertet. Vorgeschlagen wird die Hauptdomain (zdf.de) - sie deckt alle Unterdomains ab; darunter die abgefragten Namen. Große Netze (CDNs) liefern viele Namen von einer Adresse: es zählt die letzte Abfrage. Domains und ASNs, die schon in der Liste stehen, sind ausgeblendet. "Hinzufügen" setzt die Domain auf die Liste - danach die Regeln anwenden.',
     sg_note: 'Schätzung aus der Verbindungstabelle des Routers, jede Minute ausgewertet (sehr kurze Verbindungen können fehlen). Die Ziel-Adressen werden über ip-api.com zugeordnet (höchstens 10 pro Minute). ASNs, die schon in der Liste stehen, sind ausgeblendet. "Hinzufügen" setzt das ASN auf die Liste - danach die Regeln anwenden.',
@@ -2660,7 +2665,7 @@ function asnmSgRender(force) {
     if (!force && (ASNM_SG.open || (ae && box.contains(ae) && (ae.tagName === 'SELECT' || ae.tagName === 'INPUT')))) { ASNM_SG.dirty = true; return; }
     var sig = JSON.stringify(d ? [d.list, d.dlist, d.dlog, d.dnone, d.pending, d.acct, d.since] : null) + '|' + (tr ? tr.state : '') + '|' + JSON.stringify(ASNM_SG.f) + '|' +
               JSON.stringify(ASNM_SG.added) + '|' + JSON.stringify(listed) + '|' + ASNM_LANG + '|' + ASNM_SG.view + '|' +
-              JSON.stringify(d ? d.hidden : null) + JSON.stringify(ASNM_SG.loc) + ASNM_SG.showHid;
+              JSON.stringify(d ? d.hidden : null) + JSON.stringify(ASNM_SG.loc) + ASNM_SG.showHid + ASNM_SG.noneOpen;
     if (!force && sig === ASNM_SG.sig) return;
     ASNM_SG.sig = sig; ASNM_SG.dirty = false;
     var msg = '';
@@ -2749,7 +2754,21 @@ function asnmSgRender(force) {
         html += '</table>';
         if (!dom && d.pending) html += '<div class="asnm-sg-foot">' + asnmEsc(asnmSgPendingText(d)) + '</div>';
     }
-    if (dom && d.dnone > 0) html += '<div class="asnm-sg-foot">' + asnmEsc(t('sgd_none', { b: asnmFmtBytes(d.dnone), n: d.dnoneips || 0 })) + '</div>';
+    if (dom && d.dnone > 0) {
+        // addresses without a name: a click shows the busiest with network and device (helps to find a device with its own DNS)
+        var nl = d.dnolist || [];
+        html += '<div class="asnm-sg-foot">' + asnmEsc(t('sgd_none', { b: asnmFmtBytes(d.dnone), n: d.dnoneips || 0 })) +
+                (nl.length ? ' <span class="asnm-link" onclick="ASNM_SG.noneOpen = !ASNM_SG.noneOpen; asnmSgRender(true);">' + asnmEsc(t(ASNM_SG.noneOpen ? 'sgd_none_hide' : 'sgd_none_show')) + '</span>' : '') + '</div>';
+        if (ASNM_SG.noneOpen && nl.length) {
+            html += '<table class="asnm-table asnm-sg-none"><tr><th>' + t('sgd_none_ip') + '</th><th style="text-align:right;">' + t('sg_th_b') + '</th><th>' + t('sgd_none_net') + '</th><th>' + t('sgd_none_dev') + '</th></tr>';
+            for (i = 0; i < nl.length; i++) {
+                var u = nl[i];
+                html += '<tr><td>' + asnmEsc(u[0]) + '</td><td class="num">' + asnmFmtBytes(u[1]) + '</td><td>' + (u[2] ? 'AS' + asnmEsc(u[2]) + ' <span class="asnm-muted">' + asnmEsc(u[3] || '') + '</span>' : '<span class="asnm-muted">-</span>') +
+                        '</td><td>' + asnmEsc(asnmDeviceName(u[4]) || u[4] || '-') + '</td></tr>';
+            }
+            html += '</table><div class="asnm-sg-foot">' + asnmEsc(t('sgd_none_tip')) + '</div>';
+        }
+    }
     document.getElementById('asnm_sg_tbl').innerHTML = html;
     asnmApplyBusy();
 }
