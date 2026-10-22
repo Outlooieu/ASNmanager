@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.7.6
+version=3.7.7
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.7.6"
+SCRIPT_VERSION="3.7.7"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -938,6 +938,14 @@ dns_agh_check() {
         }
         END { if (o) printf "%s %s", (d ? "partly" : "bypass"), up }' "$dag_y" 2>/dev/null
 }
+# AdGuard Home fills the ipsets itself? (the Merlin AdGuardHome installer copies the dnsmasq ipset= lines into
+# its ipset_file) - then the domain entries learn even when AdGuard Home does not ask dnsmasq
+dns_agh_ipset() {
+    for dai_y in $DNS_AGH_YAML; do [ -r "$dai_y" ] && break; dai_y=""; done
+    [ -n "$dai_y" ] || return 1
+    dai_f=$(sed -n 's/^ *ipset_file: *//p' "$dai_y" | tr -d "\"' " | head -n 1)
+    [ -n "$dai_f" ] && grep -qE 'ASN[CD]_' "$dai_f" 2>/dev/null
+}
 
 dns_health() {
     dh_l=$(netstat -lnup 2>/dev/null | awk '{ n = split($NF, a, "/"); p = a[2]; m = split($4, q, ":"); port = q[m]
@@ -956,7 +964,11 @@ dns_health() {
         dh_up="-"
         if [ "$dh_c" = "ok" ] && [ "$dh_d" != "53" ] && echo "$dh_o" | grep -qi 'adguard'; then
             dh_ag=$(dns_agh_check "$dh_d")
-            [ -n "$dh_ag" ] && { dh_c="agh_${dh_ag%% *}"; dh_up=$(echo "${dh_ag#* }" | tr -cd 'A-Za-z0-9_.:/[]-'); }
+            if [ -n "$dh_ag" ]; then
+                dh_up=$(echo "${dh_ag#* }" | tr -cd 'A-Za-z0-9_.:/[]-')
+                # AdGuard Home fills the sets itself: the domain entries learn anyway - only the suggestions by domain miss lookups
+                if dns_agh_ipset; then dh_c=ok; dh_up="mirror:$dh_up"; else dh_c="agh_${dh_ag%% *}"; fi
+            fi
         fi
     elif [ "$dh_o" != "-" ] && { [ "$dh_on" = "0" ] || [ "$dh_h" != "-" ]; }; then
         dh_c=other                    # e.g. Pi-hole answers DNS (and DHCP) itself: works, but the domain entries need dnsmasq
@@ -2158,7 +2170,12 @@ cli_dnschain() {
     if [ "$dc_dp" = "0" ]; then echo "[FAIL] dnsmasq does not answer DNS - domain entries learn nothing"; return 1; fi
     [ "$dc_dp" != "53" ] && echo "dnsmasq: port $dc_dp (behind $dc_53)" || echo "dnsmasq: port 53"
     case "$2" in
-        ok)      [ "$dc_dp" != "53" ] && echo "[OK]   $dc_53 sends the lookups to dnsmasq" ;;
+        ok)      case "$7" in
+                     mirror:*) echo "[OK]   $dc_53 asks ${7#mirror:} directly, but fills the sets of the domain entries itself (ipset_file) - domain entries learn"
+                               echo "[INFO] dnsmasq sees only some lookups: the suggestions by domain miss names (upstream 127.0.0.1:$dc_dp would give them all)" ;;
+                     *) [ "$dc_dp" != "53" ] && echo "[OK]   $dc_53 sends the lookups to dnsmasq" ;;
+                 esac
+                 dns_agh_ipset && echo "[INFO] $dc_53 copies the domain lines of dnsmasq (ipset_file): every change of a domain entry restarts $dc_53 (DNS pauses for up to a minute)" ;;
         agh_*)   echo "[WARN] $dc_53 sends the lookups $([ "$2" = "agh_partly" ] && echo "partly ")to $7 instead of dnsmasq - domain entries learn only some addresses (fix: upstream 127.0.0.1:$dc_dp)" ;;
         other)   echo "[WARN] $dc_53 answers DNS instead of dnsmasq - domain entries learn only if it fills the ipsets" ;;
         *)       echo "[FAIL] $(cli_dns | head -n 1)" ;;

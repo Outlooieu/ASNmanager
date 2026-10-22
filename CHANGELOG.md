@@ -1,3 +1,7 @@
+## v3.7.7
+
+- DNS check: the Merlin AdGuard Home installer copies the domain lines of dnsmasq into its own `ipset_file`, so AdGuard Home fills the sets of the domain entries itself - also when it asks Unbound directly. In that case there is no warning any more (the status line says "AdGuard Home fills the domain sets itself"); "Check DNS chain" notes that the suggestions by domain then miss names, and that every change of a domain entry restarts AdGuard Home (DNS pauses for up to a minute)
+
 ## v3.7.6
 
 - The DNS check no longer reports "dnsmasq is not running" when it happens to look while dnsmasq is being restarted (by "Apply rules", another add-on or the router): a problem is checked once more 8 seconds later and only reported if it is still there
