@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.12
+version=3.9.13
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.12"
+SCRIPT_VERSION="3.9.13"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -145,6 +145,23 @@ smarthome|eufy|eufylife.com|
 smarthome|Roborock|roborock.com|
 smarthome|SwitchBot|switch-bot.com|
 smarthome|Home Assistant Cloud (Nabu Casa)|nabucasa.com|
+smarthome|VeSync / Levoit|vesync.com vesync.eu|
+smarthome|Midea / MSmartHome|msmartlife.net|
+smarthome|TP-Link Tapo / Kasa|tplinkcloud.com|
+smarthome|Aqara|aqara.com|
+smarthome|Govee|govee.com|
+smarthome|Meross|meross.com|
+smarthome|Ecovacs|ecovacs.com|
+smarthome|Dreame|dreame.tech|
+smarthome|Somfy|somfy.com|
+smarthome|Nuki|nuki.io|
+smarthome|Withings|withings.net|
+smarthome|Arlo|arlo.com|
+smarthome|Blink|immedia-semi.com|
+smarthome|Wyze|wyze.com|
+smarthome|EZVIZ|ezvizlife.com|
+smarthome|Bosch Smart Home|bosch-smarthome.com|
+smarthome|Homematic IP|homematic.com|
 updates|Windows Update|windowsupdate.com update.microsoft.com delivery.mp.microsoft.com|
 updates|Apple software updates|updates.cdn-apple.com swcdn.apple.com mesu.apple.com swdist.apple.com|
 updates|Android / Google Play downloads|dl.google.com play.googleapis.com gvt1.com|

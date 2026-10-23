@@ -1,3 +1,7 @@
+## v3.9.13
+
+- Smart home & IoT: 17 more presets (30 in total) - VeSync / Levoit, Midea / MSmartHome, TP-Link Tapo / Kasa, Aqara, Govee, Meross, Ecovacs, Dreame, Somfy, Nuki, Withings, Arlo, Blink, Wyze, EZVIZ, Bosch Smart Home, Homematic IP. Every domain was checked on a router (or, for VeSync, Midea and Blink, through the subdomains the devices use)
+
 ## v3.9.12
 
 - Own presets (presets.txt) are easy to tell apart: in the WebUI they carry a ★ and "(own)" in the list, the category shows how many own presets it holds ("Streaming (27, ★ 1)"), and the preview says "Your own preset"; in the SSH menu they are marked with *
