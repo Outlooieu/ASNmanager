@@ -1,3 +1,7 @@
+## v3.9.9
+
+- Preset "ZDF Mediathek": the live streams (measured) come from `zdf-hls-15` ... `zdf-hls-19.akamaized.net` (one per channel) and KiKA live from `kika-live.ard-mcdn.de`. Added
+
 ## v3.9.8
 
 - Preset "arte": measured while watching - videos come from `arte-cmafhls.akamaized.net` (subtitles `arte-cmafhlssub.akamaized.net`, playlists `manifest-arte.akamaized.net`), the live stream from `artesimulcast.akamaized.net`. Added
