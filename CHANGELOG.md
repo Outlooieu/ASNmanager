@@ -1,3 +1,7 @@
+## v3.9.15
+
+- Settings → **Own presets**: "Download own presets" saves all own presets (from /jffs and from a USB device) as one `asnmanager-presets.txt` to share; "Add presets file" takes such a file from someone else - lines with the same category and name replace earlier ones, a checkbox replaces the whole list instead. Added presets are kept in `/jffs/addons/asnmanager/presets.txt`; a presets.txt on a USB device is never changed
+
 ## v3.9.14
 
 - Traffic table: the row "Not assigned to an ASN" is called "No rule (normal way)" now - it holds the traffic that matches no ASN, IP or domain entry (it goes the normal way: VPN Director / main route), not only "no ASN"

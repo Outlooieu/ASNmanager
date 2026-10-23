@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.14
+version=3.9.15
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.14"
+SCRIPT_VERSION="3.9.15"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -1068,6 +1068,27 @@ notes_prune() {
     rm -f /tmp/asnmanager-notes.keys
 }
 # notes import <replace|merge> KEY=%XX-text;...   (WebUI restore)
+# pimport <merge|replace> <line;line;...>: own presets from the WebUI (each line %XX-encoded, "category|Name|entries|wide")
+# They go to /jffs/addons/asnmanager/presets.txt; a presets.txt on a USB device is left as it is.
+PRESET_OWN="/jffs/addons/asnmanager/presets.txt"
+cli_pimport() {
+    pi_mode=$1; mkdir -p "$(dirname "$PRESET_OWN")"; touch "$PRESET_OWN"
+    [ "$pi_mode" = "replace" ] && : > "$PRESET_OWN"
+    pi_n=0; pi_bad=0
+    for pi_e in $(echo "$2" | tr ';' ' '); do
+        pi_l=$(url_dec "$pi_e" | tr -d '\r\000-\010\013-\037"\\<>' | sed 's/^ *//; s/ *$//')
+        case "$pi_l" in ''|'#'*) continue ;; esac
+        if ! echo "$pi_l" | grep -qE '^[a-z]+\|[^|]+\|[^|]+\|(wide)?$'; then pi_bad=$((pi_bad + 1)); continue; fi
+        # the same category + name replaces the earlier line
+        pi_k=$(echo "$pi_l" | cut -d'|' -f1-2)
+        awk -F'|' -v k="$pi_k" '($1 "|" $2) != k' "$PRESET_OWN" > "$PRESET_OWN.new" && mv -f "$PRESET_OWN.new" "$PRESET_OWN"
+        echo "$pi_l" >> "$PRESET_OWN"; pi_n=$((pi_n + 1))
+    done
+    [ -s "$PRESET_OWN" ] || rm -f "$PRESET_OWN"
+    echo "Own presets: $pi_n added$([ $pi_bad -gt 0 ] && echo ", $pi_bad line(s) skipped (not in the form category|Name|entries|)")."
+    [ $pi_n -gt 0 ] || [ "$pi_mode" = "replace" ]
+}
+
 cli_nimport() {
     ni_mode="$1"; shift
     mkdir -p "$ADDON_DIR" 2>/dev/null
@@ -3060,6 +3081,7 @@ web_job() {
         edit)     cli_edit "$a1" "$a2" "$a3" > "$OUT" 2>&1 ;;
         note)     cli_note "$a1" "$(url_dec "$a2")" > "$OUT" 2>&1 ;;
         nimport)  cli_nimport "$a1" "$a2" > "$OUT" 2>&1 ;;
+        pimport)  cli_pimport "$a1" "$a2" > "$OUT" 2>&1 ;;
         import)   cli_import "$a1" "$a2" > "$OUT" 2>&1 ;;
         cimport)  cli_cimport "$a1" "$a2" > "$OUT" 2>&1 ;;
         schedule) cli_schedule "$a1" "$a2" > "$OUT" 2>&1 ;;
