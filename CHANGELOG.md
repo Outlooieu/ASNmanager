@@ -1,6 +1,10 @@
+## v3.9.16
+
+- WebUI: "Own presets" moved from its own large card into **Backup & restore** (Settings), with shorter texts; the line format is shown as a tooltip on "Add presets"
+
 ## v3.9.15
 
-- Settings → **Own presets**: "Download own presets" saves all own presets (from /jffs and from a USB device) as one `asnmanager-presets.txt` to share; "Add presets file" takes such a file from someone else - lines with the same category and name replace earlier ones, a checkbox replaces the whole list instead. Added presets are kept in `/jffs/addons/asnmanager/presets.txt`; a presets.txt on a USB device is never changed
+- Settings → Backup & restore → **Own presets**: "Download own presets" saves all own presets (from /jffs and from a USB device) as one `asnmanager-presets.txt` to share; "Add presets file" takes such a file from someone else - lines with the same category and name replace earlier ones, a checkbox replaces the whole list instead. Added presets are kept in `/jffs/addons/asnmanager/presets.txt`; a presets.txt on a USB device is never changed
 
 ## v3.9.14
 
