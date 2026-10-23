@@ -1,3 +1,7 @@
+## v3.9.18
+
+- WebUI on phones: Chrome for Android no longer shows some texts (status message, hints) in a huge font ("font boosting")
+
 ## v3.9.17
 
 - Update: the script and the WebUI page are fetched from GitHub without its CDN cache, so an update right after a release no longer installs the previous page

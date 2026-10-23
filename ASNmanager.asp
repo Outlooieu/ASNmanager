@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.9.17 -->
+<!-- ASNmanager-WebUI v3.9.18 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -415,6 +415,8 @@
 .asnm-fo-m { white-space: nowrap; }
 /* keep the font sizes fixed on phones (no automatic text enlargement) */
 #asnm { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+/* Chrome on Android enlarges ("font boosting") long text blocks on desktop pages; a max-height turns that off (zero specificity, so own max-heights still win) */
+:where(#asnm, #asnm *) { max-height: 1000000px; }
 #asnm .asnm-kv, #asnm .asnm-tr-note, #asnm .asnm-sg-foot, #asnm .asnm-help { max-height: 100000px; }
 /* tabs below the overview */
 .asnm-tabs { display: flex; gap: 6px; margin: 4px 0 0; padding: 0 2px; border-bottom: 2px solid var(--accent); overflow-x: auto; scrollbar-width: none; }
@@ -461,7 +463,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.9.17';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.9.18';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
