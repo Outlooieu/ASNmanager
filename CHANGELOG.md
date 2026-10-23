@@ -1,3 +1,7 @@
+## v3.9.8
+
+- Preset "arte": measured while watching - videos come from `arte-cmafhls.akamaized.net` (subtitles `arte-cmafhlssub.akamaized.net`, playlists `manifest-arte.akamaized.net`), the live stream from `artesimulcast.akamaized.net`. Added
+
 ## v3.9.7
 
 - Preset "ZDF Mediathek": measured while watching - the ZDF videos come from `zdfvod.akamaized.net`, `zdfvod-pckgr.akamaized.net` and `zdfvod-rwrtr.akamaized.net` (about 85 % of the traffic in the test). Added

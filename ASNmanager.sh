@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.7
+version=3.9.8
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.7"
+SCRIPT_VERSION="3.9.8"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -59,7 +59,7 @@ stream|ProSieben / Sat.1 / Kabel Eins|prosieben.de sat1.de kabeleins.de sixx.de|
 stream|Kick|kick.com|
 tvde|ARD Mediathek & regional broadcasters|ard.de ardmediathek.de ard-mcdn.de brvod-pckgr.akamaized.net brvod-rwrtr.akamaized.net daserste.de tagesschau.de ardaudiothek.de br.de wdr.de ndr.de swr.de hr.de mdr.de rbb-online.de sr-online.de radiobremen.de kika.de phoenix.de deutschlandfunk.de wdrmedien-a.akamaihd.net wdradaptiv-vh.akamaihd.net mediandr-a.akamaihd.net hrardmediathek-a.akamaihd.net odmdr-a.akamaihd.net pdodswr-a.akamaihd.net rbbmediapmdp-a.akamaihd.net srstorage01-a.akamaihd.net pmdonlinekika-a.akamaihd.net|
 tvde|ZDF Mediathek & 3sat|zdf.de zdfmediathek.de heute.de 3sat.de zdfvod.akamaized.net zdfvod-pckgr.akamaized.net zdfvod-rwrtr.akamaized.net tvdlzdf-a.akamaihd.net nrodlzdf-a.akamaihd.net rodlzdf-a.akamaihd.net ssl.zdf.de.edgekey.net|
-tvde|arte|arte.tv arte.de arteconcert-a.akamaihd.net arteptweb-a.akamaihd.net arte.gl-systemhaus.de|
+tvde|arte|arte.tv arte.de arte-cmafhls.akamaized.net arte-cmafhlssub.akamaized.net manifest-arte.akamaized.net artesimulcast.akamaized.net arteconcert-a.akamaihd.net arteptweb-a.akamaihd.net arte.gl-systemhaus.de|
 tvde|Deutsche Welle|dw.com dw.de tvdownloaddw-a.akamaihd.net|
 tvde|HbbTV (ARD / ZDF red button)|hbbtv.zdf.de itv.ard.de cdn.hbbtvlive.de|
 tvde|ORF (Austria)|orf.at|
