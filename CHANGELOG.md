@@ -1,6 +1,6 @@
 ## v3.9.13
 
-- Smart home & IoT: 17 more presets (30 in total) - VeSync / Levoit, Midea / MSmartHome, TP-Link Tapo / Kasa, Aqara, Govee, Meross, Ecovacs, Dreame, Somfy, Nuki, Withings, Arlo, Blink, Wyze, EZVIZ, Bosch Smart Home, Homematic IP. Every domain was checked on a router (or, for VeSync, Midea and Blink, through the subdomains the devices use)
+- Smart home & IoT: 17 more presets (30 in total) - VeSync / Levoit, Midea / MSmartHome, TP-Link Tapo / Kasa, Aqara, Govee, Meross, Ecovacs, Dreame, Somfy, Nuki, Withings, Arlo, Blink, Wyze, EZVIZ, Bosch Smart Home, Homematic IP. Every domain answered on a router, except `vesync.eu` and `msmartlife.net` (only their subdomains answer - both are used by devices in the test household) and `immedia-semi.com` (Blink, known to answer only under subdomains, not yet checked)
 
 ## v3.9.12
 
