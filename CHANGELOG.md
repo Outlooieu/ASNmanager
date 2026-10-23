@@ -1,3 +1,7 @@
+## v3.9.6
+
+- Preset "ARD Mediathek": measured on a phone while watching videos and live streams - the ARD now streams through its own multi-CDN domain `ard-mcdn.de` (e.g. `br-vod.ard-mcdn.de`, `tagesschau-live.ard-mcdn.de`, `rbb-live.ard-mcdn.de`, `mdr-live.ard-mcdn.de`) and for the BR through `brvod-pckgr.akamaized.net` / `brvod-rwrtr.akamaized.net`. These are added; without them a large part of the video went past the preset
+
 ## v3.9.5
 
 - Two new preset categories:
