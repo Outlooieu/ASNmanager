@@ -1,3 +1,7 @@
+## v3.9.7
+
+- Preset "ZDF Mediathek": measured while watching - the ZDF videos come from `zdfvod.akamaized.net`, `zdfvod-pckgr.akamaized.net` and `zdfvod-rwrtr.akamaized.net` (about 85 % of the traffic in the test). Added
+
 ## v3.9.6
 
 - Preset "ARD Mediathek": measured on a phone while watching videos and live streams - the ARD now streams through its own multi-CDN domain `ard-mcdn.de` (e.g. `br-vod.ard-mcdn.de`, `tagesschau-live.ard-mcdn.de`, `rbb-live.ard-mcdn.de`, `mdr-live.ard-mcdn.de`) and for the BR through `brvod-pckgr.akamaized.net` / `brvod-rwrtr.akamaized.net`. These are added; without them a large part of the video went past the preset
