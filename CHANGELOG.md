@@ -1,3 +1,7 @@
+## v3.9.12
+
+- Own presets (presets.txt) are easy to tell apart: in the WebUI they carry a ★ and "(own)" in the list, the category shows how many own presets it holds ("Streaming (27, ★ 1)"), and the preview says "Your own preset"; in the SSH menu they are marked with *
+
 ## v3.9.11
 
 - Service presets are sorted alphabetically within each category - in the WebUI, the SSH menu and `presets`; own presets from `presets.txt` are sorted into their category instead of being listed at the end. The preset numbers for `preset <n>` follow this order

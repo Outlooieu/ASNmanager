@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.11
+version=3.9.12
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.11"
+SCRIPT_VERSION="3.9.12"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -170,7 +170,8 @@ test|Speed tests & IP check|speedtest.net ookla.com fast.com whatismyip.com wiei
 preset_all() {
     { echo "$PRESET_DATA"
       for pa_f in /jffs/addons/asnmanager/presets.txt /tmp/mnt/*/ASNmanager/presets.txt; do
-          [ -f "$pa_f" ] && grep -E '^[a-z]+\|[^|]+\|[^|]+\|(wide)?$' "$pa_f" 2>/dev/null
+          # own presets get a 5th field "own" (shown with a star)
+          [ -f "$pa_f" ] && tr -d '\r' < "$pa_f" | grep -E '^[a-z]+\|[^|]+\|[^|]+\|(wide)?$' | sed 's/$/|own/'
       done; } | tr -d '\r' | awk '!s[$0]++' |
     awk -F'|' 'BEGIN { n = split("stream tvde news gaming social work shop bank services smarthome updates cloud test", c, " "); for (i = 1; i <= n; i++) o[c[i]] = i }
         { printf "%02d\t%s\t%s\n", ($1 in o) ? o[$1] : 99, tolower($2), $0 }' | sort -t "$(printf '\t')" -k1,1 -k2,2 | cut -f3-
@@ -185,9 +186,10 @@ print_presets() {
             if ($1 != last) { printf "%s -- %s --\n", (NR > 1 ? "\n" : ""), ($1 in lbl ? lbl[$1] : $1); last = $1 }
             n = split($3, e, " "); na = 0; nd = 0; for (i = 1; i <= n; i++) if (e[i] ~ /^[0-9]+$/) na++; else nd++
             info = (na ? na " ASN" (na > 1 ? "s" : "") : "") (na && nd ? ", " : "") (nd ? nd " domain" (nd > 1 ? "s" : "") : "")
-            printf " [%d]%s %s%s  (%s)\n", NR, (NR < 10 ? " " : ""), $2, ($4 == "wide" ? " (!)" : ""), info }'
+            printf " [%d]%s %s%s%s  (%s)\n", NR, (NR < 10 ? " " : ""), ($5 == "own" ? "* " : ""), $2, ($4 == "wide" ? " (!)" : ""), info }'
     echo ""
     echo " (!) = a large share of the internet runs through these networks - routing them moves far more than this one service"
+    preset_all | grep -q '|own$' && echo " *   = your own preset (presets.txt)"
 }
 
 preset_wide() { [ "$(preset_all | sed -n "${1}p" | cut -d'|' -f4)" = "wide" ]; }
@@ -2820,7 +2822,7 @@ web_export() {
         printf '],'
 
         printf '"presets":['
-        preset_all | awk -F'|' '{ gsub(/["\\]/, "", $2); printf "%s{\"cat\":\"%s\",\"name\":\"%s\",\"items\":\"%s\",\"wide\":%d}", (NR > 1 ? "," : ""), $1, $2, $3, ($4 == "wide") }'
+        preset_all | awk -F'|' '{ gsub(/["\\]/, "", $2); printf "%s{\"cat\":\"%s\",\"name\":\"%s\",\"items\":\"%s\",\"wide\":%d,\"own\":%d}", (NR > 1 ? "," : ""), $1, $2, $3, ($4 == "wide"), ($5 == "own") }'
         printf ']}\n'
     } > "$out" && mv "$out" "$WEB_DIR/data.js"
     rm -f "$sets_tmp" "$fail_tmp" "$pend_tmp" "$nm_tmp" "$nt_tmp"
