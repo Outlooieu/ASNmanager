@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.18
+version=3.9.19
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.18"
+SCRIPT_VERSION="3.9.19"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -188,7 +188,7 @@ preset_all() {
     { echo "$PRESET_DATA"
       for pa_f in /jffs/addons/asnmanager/presets.txt /tmp/mnt/*/ASNmanager/presets.txt; do
           # own presets get a 5th field "own" (shown with a star)
-          [ -f "$pa_f" ] && tr -d '\r' < "$pa_f" | grep -E '^[a-z]+\|[^|]+\|[^|]+\|(wide)?$' | sed 's/$/|own/'
+          [ -f "$pa_f" ] && tr -d '\r' < "$pa_f" | grep -E '^[a-z]+\|[^|]+\|[^|]+\|(wide)?$' | sed "s#\$#|own|$pa_f#"
       done; } | tr -d '\r' | awk '!s[$0]++' |
     awk -F'|' 'BEGIN { n = split("stream tvde news gaming social work shop bank services smarthome updates cloud test", c, " "); for (i = 1; i <= n; i++) o[c[i]] = i }
         { printf "%02d\t%s\t%s\n", ($1 in o) ? o[$1] : 99, tolower($2), $0 }' | sort -t "$(printf '\t')" -k1,1 -k2,2 | cut -f3-
@@ -206,7 +206,7 @@ print_presets() {
             printf " [%d]%s %s%s%s  (%s)\n", NR, (NR < 10 ? " " : ""), ($5 == "own" ? "* " : ""), $2, ($4 == "wide" ? " (!)" : ""), info }'
     echo ""
     echo " (!) = a large share of the internet runs through these networks - routing them moves far more than this one service"
-    preset_all | grep -q '|own$' && echo " *   = your own preset (presets.txt)"
+    preset_all | grep -q '|own|' && echo " *   = your own preset (presets.txt)"
 }
 
 preset_wide() { [ "$(preset_all | sed -n "${1}p" | cut -d'|' -f4)" = "wide" ]; }
@@ -1087,6 +1087,39 @@ cli_pimport() {
     [ -s "$PRESET_OWN" ] || rm -f "$PRESET_OWN"
     echo "Own presets: $pi_n added$([ $pi_bad -gt 0 ] && echo ", $pi_bad line(s) skipped (not in the form category|Name|entries|)")."
     [ $pi_n -gt 0 ] || [ "$pi_mode" = "replace" ]
+}
+
+# pedit <save|more|del> <file> <old key> <category> <name> <wide 0/1> <entries,comma,separated>
+# Edits one own preset in the file it comes from (/jffs or a USB device). File, key and name come %XX-encoded.
+# save: removes the line with the old key (and one with the new key), writes the new line; more: adds entries to the line with the new key
+cli_pedit() {
+    pe_f=$(url_dec "$2"); pe_old=$(url_dec "$3"); pe_cat=$4; pe_name=$(url_dec "$5" | tr -d '|\r\000-\037"\\<>' | sed 's/^ *//; s/ *$//')
+    case "$pe_f" in
+        /jffs/addons/asnmanager/presets.txt) mkdir -p /jffs/addons/asnmanager ;;
+        /tmp/mnt/*/ASNmanager/presets.txt) case "$pe_f" in */../*|*/./*) echo "Invalid file."; return 1 ;; esac
+            [ -d "$(dirname "$pe_f")" ] || { echo "The USB folder $(dirname "$pe_f") is not there."; return 1; } ;;
+        *) echo "Invalid file."; return 1 ;;
+    esac
+    touch "$pe_f" || { echo "Cannot write $pe_f."; return 1; }
+    if [ "$1" = "del" ]; then
+        grep -qF "$pe_old|" "$pe_f" || { echo "Preset not found in $pe_f."; return 1; }
+        awk -F'|' -v k="$pe_old" '($1 "|" $2) != k' "$pe_f" > "$pe_f.new" && mv -f "$pe_f.new" "$pe_f"
+        echo "Own preset deleted: ${pe_old#*|}"; return 0
+    fi
+    echo "$pe_cat" | grep -qE '^[a-z]+$' || { echo "Invalid category."; return 1; }
+    [ -n "$pe_name" ] || { echo "The name is missing."; return 1; }
+    # "AS13335" -> 13335, lower case, no doubles
+    pe_items=$(echo "$7" | tr ',' ' ' | tr -cd 'A-Za-z0-9.*_ -' | tr 'A-Z' 'a-z' | awk '{ for (i = 1; i <= NF; i++) { w = $i; if (w ~ /^as[0-9]+$/) w = substr(w, 3); if (!(w in s)) { s[w] = 1; o = o (o == "" ? "" : " ") w } } } END { print o }')
+    [ -n "$pe_items" ] || { echo "No ASNs or domains given."; return 1; }
+    pe_key="$pe_cat|$pe_name"
+    if [ "$1" = "more" ]; then
+        awk -F'|' -v OFS='|' -v k="$pe_key" -v add="$pe_items" '($1 "|" $2) == k { $3 = $3 " " add } { print }' "$pe_f" > "$pe_f.new" && mv -f "$pe_f.new" "$pe_f"
+        return 0
+    fi
+    pe_w=""; [ "$6" = "1" ] && pe_w="wide"
+    awk -F'|' -v a="$pe_old" -v b="$pe_key" '($1 "|" $2) != a && ($1 "|" $2) != b' "$pe_f" > "$pe_f.new" && mv -f "$pe_f.new" "$pe_f"
+    echo "$pe_key|$pe_items|$pe_w" >> "$pe_f"
+    echo "Own preset saved: $pe_name"
 }
 
 cli_nimport() {
@@ -2874,7 +2907,9 @@ web_export() {
         awk -F'\t' 'NF >= 3 && $1 ~ /^C[0-9]+$/ && $2 ~ /^(dom|ip)$/ { gsub(/["\\]/, "", $3); printf "%s\"%s\":[\"%s\",\"%s\"]", (n++ ? "," : ""), $1, $2, $3 }' "$CU_GONE" 2>/dev/null
         printf '},'
         printf '"presets":['
-        preset_all | awk -F'|' '{ gsub(/["\\]/, "", $2); printf "%s{\"cat\":\"%s\",\"name\":\"%s\",\"items\":\"%s\",\"wide\":%d,\"own\":%d}", (NR > 1 ? "," : ""), $1, $2, $3, ($4 == "wide"), ($5 == "own") }'
+        preset_all | awk -F'|' '{ gsub(/["\\]/, "", $2); printf "%s{\"cat\":\"%s\",\"name\":\"%s\",\"items\":\"%s\",\"wide\":%d,\"own\":%d,\"file\":\"%s\"}", (NR > 1 ? "," : ""), $1, $2, $3, ($4 == "wide"), ($5 == "own"), $6 }'
+        printf '],"pfiles":["/jffs/addons/asnmanager/presets.txt"'
+        for pf_d in /tmp/mnt/*/ASNmanager; do [ -d "$pf_d" ] && printf ',"%s"' "$pf_d/presets.txt" | tr -d '\\'; done
         printf ']}\n'
     } > "$out" && mv "$out" "$WEB_DIR/data.js"
     rm -f "$sets_tmp" "$fail_tmp" "$pend_tmp" "$nm_tmp" "$nt_tmp"
@@ -3049,7 +3084,7 @@ web_job() {
     set -- $1
     IFS=$old_ifs
     set +f
-    id="$1"; act="$2"; a1="$3"; a2="$4"; a3="$5"; a4="$6"
+    id="$1"; act="$2"; a1="$3"; a2="$4"; a3="$5"; a4="$6"; a5="$7"; a6="$8"; a7="$9"
     case "$id" in ''|*[!0-9]*) return 1 ;; esac
     case "$act" in ''|*[!a-z]*) return 1 ;; esac
 
@@ -3082,6 +3117,7 @@ web_job() {
         note)     cli_note "$a1" "$(url_dec "$a2")" > "$OUT" 2>&1 ;;
         nimport)  cli_nimport "$a1" "$a2" > "$OUT" 2>&1 ;;
         pimport)  cli_pimport "$a1" "$a2" > "$OUT" 2>&1 ;;
+        pedit)    cli_pedit "$a1" "$a2" "$a3" "$a4" "$a5" "$a6" "$a7" > "$OUT" 2>&1 ;;
         import)   cli_import "$a1" "$a2" > "$OUT" 2>&1 ;;
         cimport)  cli_cimport "$a1" "$a2" > "$OUT" 2>&1 ;;
         schedule) cli_schedule "$a1" "$a2" > "$OUT" 2>&1 ;;

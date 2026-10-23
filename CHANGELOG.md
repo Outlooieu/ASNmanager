@@ -1,3 +1,7 @@
+## v3.9.19
+
+- Settings → Backup & restore → **Edit own presets**: list of your own presets with Edit / Delete and "+ New preset" (name, category, ASNs and domains one per line, whole cloud / CDN network). Changes are written to the file the preset comes from - `/jffs/addons/asnmanager/presets.txt` or `ASNmanager/presets.txt` on a USB device; new presets go to the USB device when there is one. Pasted URLs and `AS` prefixes are cleaned up
+
 ## v3.9.18
 
 - WebUI on phones: Chrome for Android no longer shows some texts (status message, hints) in a huge font ("font boosting")

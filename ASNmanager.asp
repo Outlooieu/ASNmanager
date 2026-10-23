@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.9.18 -->
+<!-- ASNmanager-WebUI v3.9.19 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -415,6 +415,18 @@
 .asnm-fo-m { white-space: nowrap; }
 /* keep the font sizes fixed on phones (no automatic text enlargement) */
 #asnm { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.asnm-oe-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+@media (max-width: 520px) { .asnm-oe-grid { grid-template-columns: 1fr; } }
+#asnm .asnm-oe-ta { width: 100%; margin: 4px 0 8px; padding: 8px 11px; background: var(--input); color: var(--text); border: 1px solid var(--input-line); border-radius: 8px;
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; resize: vertical; outline: none; }
+#asnm .asnm-oe-ta:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.asnm-oe-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line2); font-size: 12px; }
+.asnm-oe-row .asnm-oe-n { flex: 1 1 auto; min-width: 0; color: var(--text); }
+.asnm-oe-row .asnm-oe-n > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asnm-oe-row .asnm-oe-m { color: var(--muted); font-size: 11px; }
+#asnm .asnm-oe-row .button_gen { flex: none; width: auto !important; min-width: 0 !important; }
+#asnm_oe_form .asnm-label { display: block; margin-bottom: 4px; }
+#asnm_oe_form .asnm-help { display: block; }
 /* Chrome on Android enlarges ("font boosting") long text blocks on desktop pages; a max-height turns that off (zero specificity, so own max-heights still win) */
 :where(#asnm, #asnm *) { max-height: 1000000px; }
 #asnm .asnm-kv, #asnm .asnm-tr-note, #asnm .asnm-sg-foot, #asnm .asnm-help { max-height: 100000px; }
@@ -463,7 +475,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.9.18';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.9.19';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -526,7 +538,7 @@ var ASNM_I18N = {
     job_busy: 'Another job is still running ({a}). The page shows it until it is finished - then please repeat your action.',
     job_running: 'A job started earlier is still running ({a}) - the page shows it until it is finished.',
     act_apply: 'Apply rules', act_reload: 'Reload all subnets', act_retry: 'Retry failed ASNs', act_update: 'Update', act_import: 'Restore', act_add: 'Add entries', act_preset: 'Add preset',
-    act_remove: 'Remove', act_clear: 'Clear list', act_edit: 'Edit', act_schedule: 'Schedule', act_failover: 'Failover', act_statssave: 'USB saving', act_pimport: 'Add own presets', own_title: 'Own presets', own_sub: 'Download as a .txt file to share, or add a presets file from someone else.', own_dl: 'Download presets', own_add: 'Add presets', own_replace: 'replace instead of adding', own_count: '{n} own preset(s) (★).', own_none: 'No own presets yet.', own_bad_file: 'The file holds no preset lines (category|Name|ASNs and domains|).', own_c_add: 'Add {n} preset(s)? Lines with the same category and name replace the earlier ones. {b} line(s) are skipped (wrong form).', own_c_replace: 'Replace your own presets on the router with {n} preset(s)? {b} line(s) are skipped (wrong form). A presets.txt on a USB device stays as it is.', own_help: 'The file holds one preset per line: category|Name|ASNs and domains| (wide at the end for a whole cloud / CDN network), e.g. stream|My service|example.com cdn.example.net|. Categories: stream, tvde, news, gaming, social, work, shop, bank, services, smarthome, updates, cloud, test. Added presets are kept in /jffs/addons/asnmanager/presets.txt; the download holds all own presets, also those from a USB device.', preset_cat: 'Category', preset_on: 'already on the list -> {t}', preset_have: '{n} of {m} already on the list (highlighted) - adding them again moves them to the chosen target', preset_own_s: 'own', preset_own: 'Your own preset (presets.txt on the router / USB device)', pcat_stream: 'Streaming', pcat_tvde: 'TV & media libraries (DE / AT / CH)', pcat_news: 'News', pcat_bank: 'Banks (DE)', pcat_services: 'Services (DE)', pcat_smarthome: 'Smart home & IoT', pcat_updates: 'Updates & downloads', pcat_gaming: 'Gaming', pcat_social: 'Social & messaging', pcat_work: 'Tools & work', pcat_shop: 'Shopping & payment', pcat_cloud: 'Cloud & CDN (whole networks)', pcat_test: 'Tests & IP check', preset_legend: 'A preset adds ASNs and / or domains (a domain covers every subdomain). ⚠ = cloud, CDN or hosting: a large share of the internet runs through these networks, routing them moves far more than this one service.', preset_wide: '"{n}": a large share of the internet runs through these networks (cloud / CDN / hosting).\nRouting them moves the traffic of many other services and websites as well - not only this one.\n\nAdd anyway?', tool_done: '{a}: done - see the result below', tool_failed: '{a}: failed - see the output below', act_test: 'Test route', act_trace: 'Traceroute', act_ifaces: 'Public IPs', act_status: 'ipset status', act_lookup: 'Look-up', act_sghide: 'Hide suggestion', sg_hide: 'Hide this suggestion', sg_unhide: 'Show this suggestion again', sg_showhid: 'Show hidden ({n})',
+    act_remove: 'Remove', act_clear: 'Clear list', act_edit: 'Edit', act_schedule: 'Schedule', act_failover: 'Failover', act_statssave: 'USB saving', act_pimport: 'Add own presets', act_pedit: 'Own preset', oe_open: 'Edit own presets', oe_new: '+ New preset', oe_del: 'Delete', oe_name: 'Name', oe_items: 'ASNs and domains', oe_items_help: 'One per line (or separated by spaces). A domain covers all its subdomains; ASNs as 13335 or AS13335.', oe_file: 'Save in', oe_wide: 'whole cloud / CDN network (⚠)', oe_save: 'Save', oe_usb: 'USB device {n}', oe_jffs: 'Router (/jffs)', oe_count: '{n} entries', oe_count1: '1 entry', oe_need_name: 'Please enter a name.', oe_need_items: 'Please enter at least one ASN or domain.', oe_bad: 'These are neither an ASN nor a domain and are left out:\n{l}\n\nSave anyway?', oe_c_del: 'Delete the own preset "{n}" ({f})?', own_title: 'Own presets', own_sub: 'Download as a .txt file to share, or add a presets file from someone else.', own_dl: 'Download presets', own_add: 'Add presets', own_replace: 'replace instead of adding', own_count: '{n} own preset(s) (★).', own_none: 'No own presets yet.', own_bad_file: 'The file holds no preset lines (category|Name|ASNs and domains|).', own_c_add: 'Add {n} preset(s)? Lines with the same category and name replace the earlier ones. {b} line(s) are skipped (wrong form).', own_c_replace: 'Replace your own presets on the router with {n} preset(s)? {b} line(s) are skipped (wrong form). A presets.txt on a USB device stays as it is.', own_help: 'The file holds one preset per line: category|Name|ASNs and domains| (wide at the end for a whole cloud / CDN network), e.g. stream|My service|example.com cdn.example.net|. Categories: stream, tvde, news, gaming, social, work, shop, bank, services, smarthome, updates, cloud, test. Added presets are kept in /jffs/addons/asnmanager/presets.txt; the download holds all own presets, also those from a USB device.', preset_cat: 'Category', preset_on: 'already on the list -> {t}', preset_have: '{n} of {m} already on the list (highlighted) - adding them again moves them to the chosen target', preset_own_s: 'own', preset_own: 'Your own preset (presets.txt on the router / USB device)', pcat_stream: 'Streaming', pcat_tvde: 'TV & media libraries (DE / AT / CH)', pcat_news: 'News', pcat_bank: 'Banks (DE)', pcat_services: 'Services (DE)', pcat_smarthome: 'Smart home & IoT', pcat_updates: 'Updates & downloads', pcat_gaming: 'Gaming', pcat_social: 'Social & messaging', pcat_work: 'Tools & work', pcat_shop: 'Shopping & payment', pcat_cloud: 'Cloud & CDN (whole networks)', pcat_test: 'Tests & IP check', preset_legend: 'A preset adds ASNs and / or domains (a domain covers every subdomain). ⚠ = cloud, CDN or hosting: a large share of the internet runs through these networks, routing them moves far more than this one service.', preset_wide: '"{n}": a large share of the internet runs through these networks (cloud / CDN / hosting).\nRouting them moves the traffic of many other services and websites as well - not only this one.\n\nAdd anyway?', tool_done: '{a}: done - see the result below', tool_failed: '{a}: failed - see the output below', act_test: 'Test route', act_trace: 'Traceroute', act_ifaces: 'Public IPs', act_status: 'ipset status', act_lookup: 'Look-up', act_sghide: 'Hide suggestion', sg_hide: 'Hide this suggestion', sg_unhide: 'Show this suggestion again', sg_showhid: 'Show hidden ({n})',
     tab_asns: 'ASNs', tab_traffic: 'Traffic', tab_targets: 'Targets & failover', tab_diag: 'Diagnostics', tab_settings: 'Settings',
     sub_manual: 'Enter ASNs', sub_lookup: 'Find by domain / IP', sub_presets: 'Service presets', rc_to_list: 'Show ASN list',
     sp_th: 'Speed test', sp_btn: 'Test', sp_running: 'Speed test running - about 30 seconds...',
@@ -677,7 +689,7 @@ var ASNM_I18N = {
     job_busy: 'Es läuft noch ein anderer Auftrag ({a}). Die Seite zeigt ihn an, bis er fertig ist - danach bitte deine Aktion wiederholen.',
     job_running: 'Ein vorher gestarteter Auftrag läuft noch ({a}) - die Seite zeigt ihn an, bis er fertig ist.',
     act_apply: 'Regeln anwenden', act_reload: 'Alle Subnetze neu laden', act_retry: 'Fehlgeschlagene wiederholen', act_update: 'Update', act_import: 'Wiederherstellen', act_add: 'Einträge hinzufügen', act_preset: 'Vorlage hinzufügen',
-    act_remove: 'Entfernen', act_clear: 'Liste leeren', act_edit: 'Bearbeiten', act_schedule: 'Zeitplan', act_failover: 'Failover', act_statssave: 'USB-Sicherung', act_pimport: 'Eigene Vorlagen hinzufügen', own_title: 'Eigene Vorlagen', own_sub: 'Als .txt-Datei zum Teilen herunterladen oder eine Vorlagen-Datei von jemand anderem hinzufügen.', own_dl: 'Vorlagen herunterladen', own_add: 'Vorlagen hinzufügen', own_replace: 'ersetzen statt ergänzen', own_count: '{n} eigene Vorlage(n) (★).', own_none: 'Noch keine eigenen Vorlagen.', own_bad_file: 'Die Datei enthält keine Vorlagen-Zeilen (kategorie|Name|ASNs und Domains|).', own_c_add: '{n} Vorlage(n) hinzufügen? Zeilen mit gleicher Kategorie und gleichem Namen ersetzen die bisherigen. {b} Zeile(n) werden übersprungen (falsches Format).', own_c_replace: 'Deine eigenen Vorlagen auf dem Router durch {n} Vorlage(n) ersetzen? {b} Zeile(n) werden übersprungen (falsches Format). Eine presets.txt auf einem USB-Stick bleibt unverändert.', own_help: 'Die Datei enthält eine Vorlage pro Zeile: kategorie|Name|ASNs und Domains| (wide am Ende für ein ganzes Cloud- / CDN-Netz), z. B. stream|Mein Dienst|example.com cdn.example.net|. Kategorien: stream, tvde, news, gaming, social, work, shop, bank, services, smarthome, updates, cloud, test. Hinzugefügte Vorlagen liegen in /jffs/addons/asnmanager/presets.txt; der Download enthält alle eigenen Vorlagen, auch die vom USB-Stick.', preset_cat: 'Kategorie', preset_on: 'schon in der Liste -> {t}', preset_have: '{n} von {m} schon in der Liste (markiert) - erneutes Hinzufügen setzt sie auf das gewählte Ziel', preset_own_s: 'eigene', preset_own: 'Deine eigene Vorlage (presets.txt auf dem Router / USB-Stick)', pcat_stream: 'Streaming', pcat_tvde: 'TV & Mediatheken (DE / AT / CH)', pcat_news: 'Nachrichten', pcat_bank: 'Banken (DE)', pcat_services: 'Dienste & Behörden (DE)', pcat_smarthome: 'Smart Home & IoT', pcat_updates: 'Updates & Downloads', pcat_gaming: 'Gaming', pcat_social: 'Social & Messenger', pcat_work: 'Tools & Arbeit', pcat_shop: 'Shopping & Bezahlen', pcat_cloud: 'Cloud & CDN (ganze Netze)', pcat_test: 'Tests & IP-Check', preset_legend: 'Eine Vorlage fügt ASNs und / oder Domains hinzu (eine Domain gilt für alle Unterdomains). ⚠ = Cloud, CDN oder Hosting: über diese Netze läuft ein großer Teil des Internets, wer sie umleitet, leitet weit mehr als diesen einen Dienst um.', preset_wide: '"{n}": Über diese Netze läuft ein großer Teil des Internets (Cloud / CDN / Hosting).\nWer sie umleitet, leitet auch den Verkehr vieler anderer Dienste und Webseiten mit um - nicht nur diesen einen.\n\nTrotzdem hinzufügen?', tool_done: '{a}: fertig - Ergebnis siehe unten', tool_failed: '{a}: fehlgeschlagen - siehe Ausgabe unten', act_test: 'Route testen', act_trace: 'Traceroute', act_ifaces: 'Öffentliche IPs', act_status: 'ipset-Status', act_lookup: 'Suche', act_sghide: 'Vorschlag ausblenden', sg_hide: 'Diesen Vorschlag ausblenden', sg_unhide: 'Wieder einblenden', sg_showhid: 'Ausgeblendete zeigen ({n})',
+    act_remove: 'Entfernen', act_clear: 'Liste leeren', act_edit: 'Bearbeiten', act_schedule: 'Zeitplan', act_failover: 'Failover', act_statssave: 'USB-Sicherung', act_pimport: 'Eigene Vorlagen hinzufügen', act_pedit: 'Eigene Vorlage', oe_open: 'Eigene Vorlagen bearbeiten', oe_new: '+ Neue Vorlage', oe_del: 'Löschen', oe_name: 'Name', oe_items: 'ASNs und Domains', oe_items_help: 'Einer pro Zeile (oder mit Leerzeichen getrennt). Eine Domain gilt für alle Unterdomains; ASNs als 13335 oder AS13335.', oe_file: 'Speichern in', oe_wide: 'ganzes Cloud- / CDN-Netz (⚠)', oe_save: 'Speichern', oe_usb: 'USB-Stick {n}', oe_jffs: 'Router (/jffs)', oe_count: '{n} Einträge', oe_count1: '1 Eintrag', oe_need_name: 'Bitte einen Namen eingeben.', oe_need_items: 'Bitte mindestens eine ASN oder Domain eingeben.', oe_bad: 'Das sind weder ASNs noch Domains und werden weggelassen:\n{l}\n\nTrotzdem speichern?', oe_c_del: 'Eigene Vorlage "{n}" ({f}) löschen?', own_title: 'Eigene Vorlagen', own_sub: 'Als .txt-Datei zum Teilen herunterladen oder eine Vorlagen-Datei von jemand anderem hinzufügen.', own_dl: 'Vorlagen herunterladen', own_add: 'Vorlagen hinzufügen', own_replace: 'ersetzen statt ergänzen', own_count: '{n} eigene Vorlage(n) (★).', own_none: 'Noch keine eigenen Vorlagen.', own_bad_file: 'Die Datei enthält keine Vorlagen-Zeilen (kategorie|Name|ASNs und Domains|).', own_c_add: '{n} Vorlage(n) hinzufügen? Zeilen mit gleicher Kategorie und gleichem Namen ersetzen die bisherigen. {b} Zeile(n) werden übersprungen (falsches Format).', own_c_replace: 'Deine eigenen Vorlagen auf dem Router durch {n} Vorlage(n) ersetzen? {b} Zeile(n) werden übersprungen (falsches Format). Eine presets.txt auf einem USB-Stick bleibt unverändert.', own_help: 'Die Datei enthält eine Vorlage pro Zeile: kategorie|Name|ASNs und Domains| (wide am Ende für ein ganzes Cloud- / CDN-Netz), z. B. stream|Mein Dienst|example.com cdn.example.net|. Kategorien: stream, tvde, news, gaming, social, work, shop, bank, services, smarthome, updates, cloud, test. Hinzugefügte Vorlagen liegen in /jffs/addons/asnmanager/presets.txt; der Download enthält alle eigenen Vorlagen, auch die vom USB-Stick.', preset_cat: 'Kategorie', preset_on: 'schon in der Liste -> {t}', preset_have: '{n} von {m} schon in der Liste (markiert) - erneutes Hinzufügen setzt sie auf das gewählte Ziel', preset_own_s: 'eigene', preset_own: 'Deine eigene Vorlage (presets.txt auf dem Router / USB-Stick)', pcat_stream: 'Streaming', pcat_tvde: 'TV & Mediatheken (DE / AT / CH)', pcat_news: 'Nachrichten', pcat_bank: 'Banken (DE)', pcat_services: 'Dienste & Behörden (DE)', pcat_smarthome: 'Smart Home & IoT', pcat_updates: 'Updates & Downloads', pcat_gaming: 'Gaming', pcat_social: 'Social & Messenger', pcat_work: 'Tools & Arbeit', pcat_shop: 'Shopping & Bezahlen', pcat_cloud: 'Cloud & CDN (ganze Netze)', pcat_test: 'Tests & IP-Check', preset_legend: 'Eine Vorlage fügt ASNs und / oder Domains hinzu (eine Domain gilt für alle Unterdomains). ⚠ = Cloud, CDN oder Hosting: über diese Netze läuft ein großer Teil des Internets, wer sie umleitet, leitet weit mehr als diesen einen Dienst um.', preset_wide: '"{n}": Über diese Netze läuft ein großer Teil des Internets (Cloud / CDN / Hosting).\nWer sie umleitet, leitet auch den Verkehr vieler anderer Dienste und Webseiten mit um - nicht nur diesen einen.\n\nTrotzdem hinzufügen?', tool_done: '{a}: fertig - Ergebnis siehe unten', tool_failed: '{a}: fehlgeschlagen - siehe Ausgabe unten', act_test: 'Route testen', act_trace: 'Traceroute', act_ifaces: 'Öffentliche IPs', act_status: 'ipset-Status', act_lookup: 'Suche', act_sghide: 'Vorschlag ausblenden', sg_hide: 'Diesen Vorschlag ausblenden', sg_unhide: 'Wieder einblenden', sg_showhid: 'Ausgeblendete zeigen ({n})',
     tab_asns: 'ASNs', tab_traffic: 'Traffic', tab_targets: 'Ziele & Failover', tab_diag: 'Diagnose', tab_settings: 'Einstellungen',
     sub_manual: 'ASNs eingeben', sub_lookup: 'Per Domain / IP suchen', sub_presets: 'Dienst-Vorlagen', rc_to_list: 'Zur ASN-Liste',
     sp_th: 'Speedtest', sp_btn: 'Test', sp_running: 'Speedtest läuft - etwa 30 Sekunden...',
@@ -1129,6 +1141,7 @@ function asnmRenderPresets() {
     cs.innerHTML = h;
     asnmPresetCat(cs.value, true);
     asnmOwnRender();
+    if (document.getElementById('asnm_oe').style.display !== 'none' && document.getElementById('asnm_oe_form').style.display === 'none') asnmOeRender();
 }
 function asnmPresetCat(cat, keep) {
     try { localStorage.setItem('asnm_preset_cat', cat); } catch (e) {}
@@ -1874,6 +1887,91 @@ function asnmOwnFile(inp) {
         asnmSendQueue(jobs);
     };
     rd.readAsText(f);
+}
+
+// editor for own presets: new / edit / delete, written to the file the preset comes from (/jffs or USB device)
+ASNM.oe = { idx: -1 };
+function asnmOeToggle() {
+    var el = document.getElementById('asnm_oe');
+    el.style.display = el.style.display === 'none' ? '' : 'none';
+    asnmOeEdit(-2);
+}
+function asnmOeFileLabel(f) {
+    var m = /^\/tmp\/mnt\/([^\/]+)\//.exec(f || '');
+    return m ? t('oe_usb', { n: m[1] }) : t('oe_jffs');
+}
+function asnmOeRender() {
+    var box = document.getElementById('asnm_oe_list');
+    if (!box || !ASNM.data) return;
+    var p = ASNM.data.presets || [], h = '', i, n = 0;
+    for (i = 0; i < p.length; i++) {
+        if (!p[i].own) continue;
+        n++;
+        var c = String(p[i].items).split(' ').length;
+        h += '<div class="asnm-oe-row"><span class="asnm-oe-n"><span>★ ' + asnmEsc(p[i].name) + '</span><span class="asnm-oe-m">' + asnmEsc(t('pcat_' + p[i].cat)) + ' · ' + t(c === 1 ? 'oe_count1' : 'oe_count', { n: c }) + ' · ' + asnmEsc(asnmOeFileLabel(p[i].file)) + '</span></span>' +
+             '<input type="button" class="button_gen asnm-ghost asnm-small-btn" value="' + asnmEsc(t('act_edit')) + '" onclick="asnmOeEdit(' + i + ');"/>' +
+             '<input type="button" class="button_gen asnm-ghost asnm-small-btn" value="' + asnmEsc(t('oe_del')) + '" onclick="asnmOeDel(' + i + ');"/></div>';
+    }
+    if (!n) h = '<div class="asnm-help">' + asnmEsc(t('own_none')) + '</div>';
+    h += '<div class="asnm-row" style="margin-top:8px;"><input type="button" class="button_gen asnm-btn asnm-small-btn" value="' + asnmEsc(t('oe_new')) + '" onclick="asnmOeEdit(-1);"/></div>';
+    box.innerHTML = h;
+}
+// i = index in ASNM.data.presets, -1 = new preset, -2 = close the form
+function asnmOeEdit(i) {
+    var form = document.getElementById('asnm_oe_form');
+    ASNM.oe.idx = i;
+    asnmOeRender();
+    if (i === -2) { form.style.display = 'none'; return; }
+    var p = i >= 0 ? ASNM.data.presets[i] : null, cs = document.getElementById('asnm_oe_cat'), fs = document.getElementById('asnm_oe_file'), h = '', k;
+    for (k = 0; k < ASNM_PCATS.length; k++) h += '<option value="' + ASNM_PCATS[k] + '">' + asnmEsc(t('pcat_' + ASNM_PCATS[k])) + '</option>';
+    cs.innerHTML = h;
+    var files = ASNM.data.pfiles || ['/jffs/addons/asnmanager/presets.txt'];
+    h = '';
+    for (k = 0; k < files.length; k++) h += '<option value="' + asnmEsc(files[k]) + '">' + asnmEsc(asnmOeFileLabel(files[k])) + '</option>';
+    fs.innerHTML = h;
+    if (!p && files.length > 1) fs.value = files[1];                       // new presets go to the USB device when there is one
+    document.getElementById('asnm_oe_file_w').style.display = p ? 'none' : '';
+    cs.value = p ? p.cat : (document.getElementById('asnm_preset_cat').value || 'stream');
+    document.getElementById('asnm_oe_name').value = p ? p.name : '';
+    document.getElementById('asnm_oe_items').value = p ? String(p.items).split(' ').join('\n') : '';
+    document.getElementById('asnm_oe_wide').checked = !!(p && p.wide);
+    form.style.display = '';
+    document.getElementById('asnm_oe_name').focus();
+}
+function asnmOeSave() {
+    var i = ASNM.oe.idx, p = i >= 0 ? ASNM.data.presets[i] : null;
+    var name = document.getElementById('asnm_oe_name').value.replace(/[|"\\<>]/g, '').replace(/^\s+|\s+$/g, '');
+    var cat = document.getElementById('asnm_oe_cat').value;
+    var raw = document.getElementById('asnm_oe_items').value.split(/[\s,;]+/), items = [], bad = [], seen = {}, k;
+    for (k = 0; k < raw.length; k++) {
+        var w = raw[k].toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^\*\./, '');
+        if (!w) continue;
+        if (/^as\d+$/.test(w)) w = w.substr(2);
+        if (!/^\d+$/.test(w) && !/^[a-z0-9_-]+(\.[a-z0-9_-]+)+$/.test(w)) { bad.push(raw[k]); continue; }
+        if (!seen[w]) { seen[w] = 1; items.push(w); }
+    }
+    if (!name) { alert(t('oe_need_name')); return; }
+    if (!items.length) { alert(t('oe_need_items')); return; }
+    if (bad.length && !confirm(t('oe_bad', { l: bad.join(', ') }))) return;
+    var file = p ? p.file : document.getElementById('asnm_oe_file').value;
+    var old = p ? p.cat + '|' + p.name : '', wide = document.getElementById('asnm_oe_wide').checked ? '1' : '0';
+    // amng_custom values are size limited: the first job writes the line, further jobs add the rest of the entries
+    var jobs = [], chunk = [], len = 0, mode = 'save';
+    for (k = 0; k < items.length; k++) {
+        if (len + items[k].length + 1 > 1200 && chunk.length) {
+            jobs.push(['pedit', [mode, encodeURIComponent(file), encodeURIComponent(old), cat, encodeURIComponent(name), wide, chunk.join(',')]]);
+            mode = 'more'; chunk = []; len = 0;
+        }
+        chunk.push(items[k]); len += items[k].length + 1;
+    }
+    jobs.push(['pedit', [mode, encodeURIComponent(file), encodeURIComponent(old), cat, encodeURIComponent(name), wide, chunk.join(',')]]);
+    document.getElementById('asnm_oe_form').style.display = 'none';
+    asnmSendQueue(jobs);
+}
+function asnmOeDel(i) {
+    var p = ASNM.data.presets[i];
+    if (!p || !confirm(t('oe_c_del', { n: p.name, f: asnmOeFileLabel(p.file) }))) return;
+    asnmSend('pedit', ['del', encodeURIComponent(p.file), encodeURIComponent(p.cat + '|' + p.name)]);
 }
 
 function asnmDiagPack() {
@@ -3655,6 +3753,28 @@ function initial() {
           <input type="button" class="button_gen asnm-btn" data-i18n-value="own_dl" onclick="asnmOwnDownload();"/>
           <input type="button" class="button_gen asnm-btn" data-i18n-value="own_add" data-i18n-title="own_help" onclick="document.getElementById('asnm_own_file').click();"/>
           <label class="asnm-help"><input type="checkbox" id="asnm_own_replace"/> <span data-i18n="own_replace"></span></label>
+        </div>
+        <div class="asnm-row" style="margin-top:6px;">
+          <input type="button" class="button_gen asnm-btn" data-i18n-value="oe_open" onclick="asnmOeToggle();"/>
+        </div>
+        <div id="asnm_oe" style="display:none;margin-top:10px;">
+          <div id="asnm_oe_list"></div>
+          <div id="asnm_oe_form" style="display:none;">
+            <div class="asnm-oe-grid">
+              <label><span class="asnm-label" data-i18n="oe_name"></span><input type="text" id="asnm_oe_name" maxlength="60"/></label>
+              <label><span class="asnm-label" data-i18n="preset_cat"></span><select id="asnm_oe_cat"></select></label>
+            </div>
+            <label><span class="asnm-label" data-i18n="oe_items"></span><span class="asnm-help" data-i18n="oe_items_help"></span>
+              <textarea id="asnm_oe_items" class="asnm-oe-ta" rows="5" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></label>
+            <div class="asnm-oe-grid">
+              <label id="asnm_oe_file_w"><span class="asnm-label" data-i18n="oe_file"></span><select id="asnm_oe_file"></select></label>
+              <label class="asnm-help" style="align-self:end;padding-bottom:8px;display:flex;gap:6px;align-items:center;"><input type="checkbox" id="asnm_oe_wide"/> <span data-i18n="oe_wide"></span></label>
+            </div>
+            <div class="asnm-row" style="margin-top:8px;">
+              <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="oe_save" onclick="asnmOeSave();"/>
+              <input type="button" class="button_gen asnm-ghost asnm-small-btn" data-i18n-value="btn_cancel" onclick="asnmOeEdit(-2);"/>
+            </div>
+          </div>
         </div></div>
     </div>
   </div>
