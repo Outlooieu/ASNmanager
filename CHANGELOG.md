@@ -1,3 +1,7 @@
+## v3.9.11
+
+- Service presets are sorted alphabetically within each category - in the WebUI, the SSH menu and `presets`; own presets from `presets.txt` are sorted into their category instead of being listed at the end. The preset numbers for `preset <n>` follow this order
+
 ## v3.9.10
 
 - Suggestions by domain: traffic of servers that also answered lookups for other domains (CDNs such as Akamai or Cloudflare) is marked under the domain - "⚠ 1.2 GB via shared servers - also: primevideo.com". The traffic is still counted under the latest lookup, but now it is visible that it may belong to another service

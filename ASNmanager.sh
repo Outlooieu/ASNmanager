@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.10
+version=3.9.11
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.10"
+SCRIPT_VERSION="3.9.11"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -165,11 +165,15 @@ cloud|Oracle Cloud|31898|wide
 test|Speed tests & IP check|speedtest.net ookla.com fast.com whatismyip.com wieistmeineip.de ipify.org browserleaks.com ipleak.net dnsleaktest.com|'
 # own presets: a file "presets.txt" (same format, one preset per line) in /jffs/addons/asnmanager or in the folder
 # ASNmanager of a USB device - its presets are added after the built-in ones (they are never uploaded anywhere)
+# all presets (built-in and own) sorted by category and then alphabetically by name - the number of a preset is its
+# place in this order (menu, "preset <n>" and the WebUI use the same order)
 preset_all() {
-    echo "$PRESET_DATA"
-    for pa_f in /jffs/addons/asnmanager/presets.txt /tmp/mnt/*/ASNmanager/presets.txt; do
-        [ -f "$pa_f" ] && grep -E '^[a-z]+\|[^|]+\|[^|]+\|(wide)?$' "$pa_f" 2>/dev/null
-    done | tr -d '\r' | awk '!s[$0]++'
+    { echo "$PRESET_DATA"
+      for pa_f in /jffs/addons/asnmanager/presets.txt /tmp/mnt/*/ASNmanager/presets.txt; do
+          [ -f "$pa_f" ] && grep -E '^[a-z]+\|[^|]+\|[^|]+\|(wide)?$' "$pa_f" 2>/dev/null
+      done; } | tr -d '\r' | awk '!s[$0]++' |
+    awk -F'|' 'BEGIN { n = split("stream tvde news gaming social work shop bank services smarthome updates cloud test", c, " "); for (i = 1; i <= n; i++) o[c[i]] = i }
+        { printf "%02d\t%s\t%s\n", ($1 in o) ? o[$1] : 99, tolower($2), $0 }' | sort -t "$(printf '\t')" -k1,1 -k2,2 | cut -f3-
 }
 PRESET_COUNT=$(preset_all | grep -c .)
 
