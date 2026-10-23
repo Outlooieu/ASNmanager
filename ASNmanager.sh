@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.16
+version=3.9.17
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.16"
+SCRIPT_VERSION="3.9.17"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -1648,7 +1648,7 @@ check_menu_update() {
     rm -f "$TMP_CHECK" 2>/dev/null
     FETCH_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/ASNmanager.sh"
 
-    if curl -s -S -k --connect-timeout 1 -m 10 "$FETCH_URL" -o "$TMP_CHECK" && [ -s "$TMP_CHECK" ]; then
+    if curl -s -S -k --connect-timeout 1 -m 10 "$FETCH_URL?t=$(date +%s)" -o "$TMP_CHECK" && [ -s "$TMP_CHECK" ]; then
         sed -i 's/\r$//' "$TMP_CHECK" 2>/dev/null
         REMOTE_VERSION=$(grep -m 1 "^SCRIPT_VERSION=" "$TMP_CHECK" | cut -d'"' -f2 | tr -d '\r')
         if [ -n "$REMOTE_VERSION" ] && is_remote_newer "$SCRIPT_VERSION" "$REMOTE_VERSION"; then
@@ -1668,7 +1668,7 @@ update_self() {
     rm -f "$TMP_SCRIPT" 2>/dev/null
     FETCH_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/ASNmanager.sh"
 
-    if curl -s -S -k --connect-timeout 10 -m 60 "$FETCH_URL" -o "$TMP_SCRIPT" && [ -s "$TMP_SCRIPT" ]; then
+    if curl -s -S -k --connect-timeout 10 -m 60 "$FETCH_URL?t=$(date +%s)" -o "$TMP_SCRIPT" && [ -s "$TMP_SCRIPT" ]; then
         sed -i 's/\r$//' "$TMP_SCRIPT" 2>/dev/null
         REMOTE_VERSION=$(grep -m 1 "^SCRIPT_VERSION=" "$TMP_SCRIPT" | cut -d'"' -f2 | tr -d '\r')
         if [ "$SCRIPT_VERSION" = "$REMOTE_VERSION" ]; then
@@ -5061,7 +5061,7 @@ UPD_NOTES="https://github.com/${GITHUB_USER}/${GITHUB_REPO}/blob/main/CHANGELOG.
 # Downloads the installer file to $1 and prints its version. Empty output = GitHub not reachable / not ASN Manager.
 upd_fetch() {
     rm -f "$1"
-    curl -s -S -k --connect-timeout 8 -m 60 "$UPD_URL" -o "$1" 2>/dev/null && [ -s "$1" ] || return 1
+    curl -s -S -k --connect-timeout 8 -m 60 "$UPD_URL?t=$(date +%s)" -o "$1" 2>/dev/null && [ -s "$1" ] || return 1
     sed -i 's/\r$//' "$1" 2>/dev/null
     grep -q '^SCRIPT_VERSION="' "$1" || return 1
     grep -m 1 '^SCRIPT_VERSION=' "$1" | cut -d'"' -f2 | tr -cd '0-9.'
@@ -5237,7 +5237,7 @@ webui_install() {
     mkdir -p "$ADDON_DIR"
     if [ "$1" != "local" ]; then
         echo "Downloading WebUI page..."
-        if curl -fsSk --connect-timeout 10 -m 60 "$ASP_URL" -o "$WEBUI_SRC.new" && grep -q "$WEBUI_MARK" "$WEBUI_SRC.new"; then
+        if curl -fsSk --connect-timeout 10 -m 60 "$ASP_URL?t=$(date +%s)" -o "$WEBUI_SRC.new" && grep -q "$WEBUI_MARK" "$WEBUI_SRC.new"; then
             sed -i 's/\r$//' "$WEBUI_SRC.new"
             mv -f "$WEBUI_SRC.new" "$WEBUI_SRC"
         else

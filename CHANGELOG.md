@@ -1,3 +1,7 @@
+## v3.9.17
+
+- Update: the script and the WebUI page are fetched from GitHub without its CDN cache, so an update right after a release no longer installs the previous page
+
 ## v3.9.16
 
 - WebUI: "Own presets" moved from its own large card into **Backup & restore** (Settings), with shorter texts; the line format is shown as a tooltip on "Add presets"
