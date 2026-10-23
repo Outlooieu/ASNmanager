@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.9.13 -->
+<!-- ASNmanager-WebUI v3.9.14 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -461,7 +461,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.9.13';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.9.14';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -475,7 +475,7 @@ var ASNM_I18N = {
     tr_on: 'active', tr_off: 'off', tr_btn_disable: 'Disable', tr_btn_reset: 'Disable & reset', tr_btn_enable: 'Enable',
     tr_th_name: 'ASN / target', tr_th_down: 'Download', tr_th_up: 'Upload', tr_th_pk: 'Packets', tr_th_share: 'Share', tr_show: 'Show details', tr_hide: 'Hide details', tr_sum: 'Total {b} · {n} ASN(s)', tr_toggle_tip: 'Click to expand or collapse', tr_th_share_tip: 'Share of the total traffic. In expanded rows: share of the row above.',
     tr_hint: 'Click a row to see the interfaces and devices behind it', tr_dev_1: '1 device', tr_dev_n: '{n} devices',
-    tr_other: 'Not assigned to an ASN', tr_by_iface: 'By interface', tr_by_client: 'By client (all interfaces)', tr_unknown: 'Other addresses (no counter rule)', tr_unknown_hint: 'Traffic from IP addresses that have no counter rule of their own, e.g. a device that connected a moment ago or sits behind another router. Show them on the router with: asnstats.sh unknown', tr_total: 'Total', tr_split_asn: 'Via rules', tr_split_other: 'Not assigned',
+    tr_other: 'No rule (normal way)', tr_by_iface: 'By interface', tr_by_client: 'By client (all interfaces)', tr_unknown: 'Other addresses (no counter rule)', tr_unknown_hint: 'Traffic from IP addresses that have no counter rule of their own, e.g. a device that connected a moment ago or sits behind another router. Show them on the router with: asnstats.sh unknown', tr_total: 'Total', tr_split_asn: 'Via rules', tr_split_other: 'No rule',
     tr_no_clients: 'No client traffic yet', tr_empty: 'No traffic counted yet.', tr_off_hint: 'Counting is off. Click "Enable" to start.',
     tr_gone: 'removed from list', tr_c_reset: 'Disable counting and delete all statistics?', tr_working: 'Applying...',
     tr_note: 'IPv4, forwarded traffic only (no router own traffic). Updates every {s} s.', tr_saved_usb: 'Counts survive a reboot - saved hourly on the USB device: {p} (last change: {t})', tr_no_usb: 'No USB device found - the numbers are only kept in RAM and are lost on a reboot. Connect a USB device (folder ASNmanager) or turn saving off.',
@@ -626,7 +626,7 @@ var ASNM_I18N = {
     tr_on: 'aktiv', tr_off: 'aus', tr_btn_disable: 'Deaktivieren', tr_btn_reset: 'Deaktivieren und zurücksetzen', tr_btn_enable: 'Aktivieren',
     tr_th_name: 'ASN / Ziel', tr_th_down: 'Download', tr_th_up: 'Upload', tr_th_pk: 'Pakete', tr_th_share: 'Anteil', tr_show: 'Details anzeigen', tr_hide: 'Details ausblenden', tr_sum: 'Gesamt {b} · {n} ASN(s)', tr_toggle_tip: 'Klicken zum Auf- oder Zuklappen', tr_th_share_tip: 'Anteil am Gesamt-Traffic. In aufgeklappten Zeilen: Anteil der übergeordneten Zeile.',
     tr_hint: 'Zeile anklicken, um die Interfaces und Geräte dahinter zu sehen', tr_dev_1: '1 Gerät', tr_dev_n: '{n} Geräte',
-    tr_other: 'Keinem ASN zugeordnet', tr_by_iface: 'Nach Interface', tr_by_client: 'Nach Client (alle Interfaces)', tr_unknown: 'Sonstige Adressen (ohne eigene Zählregel)', tr_unknown_hint: 'Traffic von IP-Adressen ohne eigene Zählregel, z. B. ein Gerät, das sich gerade erst verbunden hat oder hinter einem anderen Router hängt. Anzeige auf dem Router mit: asnstats.sh unknown', tr_total: 'Gesamt', tr_split_asn: 'Über Regeln', tr_split_other: 'Nicht zugeordnet',
+    tr_other: 'Ohne Regel (normaler Weg)', tr_by_iface: 'Nach Interface', tr_by_client: 'Nach Client (alle Interfaces)', tr_unknown: 'Sonstige Adressen (ohne eigene Zählregel)', tr_unknown_hint: 'Traffic von IP-Adressen ohne eigene Zählregel, z. B. ein Gerät, das sich gerade erst verbunden hat oder hinter einem anderen Router hängt. Anzeige auf dem Router mit: asnstats.sh unknown', tr_total: 'Gesamt', tr_split_asn: 'Über Regeln', tr_split_other: 'Ohne Regel',
     tr_no_clients: 'Noch kein Client-Traffic', tr_empty: 'Noch kein Traffic gezählt.', tr_off_hint: 'Die Zählung ist aus. Mit "Aktivieren" starten.',
     tr_gone: 'aus Liste entfernt', tr_c_reset: 'Zählung deaktivieren und alle Statistikdaten löschen?', tr_working: 'Wird umgesetzt...',
     tr_note: 'Nur IPv4 und weitergeleiteter Traffic (ohne Router-Eigenverkehr). Aktualisiert alle {s} s.', tr_saved_usb: 'Die Zählstände überleben einen Neustart - stündlich gesichert auf dem USB-Gerät: {p} (letzte Änderung: {t})', tr_no_usb: 'Kein USB-Gerät gefunden - die Zahlen liegen nur im Arbeitsspeicher und gehen bei einem Neustart verloren. USB-Gerät anschließen (Ordner ASNmanager) oder die Sicherung ausschalten.',
@@ -1686,6 +1686,9 @@ function asnmTrRowLabel(r) {
             var e = ASNM.data.entries[i];
             if (e.asn === r.asn && e.kind) return asnmEntryCell(e);
         }
+    // a removed IP / domain entry: what it was (remembered on removal)
+    var g = ASNM.data && ASNM.data.removed && ASNM.data.removed[r.asn];
+    if (g) return asnmEntryCell({ kind: g[0], value: g[1] }) + ' <span class="asnm-muted asnm-cid">' + asnmEsc(r.asn) + '</span>';
     return /^C\d+$/.test(r.asn) ? asnmEsc(r.asn) : 'AS' + asnmEsc(r.asn);
 }
 // second line of a stats row: the ASN name (cut with "..." so long names do not push the numbers out of view)

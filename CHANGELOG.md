@@ -1,3 +1,8 @@
+## v3.9.14
+
+- Traffic table: the row "Not assigned to an ASN" is called "No rule (normal way)" now - it holds the traffic that matches no ASN, IP or domain entry (it goes the normal way: VPN Director / main route), not only "no ASN"
+- A removed IP / domain entry keeps its name in the traffic table ("*.akamaized.net C9 - removed from list" instead of only "C9"): the label is remembered when the entry is removed (`/jffs/addons/asnmanager/removed_entries.txt`)
+
 ## v3.9.13
 
 - Smart home & IoT: 17 more presets (30 in total) - VeSync / Levoit, Midea / MSmartHome, TP-Link Tapo / Kasa, Aqara, Govee, Meross, Ecovacs, Dreame, Somfy, Nuki, Withings, Arlo, Blink, Wyze, EZVIZ, Bosch Smart Home, Homematic IP. Every domain answered on a router, except `vesync.eu` and `msmartlife.net` (only their subdomains answer - both are used by devices in the test household) and `immedia-semi.com` (Blink, known to answer only under subdomains, not yet checked)

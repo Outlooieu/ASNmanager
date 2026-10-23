@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.13
+version=3.9.14
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.13"
+SCRIPT_VERSION="3.9.14"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -2591,6 +2591,16 @@ cli_import() {
     echo "Imported $n ASN(s) (${mode})${skipped}. Apply rules to activate."
 }
 
+# the traffic statistics keep the numbers of a removed IP / domain entry under its id (C9 ...): remember what it was,
+# so the table can still show "*.akamaized.net (removed)" instead of only "C9"
+CU_GONE="/jffs/addons/asnmanager/removed_entries.txt"
+cu_gone_note() {
+    [ -n "$1" ] || return 0
+    cgn=$(awk -F: -v id="$1" '$1 == id { print $1 "\t" $4 "\t" $5; exit }' "$CUSTOM_FILE" 2>/dev/null)
+    [ -n "$cgn" ] || return 0
+    mkdir -p "$(dirname "$CU_GONE")"
+    { awk -F'\t' -v id="$1" '$1 != id' "$CU_GONE" 2>/dev/null; echo "$cgn"; } | tail -n 500 > "$CU_GONE.new" && mv -f "$CU_GONE.new" "$CU_GONE"
+}
 cli_remove() {
     n=0; cn=0
     set -f
@@ -2598,7 +2608,7 @@ cli_remove() {
         case "$raw" in
             C[0-9]*|c[0-9]*)
                 cid="C${raw#?}"
-                cu_has "$cid" && { sed -i "/^${cid}:/d" "$CUSTOM_FILE"; cn=$((cn + 1)); }
+                cu_has "$cid" && { cu_gone_note "$cid"; sed -i "/^${cid}:/d" "$CUSTOM_FILE"; cn=$((cn + 1)); }
                 continue ;;
         esac
         k=$(cu_kind "$raw") || continue
@@ -2608,6 +2618,7 @@ cli_remove() {
                 kk=${k%% *}; vv=${k#* }
                 if awk -F: -v k="$kk" -v v="$vv" '$4 == k && $5 == v { f = 1 } END { exit !f }' "$CUSTOM_FILE" 2>/dev/null; then
                     cn=$((cn + 1))
+                    cu_gone_note "$(awk -F: -v k="$kk" -v v="$vv" '$4 == k && $5 == v { print $1; exit }' "$CUSTOM_FILE")"
                     awk -F: -v k="$kk" -v v="$vv" '!($4 == k && $5 == v)' "$CUSTOM_FILE" > "$CUSTOM_FILE.new" && mv -f "$CUSTOM_FILE.new" "$CUSTOM_FILE"
                 fi ;;
         esac
@@ -2838,6 +2849,9 @@ web_export() {
         export_devices
         printf '],'
 
+        printf '"removed":{'
+        awk -F'\t' 'NF >= 3 && $1 ~ /^C[0-9]+$/ && $2 ~ /^(dom|ip)$/ { gsub(/["\\]/, "", $3); printf "%s\"%s\":[\"%s\",\"%s\"]", (n++ ? "," : ""), $1, $2, $3 }' "$CU_GONE" 2>/dev/null
+        printf '},'
         printf '"presets":['
         preset_all | awk -F'|' '{ gsub(/["\\]/, "", $2); printf "%s{\"cat\":\"%s\",\"name\":\"%s\",\"items\":\"%s\",\"wide\":%d,\"own\":%d}", (NR > 1 ? "," : ""), $1, $2, $3, ($4 == "wide"), ($5 == "own") }'
         printf ']}\n'
