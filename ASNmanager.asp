@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.9.9 -->
+<!-- ASNmanager-WebUI v3.9.10 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -319,17 +319,17 @@
 .asnm-sg { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
 .asnm-sg-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .asnm-sg-title { font-weight: 700; font-size: 13px; color: var(--strong); }
-.asnm-sg-name { display: block; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.asnm-sg-on { font-size: 11px; color: var(--warn); max-width: 130px; line-height: 1.35; margin-top: 2px; }
+.asnm-sg-name { display: block; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asnm-sg-on { font-size: 11px; color: var(--warn); max-width: 120px; line-height: 1.35; margin-top: 2px; }
 .asnm-sg-cl { font-size: 12px; color: var(--text2); max-width: 170px; }
 .asnm-sg-clrow { display: flex; justify-content: space-between; gap: 8px; line-height: 18px; }
 .asnm-sg-clrow span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #asnm_sg .asnm-table th:not(:first-child), #asnm_sg .asnm-table td:not(:first-child) { padding-left: 6px; padding-right: 6px; }
-#asnm .asnm-sg-sel { width: 96px; }
+#asnm .asnm-sg-sel { width: 88px; }
 #asnm .asnm-sg-note { width: 130px; height: 32px !important; }
 #asnm_sg_tbl th { white-space: nowrap; }
 #asnm_sg_tbl td.num { white-space: nowrap; }
-#asnm_sg_tbl .asnm-ms-btn { width: 116px; }
+#asnm_sg_tbl .asnm-ms-btn { width: 108px; }
 .asnm-sg-foot { margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.5; }
 /* collapsible sections inside the traffic card */
 .asnm-sec { margin-top: 12px; border-top: 1px solid var(--line); }
@@ -353,9 +353,10 @@
 .asnm-dp-row { align-items: center; gap: 12px; }
 #asnm .asnm-diag-dev { width: 260px; }
 .asnm-sg-none { margin-top: 6px; }
+.asnm-sg-amb { font-size: 11px; color: var(--warn); max-width: 120px; line-height: 1.35; margin-top: 2px; }
 .asnm-diag-sys { margin: 0 0 14px; padding: 0 0 10px; border-bottom: 1px solid var(--line); }
 .asnm-dp-full { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); cursor: pointer; }
-.asnm-sg-x { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin-left: 4px; padding: 0;
+.asnm-sg-x { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 28px; margin-left: 3px; padding: 0;
     vertical-align: middle; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
 .asnm-sg-x:hover { color: var(--text); border-color: var(--muted); }
 .asnm-sg-x svg { width: 15px; height: 15px; }
@@ -458,7 +459,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.9.9';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.9.10';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -503,6 +504,7 @@ var ASNM_I18N = {
     sgd_off_confirm: 'Turn off suggestions by domain?\ndnsmasq is restarted once and the collected names are deleted.',
     sgd_empty: 'No names collected yet - domains show up about a minute after a device looked them up.',
     sgd_none: '{b} of traffic (since the collection started) went to {n} address(es) without a known name (looked up before the suggestions by domain were turned on, answered from a cache, or not through the router - e.g. "secure DNS" in a browser).',
+    sgd_amb: '{b} via shared servers - also: {d}', sgd_amb_tip: 'These servers also answered lookups for other domains (CDN). The traffic is counted under this domain because it was the latest lookup - it may belong to one of the others.',
     sgd_none_show: 'Show the largest', sgd_none_hide: 'Hide', sgd_none_ip: 'Address', sgd_none_net: 'Network', sgd_none_dev: 'Used most by',
     sgd_none_tip: 'A device with a lot of traffic here probably asks its own DNS server (e.g. 8.8.8.8 on many TV sticks, "Private DNS" on Android, "secure DNS" in Chrome / Firefox). Traffic counted before the suggestions by domain were turned on has no names either - it leaves this list over time.',
     sgd_ext: 'The lookup log of another add-on (e.g. Diversion) is read, dnsmasq is left as it is.',
@@ -653,6 +655,7 @@ var ASNM_I18N = {
     sgd_off_confirm: 'Vorschläge nach Domain ausschalten?\ndnsmasq wird einmal neu gestartet, die gesammelten Namen werden gelöscht.',
     sgd_empty: 'Noch keine Namen gesammelt - Domains erscheinen etwa eine Minute, nachdem ein Gerät sie abgefragt hat.',
     sgd_none: '{b} Traffic (seit Beginn der Sammlung) gingen an {n} Adresse(n) ohne bekannten Namen (abgefragt, bevor die Vorschläge nach Domain eingeschaltet waren, aus einem Zwischenspeicher beantwortet oder nicht über den Router - z. B. "Sicheres DNS" im Browser).',
+    sgd_amb: '{b} über geteilte Server - auch: {d}', sgd_amb_tip: 'Diese Server haben auch Anfragen für andere Domains beantwortet (CDN). Der Traffic ist dieser Domain zugeordnet, weil sie zuletzt abgefragt wurde - er kann auch zu einer der anderen gehören.',
     sgd_none_show: 'Die größten anzeigen', sgd_none_hide: 'Ausblenden', sgd_none_ip: 'Adresse', sgd_none_net: 'Netz', sgd_none_dev: 'Am meisten genutzt von',
     sgd_none_tip: 'Ein Gerät mit viel Traffic hier fragt wahrscheinlich einen eigenen DNS-Server (z. B. 8.8.8.8 bei vielen TV-Sticks, "Privates DNS" bei Android, "Sicheres DNS" in Chrome / Firefox). Traffic, der gezählt wurde, bevor die Vorschläge nach Domain eingeschaltet waren, hat ebenfalls keine Namen - er verschwindet mit der Zeit aus dieser Liste.',
     sgd_ext: 'Gelesen wird das Abfrage-Protokoll eines anderen Add-ons (z. B. Diversion), dnsmasq bleibt unverändert.',
@@ -2802,6 +2805,9 @@ function asnmSgRender(force) {
                 var more = (r.nsub || subs.length) - sh.length - (subs.length && subs[0][0] === r.d ? 1 : 0);
                 first = '<b>' + asnmEsc(r.d) + '</b><span class="asnm-sg-name asnm-dev" title="' + asnmEsc(tip.join('\n')) + '">' +
                         asnmEsc(sh.join(', ') + (more > 0 ? (sh.length ? ' ' : '') + t('sgd_subs_more', { n: more }) : '')) + '</span>';
+                // traffic of servers that also answered for other domains (CDN): counted here, but not certain
+                if (r.amb > 0 && (r.alt || []).length)
+                    first += '<div class="asnm-sg-amb" title="' + asnmEsc(t('sgd_amb_tip')) + '">⚠ ' + asnmEsc(t('sgd_amb', { b: asnmFmtBytes(r.amb), d: r.alt.join(', ') })) + '</div>';
             } else {
                 first = '<b>AS' + a + '</b><span class="asnm-sg-name asnm-dev" title="' + asnmEsc(r.name) + '">' + asnmEsc(r.name || '-') + '</span>';
             }

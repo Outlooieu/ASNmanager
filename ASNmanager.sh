@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.9
+version=3.9.10
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.9"
+SCRIPT_VERSION="3.9.10"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -3922,6 +3922,10 @@ sgd_export() {
             if (cv) next
             bd = base(fn)
             tot[bd] += b; if (ond != "" && !(bd in on)) { on[bd] = don[ond]; osrc[bd] = dsrc[ond] }
+            # a server that also answered for other domains (CDN): the traffic is counted here, but marked as uncertain
+            nb2 = split(names[ip], aln, ","); sh = 0
+            for (x = 2; x <= nb2; x++) { ob = base(aln[x]); if (ob != bd) { sh = 1; if (!((bd "|" ob) in salt)) { salt[bd "|" ob] = 1; if (nalt[bd]++ < 4) alt[bd] = alt[bd] (alt[bd] == "" ? "" : ",") "\"" ob "\"" } } }
+            if (sh) amb[bd] += b
             if (!((bd "|" ip) in sip)) { sip[bd "|" ip] = 1; nip[bd]++ }
             if (!((bd "|" fn) in ssub)) { ssub[bd "|" fn] = 1; subs[bd] = subs[bd] " " fn; nsub[bd]++ }
             sb[bd "|" fn] += b
@@ -3937,7 +3941,7 @@ sgd_export() {
                 m2 = split(cls[d], cc, " ")
                 for (x = 1; x <= m2; x++) for (y = x + 1; y <= m2; y++) if (cb[d "|" cc[y]] > cb[d "|" cc[x]]) { t = cc[x]; cc[x] = cc[y]; cc[y] = t }
                 jc = ""; for (x = 1; x <= m2 && x <= 40; x++) jc = jc (x > 1 ? "," : "") "[\"" cc[x] "\"," sprintf("%.0f", cb[d "|" cc[x]]) "]"
-                printf "%.0f\t{\"d\":\"%s\",\"b\":%.0f,\"ips\":%d,\"on\":\"%s\",\"osrc\":\"%s\",\"subs\":[%s],\"nsub\":%d,\"cl\":[%s],\"ncl\":%d}\n", tot[d], d, tot[d], nip[d], on[d], osrc[d], js, m, jc, m2
+                printf "%.0f\t{\"d\":\"%s\",\"b\":%.0f,\"ips\":%d,\"on\":\"%s\",\"osrc\":\"%s\",\"subs\":[%s],\"nsub\":%d,\"cl\":[%s],\"ncl\":%d,\"amb\":%.0f,\"alt\":[%s]}\n", tot[d], d, tot[d], nip[d], on[d], osrc[d], js, m, jc, m2, amb[d], alt[d]
             }
             nn2 = 0; for (i in nonen) nn2++
             printf "N\t%.0f\t%d\n", none, nn2

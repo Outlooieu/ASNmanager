@@ -1,3 +1,7 @@
+## v3.9.10
+
+- Suggestions by domain: traffic of servers that also answered lookups for other domains (CDNs such as Akamai or Cloudflare) is marked under the domain - "⚠ 1.2 GB via shared servers - also: primevideo.com". The traffic is still counted under the latest lookup, but now it is visible that it may belong to another service
+
 ## v3.9.9
 
 - Preset "ZDF Mediathek": the live streams (measured) come from `zdf-hls-15` ... `zdf-hls-19.akamaized.net` (one per channel) and KiKA live from `kika-live.ard-mcdn.de`. Added

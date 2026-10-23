@@ -9,7 +9,7 @@ ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to eas
  /_\ / __| \| | |  \/  | /_\ | \| | /_\ / __| __|| _ \
 / _ \__ \ .' | | |\/| |/ _ \| .' |/ _ \ (_ | _| |   /
 /_/ \_\___/_|\_| |_|  |_/_/ \_\_|\_/_/ \_\___|___||_|_\
-              === ASN MANAGER v3.9.9 ===
+              === ASN MANAGER v3.9.10 ===
 ================================================================
  ASNs
  [1]  Show ASN list & routing targets
@@ -277,7 +277,7 @@ It is off by default. When you turn it on (in the domain view, or `ASNmanager.sh
 
 With AdGuard Home in front of dnsmasq, its upstream should be dnsmasq (`127.0.0.1:553`), not Unbound or another server directly - otherwise dnsmasq sees almost no lookups and this view stays nearly empty. The domain entries themselves still learn when the AdGuard Home installer copies the dnsmasq domain lines into its own `ipset_file` (it does by default); without that copy they learn only through dnsmasq, and the DNS check in the status warns. Note: with that copy, every change of a domain entry restarts AdGuard Home (DNS pauses for up to a minute).
 
-Limits: traffic to an address whose name was looked up before the collection started, answered from a cache in front of dnsmasq (AdGuard Home), or not through the router at all ("secure DNS" in a browser, a device with a fixed DNS server) has no name - the page shows how much that is. Large networks (CDNs) serve many names from one address; the most recent lookup counts.
+Limits: traffic to an address whose name was looked up before the collection started, answered from a cache in front of dnsmasq (AdGuard Home), or not through the router at all ("secure DNS" in a browser, a device with a fixed DNS server) has no name - the page shows how much that is. Large networks (CDNs) serve many names from one address; the most recent lookup counts, and traffic of such shared servers is marked with ⚠ and the other domains they served ("via shared servers - also: ...").
 
 ## Traffic statistics
 
