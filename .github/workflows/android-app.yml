@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -41,7 +41,17 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           # without the signing key (repository secrets) a debug build: installable, but every build has another key
-          if [ -n "$KEYSTORE_FILE" ]; then gradle -p android assembleRelease --no-daemon; t=release; else gradle -p android assembleDebug --no-daemon; t=debug; fi
+          if [ -n "$KEYSTORE_FILE" ]; then t=release; task=assembleRelease; else t=debug; task=assembleDebug; fi
+          set +e
+          gradle -p android $task --no-daemon > build.log 2>&1; rc=$?
+          set -e
+          cat build.log
+          if [ $rc -ne 0 ]; then
+            # the reasons as one annotation (readable without the log)
+            msg=$(grep -E 'error:|e: |What went wrong|> |Could not|FAILED|Exception' build.log | grep -v '^\s*at ' | head -n 40 | sed 's/%/%25/g' | awk '{ printf "%s%%0A", $0 }')
+            echo "::error title=Gradle build failed::$msg"
+            exit 1
+          fi
           echo "APK_TYPE=$t" >> "$GITHUB_ENV"
       - name: Rename
         run: |
