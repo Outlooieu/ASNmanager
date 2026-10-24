@@ -9,7 +9,7 @@ ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to eas
  /_\ / __| \| | |  \/  | /_\ | \| | /_\ / __| __|| _ \
 / _ \__ \ .' | | |\/| |/ _ \| .' |/ _ \ (_ | _| |   /
 /_/ \_\___/_|\_| |_|  |_/_/ \_\_|\_/_/ \_\___|___||_|_\
-              === ASN MANAGER v3.9.19 ===
+              === ASN MANAGER v3.9.20 ===
 ================================================================
  ASNs
  [1]  Show ASN list & routing targets
@@ -143,7 +143,7 @@ SSH menu: the entries are grouped by what you do - ASNs (list, add, find, preset
 
 Features:
 
-- Modern interface with **Dark**, **Light** and **Blue** theme, language switch (router default / English), a small orbit animation around the logo (switched off automatically when the operating system asks for reduced motion)
+- Modern interface with **Dark**, **Light** and **Blue** theme, language switch (router default / English - see "Languages" below), a small orbit animation around the logo (switched off automatically when the operating system asks for reduced motion)
 - Status tiles, "Apply rules" with live progress bar (e.g. `AS13335 -> WGC1 (3 of 12)`), retry for failed ASNs only (0 subnets are highlighted red)
 - ASN names next to the numbers (looked up once per ASN), a short note per entry (in "Edit"), and a DNS / DHCP check in the overview that warns when dnsmasq is down (e.g. after a failed AdGuard Home start)
 - "Apply rules" builds from the saved subnets and downloads only new ASNs; if only IP / domain entries were added or changed, only those are applied (seconds). "Reload all subnets" downloads every ASN again (the daily schedule does this anyway). Command line: `apply`, `apply full`
@@ -168,6 +168,31 @@ Enable / disable / move the tab: menu option **[16]** or
 ```
 
 Files used by the WebUI: `/jffs/addons/asnmanager/` (page, settings, cached flags), `/www/ext/asnmanager/` (runtime data in RAM), one `userN.asp` slot and one line each in `/jffs/scripts/service-event` and `/jffs/scripts/services-start` (marked `# ASNmanager-WebUI`).
+
+### Languages
+
+The page follows the language of the router (Administration > System > Language). Built in: **English** and **German**. Language packs: **French, Italian, Spanish, Dutch, Polish, Portuguese (Brazil), Czech, Danish, Finnish, Hungarian, Norwegian, Romanian, Russian, Slovenian, Swedish, Turkish, Ukrainian** - only the pack of the router language is downloaded (with the WebUI install / update, file `lang/<code>.js`), every other language shows English. The switch "English" in the header forces English. Messages of the script and the SSH menu stay English.
+
+The packs were translated with care but not by native speakers - corrections are very welcome as an issue or pull request (`lang/fr.js` ...). Texts missing in a pack appear in English.
+
+## DNS fitting the line
+
+Normally the router looks up every name one way. A site that ASN Manager sends over WAN would then still be looked up through a VPN (or the other way round) - location, CDN servers and leak tests do not fit together. Settings > **DNS fitting the line** has three switches:
+
+- **Sites of ASN Manager** - domain entries (for all devices) and the names learned for ASN entries are looked up through their target: dnsmasq gets `server=/name/<DNS of the target>` (servers file, re-read with SIGHUP), and an `ip rule iif lo to <DNS> lookup <table of the target>` (prio 10500) sends the router's lookup through that line; a VPN that is down blocks them (prio 10501), so nothing leaks over WAN. DNS servers: WAN = the DNS of the WAN settings; a VPN = the DNS of the provider entered in the table (not in the VPN client of the router - there the router sends the lookups of the devices past AdGuard Home), otherwise a free public one through the tunnel
+- **Every device by the VPN Director** (AdGuard Home) - every device also gets the DNS of the line the VPN Director gives it; devices not in the VPN Director use WAN. AdGuard Home gets one client per device, named like the device, e.g. "Phone (ASNM WGC1)" (devices that already have an own client in AdGuard Home are left alone, other clients are kept, a backup is made, AdGuard Home is restarted only when the VPN Director or the domain entries change)
+- **Encrypt lookups over WAN** - with Unbound the WAN names are forwarded over DNS over TLS (port 853), AdGuard Home uses `tls://` for the devices on WAN; without Unbound the normal DNS usually goes over WAN anyway - turn on DNS over TLS of the firmware (WAN > DNS Privacy Protocol) or use dnscrypt-proxy; both are recognised
+
+The table "How it runs now" shows per line the DNS server, where it comes from, whether it is protected and what it is used for. Command line: `dnsfollow on|off|sync|status`, `dnsfollow server WGC3 10.2.0.1`, `dnsdevice on|off`, `dnstls on|off`. Turning a switch off removes everything it set up.
+
+| Setup | Sites of ASN Manager | Every device | Encrypt over WAN |
+|---|---|---|---|
+| Unbound behind dnsmasq | yes | with AdGuard Home | yes (Unbound DoT) |
+| dnsmasq only / Diversion | yes | - | yes (firmware DoT) |
+| dnscrypt-proxy behind dnsmasq | yes | with AdGuard Home | yes (dnscrypt-proxy) |
+| AdGuard Home in front of dnsmasq | yes | yes | yes |
+| Pi-hole with the router as upstream | yes | - | via the router |
+| Pi-hole with an external upstream | - (dnsmasq sees no lookups) | - | Pi-hole itself |
 
 ## Back to the router
 

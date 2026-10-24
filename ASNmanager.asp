@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.9.19 -->
+<!-- ASNmanager-WebUI v3.9.20 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -16,6 +16,7 @@
 <script language="JavaScript" type="text/javascript" src="/popup.js"></script>
 <script language="JavaScript" type="text/javascript" src="/help.js"></script>
 <script language="JavaScript" type="text/javascript" src="/validator.js"></script>
+<script type="text/javascript" src="/ext/asnmanager/lang.js"></script>
 <style>
 #asnm, #asnm * { box-sizing: border-box; }
 
@@ -415,6 +416,23 @@
 .asnm-fo-m { white-space: nowrap; }
 /* keep the font sizes fixed on phones (no automatic text enlargement) */
 #asnm { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.asnm-dw-row { display: flex; gap: 18px; align-items: center; justify-content: space-between; padding: 14px 0; border-top: 1px solid var(--line2); }
+#asnm_dw_intro { margin-bottom: 8px; line-height: 1.55; }
+.asnm-dw-txt { flex: 1 1 auto; min-width: 0; }
+.asnm-dw-txt .asnm-label { display: block; margin-bottom: 3px; }
+.asnm-dw-row .asnm-seg { flex: none; }
+@media (max-width: 560px) { .asnm-dw-row { flex-direction: column; align-items: flex-start; gap: 8px; } }
+#asnm_dw_now { margin-top: 6px; }
+#asnm_dw_now h4 { margin: 14px 0 6px; font-size: 13px; color: var(--text); }
+#asnm_dw_now .asnm-dw-src { display: block; color: var(--muted); font-size: 11px; }
+#asnm_dw_now .asnm-dw-edit { display: inline-block; margin-top: 3px; font-size: 11px; color: var(--accent2); }
+.asnm-dw-ed { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#asnm .asnm-dw-ed input[type="text"] { width: 150px; }
+#asnm_dw_now .asnm-dw-ok { color: var(--ok); } #asnm_dw_now .asnm-dw-no { color: var(--warn); }
+.asnm-dw-more { margin-top: 12px; font-size: 12px; color: var(--text2); }
+.asnm-dw-more summary { cursor: pointer; color: var(--accent2); }
+.asnm-dw-more ul { margin: 8px 0 0 18px; padding: 0; line-height: 1.55; }
+.asnm-dw-more li { margin-bottom: 4px; }
 .asnm-oe-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
 @media (max-width: 520px) { .asnm-oe-grid { grid-template-columns: 1fr; } }
 #asnm .asnm-oe-ta { width: 100%; margin: 4px 0 8px; padding: 8px 11px; background: var(--input); color: var(--text); border: 1px solid var(--input-line); border-radius: 8px;
@@ -475,7 +493,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.9.19';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.9.20';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -524,7 +542,7 @@ var ASNM_I18N = {
     sgd_none_show: 'Show the largest', sgd_none_hide: 'Hide', sgd_none_ip: 'Address', sgd_none_net: 'Network', sgd_none_dev: 'Used most by',
     sgd_none_tip: 'A device with a lot of traffic here probably asks its own DNS server (e.g. 8.8.8.8 on many TV sticks, "Private DNS" on Android, "secure DNS" in Chrome / Firefox). Traffic counted before the suggestions by domain were turned on has no names either - it leaves this list over time.',
     sgd_ext: 'The lookup log of another add-on (e.g. Diversion) is read, dnsmasq is left as it is.',
-    sgd_note: 'Names from the lookups dnsmasq answered, evaluated every minute. Suggested is the main domain (zdf.de) - it covers every subdomain; the names below it were looked up. Large networks (CDNs) serve many names from one address: the latest lookup counts. Domains and ASNs already in the list are hidden. "Add" puts the domain on the list - then apply the rules.',
+    sgd_note: 'Names from the lookups dnsmasq answered (and from the query log of AdGuard Home, written in batches), evaluated every minute. Suggested is the main domain (zdf.de) - it covers every subdomain; the names below it were looked up. Large networks (CDNs) serve many names from one address: the latest lookup counts. Domains and ASNs already in the list are hidden. "Add" puts the domain on the list - then apply the rules.',
     sg_note: 'Estimate from the connection table of the router, evaluated every minute (very short connections can be missed). Destination addresses are looked up via ip-api.com (at most 10 per minute). ASNs that are already in the list are hidden. "Add" puts the ASN on the list - then apply the rules.',
     sec_tbl: 'Traffic per ASN / target', sec_cnt: '{n} entry(ies)', sg_f_show: 'Show', sg_f_dev: 'Device', sg_f_q: 'Search ASN or name',
     sg_f_count: '{x} of {y} ASN(s)', sgd_f_count: '{x} of {y} domain(s)', sgd_nomatch: 'No domain matches the filter.', sg_f_total: ' - {n} found in total, the 100 largest are listed', sg_n_dev: '{n} devices', sg_nomatch: 'No ASN matches the filter.',
@@ -538,7 +556,7 @@ var ASNM_I18N = {
     job_busy: 'Another job is still running ({a}). The page shows it until it is finished - then please repeat your action.',
     job_running: 'A job started earlier is still running ({a}) - the page shows it until it is finished.',
     act_apply: 'Apply rules', act_reload: 'Reload all subnets', act_retry: 'Retry failed ASNs', act_update: 'Update', act_import: 'Restore', act_add: 'Add entries', act_preset: 'Add preset',
-    act_remove: 'Remove', act_clear: 'Clear list', act_edit: 'Edit', act_schedule: 'Schedule', act_failover: 'Failover', act_statssave: 'USB saving', act_pimport: 'Add own presets', act_pedit: 'Own preset', oe_open: 'Edit own presets', oe_new: '+ New preset', oe_del: 'Delete', oe_name: 'Name', oe_items: 'ASNs and domains', oe_items_help: 'One per line (or separated by spaces). A domain covers all its subdomains; ASNs as 13335 or AS13335.', oe_file: 'Save in', oe_wide: 'whole cloud / CDN network (⚠)', oe_save: 'Save', oe_usb: 'USB device {n}', oe_jffs: 'Router (/jffs)', oe_count: '{n} entries', oe_count1: '1 entry', oe_need_name: 'Please enter a name.', oe_need_items: 'Please enter at least one ASN or domain.', oe_bad: 'These are neither an ASN nor a domain and are left out:\n{l}\n\nSave anyway?', oe_c_del: 'Delete the own preset "{n}" ({f})?', own_title: 'Own presets', own_sub: 'Download as a .txt file to share, or add a presets file from someone else.', own_dl: 'Download presets', own_add: 'Add presets', own_replace: 'replace instead of adding', own_count: '{n} own preset(s) (★).', own_none: 'No own presets yet.', own_bad_file: 'The file holds no preset lines (category|Name|ASNs and domains|).', own_c_add: 'Add {n} preset(s)? Lines with the same category and name replace the earlier ones. {b} line(s) are skipped (wrong form).', own_c_replace: 'Replace your own presets on the router with {n} preset(s)? {b} line(s) are skipped (wrong form). A presets.txt on a USB device stays as it is.', own_help: 'The file holds one preset per line: category|Name|ASNs and domains| (wide at the end for a whole cloud / CDN network), e.g. stream|My service|example.com cdn.example.net|. Categories: stream, tvde, news, gaming, social, work, shop, bank, services, smarthome, updates, cloud, test. Added presets are kept in /jffs/addons/asnmanager/presets.txt; the download holds all own presets, also those from a USB device.', preset_cat: 'Category', preset_on: 'already on the list -> {t}', preset_have: '{n} of {m} already on the list (highlighted) - adding them again moves them to the chosen target', preset_own_s: 'own', preset_own: 'Your own preset (presets.txt on the router / USB device)', pcat_stream: 'Streaming', pcat_tvde: 'TV & media libraries (DE / AT / CH)', pcat_news: 'News', pcat_bank: 'Banks (DE)', pcat_services: 'Services (DE)', pcat_smarthome: 'Smart home & IoT', pcat_updates: 'Updates & downloads', pcat_gaming: 'Gaming', pcat_social: 'Social & messaging', pcat_work: 'Tools & work', pcat_shop: 'Shopping & payment', pcat_cloud: 'Cloud & CDN (whole networks)', pcat_test: 'Tests & IP check', preset_legend: 'A preset adds ASNs and / or domains (a domain covers every subdomain). ⚠ = cloud, CDN or hosting: a large share of the internet runs through these networks, routing them moves far more than this one service.', preset_wide: '"{n}": a large share of the internet runs through these networks (cloud / CDN / hosting).\nRouting them moves the traffic of many other services and websites as well - not only this one.\n\nAdd anyway?', tool_done: '{a}: done - see the result below', tool_failed: '{a}: failed - see the output below', act_test: 'Test route', act_trace: 'Traceroute', act_ifaces: 'Public IPs', act_status: 'ipset status', act_lookup: 'Look-up', act_sghide: 'Hide suggestion', sg_hide: 'Hide this suggestion', sg_unhide: 'Show this suggestion again', sg_showhid: 'Show hidden ({n})',
+    act_remove: 'Remove', act_clear: 'Clear list', act_edit: 'Edit', act_schedule: 'Schedule', act_failover: 'Failover', act_statssave: 'USB saving', act_pimport: 'Add own presets', dw_set_vpn: 'Enter the DNS of the VPN provider', dw_ip2: 'second (optional)', dw_auto: 'Automatic', dw_bad_ip: '"{v}" is not an IPv4 address.', dw_need_ip: 'Please enter at least one address.', dw_vpn_why: 'Enter the DNS of your VPN provider for {t} here (the line DNS = ... of its WireGuard file) - not in the VPN client of the router: there the router sends the lookups of the devices straight to the provider, past AdGuard Home and its filters. Here they go through AdGuard Home first and then through the tunnel.', act_dnsfsrv: 'DNS of the VPN line', dw_title: 'DNS fitting the line', dw_sub: 'A lookup takes the same line as the traffic after it', dw_intro: 'Normally the router looks up every name one way (here: {b}). A site that ASN Manager sends over WAN would then still be looked up through a VPN - location, CDN servers and leak tests do not fit together. These three switches fix that.', dw_base_unknown: 'your normal DNS', dw_f_title: 'Sites of ASN Manager', dw_f_desc: 'Domains and ASNs on your list are looked up through their target - a site on WAN asks a DNS server over WAN, a site on WGC3 one through WGC3.', dw_d_title: 'Every device by the VPN Director', dw_d_desc: 'All other sites: each device looks them up through the line the VPN Director gives it. Needs AdGuard Home (restarted when the VPN Director or your domains change).', dw_t_title: 'Encrypt lookups over WAN', dw_t_desc: 'What is looked up over WAN goes out as DNS over TLS - your provider no longer sees the names. Lookups through a VPN are protected by the tunnel anyway.', dw_now: 'How it runs now', dw_th_line: 'Line', dw_th_dns: 'DNS server', dw_th_prot: 'Protected', dw_th_for: 'Used for', dw_normal: 'normal DNS', dw_unbound: 'Unbound (resolves itself)', dw_router_dns: 'DNS of the router', dw_for_rest: 'everything else', dw_devs: '{n} device(s)', dw_other_devs: 'devices not in the VPN Director', dw_doms: '{n} domains', dw_names: '{n} learned names', dw_src_router_wan: 'from the WAN settings of the router', dw_src_router: 'from the VPN client of the router (bypasses AdGuard Home - better enter it here)', dw_src_auto: 'chosen automatically (public DNS through the tunnel)', dw_src_auto_wan: 'chosen automatically (no WAN DNS set)', dw_src_own: 'DNS of the VPN provider (entered here)', dw_src_own_wan: 'own setting (dns_follow.conf)', dw_p_tunnel: 'VPN tunnel', dw_p_on: 'encrypted (TLS)', dw_p_fw: 'encrypted (firmware TLS)', dw_p_dc: 'encrypted (dnscrypt-proxy)', dw_p_dcfw: 'encrypted (dnscrypt-proxy; firmware DoT is on too - one is enough)', dw_p_off: 'not encrypted', dw_p_ub: 'not encrypted (Unbound asks the name servers)', dw_ub_hint: 'Unbound resolves over WAN and asks the name servers itself - that is always unencrypted. Two ways: send Unbound through a VPN (outgoing-interface: 192.168.1.1 in unbound.conf plus the router 192.168.1.1 in the VPN Director, or the VPN option of unbound_manager) - then the tunnel protects it; or turn on DNS over TLS forwarding in Unbound (e.g. to Quad9) - then everything is encrypted, but Unbound no longer resolves by itself.', dw_p_plain: 'not encrypted - turn on WAN > DNS Privacy Protocol', dw_p_agh: 'devices only', dw_p_noubc: 'devices only (Unbound does not answer)', dw_p_nofw: 'devices only', dw_p_unknown: 'not encrypted (server without TLS)', dw_more: 'How does it work?', dw_more_1: 'For every DNS server of a line ASN Manager sets a routing rule, so the lookup of the router really goes through that line. If a VPN is down, its lookups are blocked instead of going over WAN.', dw_more_2: 'DNS servers: for WAN the ones set in the router under WAN; for a VPN the DNS of the provider you enter here, otherwise a free public one through the tunnel. Do not enter the DNS in the VPN client of the router - the router would then send the lookups past AdGuard Home. One server can belong to one line only.', dw_more_3: 'Sites of ASN Manager: domain entries for all devices and the names seen for your ASN entries (needs suggestions by domain). Entries for single devices are left out - DNS is the same for all devices.', dw_more_4: 'Every device: AdGuard Home gets one client per device of the VPN Director, named "<device> (ASNM <line>)". Your filters stay, other clients are not touched, a backup is made before every change.', dw_more_5: 'Encryption: with Unbound it forwards the WAN names over TLS (port 853); without Unbound the normal DNS usually goes over WAN anyway - turn on DNS over TLS in the router (WAN > DNS Privacy Protocol) or use dnscrypt-proxy (DoH / DNSCrypt) behind dnsmasq.', dw_more_6: 'Turning a switch off removes everything it set up again.', dnst_title: 'Encrypted DNS for WAN', dnst_desc: 'The lookups that go over WAN are sent encrypted (DNS over TLS, port 853) - your provider no longer sees which names you look up. With Unbound it does this for the names, AdGuard Home for the devices on WAN. Without Unbound the normal DNS usually goes over WAN anyway - then the firmware encrypts it (WAN > DNS Privacy Protocol > DNS-over-TLS). Lookups through a VPN are encrypted by the tunnel anyway.', dnst_on: '{t}: encrypted (DNS over TLS)', dnst_agh: '{t}: encrypted for devices only (no Unbound for the names)', dnst_noubc: '{t}: encrypted for devices only - unbound-control does not answer (see dnsfollow status)', dnst_nofw: '{t}: encrypted for devices only - for the names the DNS over TLS of the firmware cannot be used here', dnst_b_tunnel: 'Normal DNS ({b}): encrypted by the VPN tunnel', dnst_b_fw: 'Normal DNS ({b}): encrypted by the firmware (DNS over TLS)', dnst_b_ub: 'Normal DNS ({b}): Unbound asks the name servers itself - not encrypted', dnst_b_plain: 'Normal DNS ({b}): NOT encrypted - turn on WAN > Internet Connection > DNS Privacy Protocol > DNS-over-TLS', dnst_unknown: '{t}: not encrypted - no TLS name known for its DNS server (set a known one, e.g. 9.9.9.11)', dnsd_title: 'DNS per device (AdGuard Home)', dnsd_desc: 'Every device also gets the DNS of the target the VPN Director sends it to (devices not in the VPN Director: WAN). AdGuard Home gets a client "ASNM <target>" per target; local names and the domains of ASN Manager still go to dnsmasq, filters stay as they are. AdGuard Home is restarted when the VPN Director or the domain entries change.', dnsd_row: 'Devices on {t} (VPN Director, {n}): DNS {s}', dnsd_rest: 'Other devices ({l}): WAN, DNS {s}', dnsd_normal: 'as before (normal DNS)', dnsd_confirm: 'Turn on "DNS per device"? ASN Manager writes clients "... (ASNM ...)" into the AdGuard Home configuration (a backup is kept) and restarts AdGuard Home - DNS stops for a few seconds. "DNS follows the route" is turned on as well.', dnsd_confirm_off: 'Turn off "DNS per device"? The "... (ASNM ...)" clients are removed from AdGuard Home and AdGuard Home is restarted.', dnsf_title: 'DNS follows the route', dnsf_sub: 'Look up a name through the same way it is routed', dnsf_desc: 'Names routed to another target than your normal DNS are also looked up through that target - e.g. a site on WAN asks a DNS server over WAN, so IP address and DNS fit together. Covers domain entries (for all devices) and the names learned for ASN entries (needs "suggestions by domain"). Your normal DNS stays as it is.', dnsf_off: 'Off', dnsf_on: 'On', dnsf_base: 'Normal DNS: {m} via {b} (unchanged)', dnsf_row: '{t}: DNS {s} - {d} domain entries, {l} learned names', dnsf_none: 'No names to another target yet.', dnsf_confirm: 'Turn on "DNS follows the route"? dnsmasq is restarted once. Turning it off removes everything again.', act_pedit: 'Own preset', oe_open: 'Edit own presets', oe_new: '+ New preset', oe_del: 'Delete', oe_name: 'Name', oe_items: 'ASNs and domains', oe_items_help: 'One per line (or separated by spaces). A domain covers all its subdomains; ASNs as 13335 or AS13335.', oe_file: 'Save in', oe_wide: 'whole cloud / CDN network (⚠)', oe_save: 'Save', oe_usb: 'USB device {n}', oe_jffs: 'Router (/jffs)', oe_count: '{n} entries', oe_count1: '1 entry', oe_need_name: 'Please enter a name.', oe_need_items: 'Please enter at least one ASN or domain.', oe_bad: 'These are neither an ASN nor a domain and are left out:\n{l}\n\nSave anyway?', oe_c_del: 'Delete the own preset "{n}" ({f})?', own_title: 'Own presets', own_sub: 'Download as a .txt file to share, or add a presets file from someone else.', own_dl: 'Download presets', own_add: 'Add presets', own_replace: 'replace instead of adding', own_count: '{n} own preset(s) (★).', own_none: 'No own presets yet.', own_bad_file: 'The file holds no preset lines (category|Name|ASNs and domains|).', own_c_add: 'Add {n} preset(s)? Lines with the same category and name replace the earlier ones. {b} line(s) are skipped (wrong form).', own_c_replace: 'Replace your own presets on the router with {n} preset(s)? {b} line(s) are skipped (wrong form). A presets.txt on a USB device stays as it is.', own_help: 'The file holds one preset per line: category|Name|ASNs and domains| (wide at the end for a whole cloud / CDN network), e.g. stream|My service|example.com cdn.example.net|. Categories: stream, tvde, news, gaming, social, work, shop, bank, services, smarthome, updates, cloud, test. Added presets are kept in /jffs/addons/asnmanager/presets.txt; the download holds all own presets, also those from a USB device.', preset_cat: 'Category', preset_on: 'already on the list -> {t}', preset_have: '{n} of {m} already on the list (highlighted) - adding them again moves them to the chosen target', preset_own_s: 'own', preset_own: 'Your own preset (presets.txt on the router / USB device)', pcat_stream: 'Streaming', pcat_tvde: 'TV & media libraries (DE / AT / CH)', pcat_news: 'News', pcat_bank: 'Banks (DE)', pcat_services: 'Services (DE)', pcat_smarthome: 'Smart home & IoT', pcat_updates: 'Updates & downloads', pcat_gaming: 'Gaming', pcat_social: 'Social & messaging', pcat_work: 'Tools & work', pcat_shop: 'Shopping & payment', pcat_cloud: 'Cloud & CDN (whole networks)', pcat_test: 'Tests & IP check', preset_legend: 'A preset adds ASNs and / or domains (a domain covers every subdomain). ⚠ = cloud, CDN or hosting: a large share of the internet runs through these networks, routing them moves far more than this one service.', preset_wide: '"{n}": a large share of the internet runs through these networks (cloud / CDN / hosting).\nRouting them moves the traffic of many other services and websites as well - not only this one.\n\nAdd anyway?', tool_done: '{a}: done - see the result below', tool_failed: '{a}: failed - see the output below', act_test: 'Test route', act_trace: 'Traceroute', act_ifaces: 'Public IPs', act_status: 'ipset status', act_lookup: 'Look-up', act_sghide: 'Hide suggestion', sg_hide: 'Hide this suggestion', sg_unhide: 'Show this suggestion again', sg_showhid: 'Show hidden ({n})',
     tab_asns: 'ASNs', tab_traffic: 'Traffic', tab_targets: 'Targets & failover', tab_diag: 'Diagnostics', tab_settings: 'Settings',
     sub_manual: 'Enter ASNs', sub_lookup: 'Find by domain / IP', sub_presets: 'Service presets', rc_to_list: 'Show ASN list',
     sp_th: 'Speed test', sp_btn: 'Test', sp_running: 'Speed test running - about 30 seconds...',
@@ -675,7 +693,7 @@ var ASNM_I18N = {
     sgd_none_show: 'Die größten anzeigen', sgd_none_hide: 'Ausblenden', sgd_none_ip: 'Adresse', sgd_none_net: 'Netz', sgd_none_dev: 'Am meisten genutzt von',
     sgd_none_tip: 'Ein Gerät mit viel Traffic hier fragt wahrscheinlich einen eigenen DNS-Server (z. B. 8.8.8.8 bei vielen TV-Sticks, "Privates DNS" bei Android, "Sicheres DNS" in Chrome / Firefox). Traffic, der gezählt wurde, bevor die Vorschläge nach Domain eingeschaltet waren, hat ebenfalls keine Namen - er verschwindet mit der Zeit aus dieser Liste.',
     sgd_ext: 'Gelesen wird das Abfrage-Protokoll eines anderen Add-ons (z. B. Diversion), dnsmasq bleibt unverändert.',
-    sgd_note: 'Namen aus den Anfragen, die dnsmasq beantwortet hat, jede Minute ausgewertet. Vorgeschlagen wird die Hauptdomain (zdf.de) - sie deckt alle Unterdomains ab; darunter die abgefragten Namen. Große Netze (CDNs) liefern viele Namen von einer Adresse: es zählt die letzte Abfrage. Domains und ASNs, die schon in der Liste stehen, sind ausgeblendet. "Hinzufügen" setzt die Domain auf die Liste - danach die Regeln anwenden.',
+    sgd_note: 'Namen aus den Anfragen, die dnsmasq beantwortet hat (und aus dem Abfrageprotokoll von AdGuard Home, das in Schüben geschrieben wird), jede Minute ausgewertet. Vorgeschlagen wird die Hauptdomain (zdf.de) - sie deckt alle Unterdomains ab; darunter die abgefragten Namen. Große Netze (CDNs) liefern viele Namen von einer Adresse: es zählt die letzte Abfrage. Domains und ASNs, die schon in der Liste stehen, sind ausgeblendet. "Hinzufügen" setzt die Domain auf die Liste - danach die Regeln anwenden.',
     sg_note: 'Schätzung aus der Verbindungstabelle des Routers, jede Minute ausgewertet (sehr kurze Verbindungen können fehlen). Die Ziel-Adressen werden über ip-api.com zugeordnet (höchstens 10 pro Minute). ASNs, die schon in der Liste stehen, sind ausgeblendet. "Hinzufügen" setzt das ASN auf die Liste - danach die Regeln anwenden.',
     sec_tbl: 'Traffic nach ASN / Ziel', sec_cnt: '{n} Einträge', sg_f_show: 'Anzeigen', sg_f_dev: 'Gerät', sg_f_q: 'ASN oder Name suchen',
     sg_f_count: '{x} von {y} ASN(s)', sgd_f_count: '{x} von {y} Domain(s)', sgd_nomatch: 'Keine Domain passt zum Filter.', sg_f_total: ' - insgesamt {n} gefunden, die 100 größten sind aufgeführt', sg_n_dev: '{n} Geräte', sg_nomatch: 'Kein ASN passt zum Filter.',
@@ -689,7 +707,7 @@ var ASNM_I18N = {
     job_busy: 'Es läuft noch ein anderer Auftrag ({a}). Die Seite zeigt ihn an, bis er fertig ist - danach bitte deine Aktion wiederholen.',
     job_running: 'Ein vorher gestarteter Auftrag läuft noch ({a}) - die Seite zeigt ihn an, bis er fertig ist.',
     act_apply: 'Regeln anwenden', act_reload: 'Alle Subnetze neu laden', act_retry: 'Fehlgeschlagene wiederholen', act_update: 'Update', act_import: 'Wiederherstellen', act_add: 'Einträge hinzufügen', act_preset: 'Vorlage hinzufügen',
-    act_remove: 'Entfernen', act_clear: 'Liste leeren', act_edit: 'Bearbeiten', act_schedule: 'Zeitplan', act_failover: 'Failover', act_statssave: 'USB-Sicherung', act_pimport: 'Eigene Vorlagen hinzufügen', act_pedit: 'Eigene Vorlage', oe_open: 'Eigene Vorlagen bearbeiten', oe_new: '+ Neue Vorlage', oe_del: 'Löschen', oe_name: 'Name', oe_items: 'ASNs und Domains', oe_items_help: 'Einer pro Zeile (oder mit Leerzeichen getrennt). Eine Domain gilt für alle Unterdomains; ASNs als 13335 oder AS13335.', oe_file: 'Speichern in', oe_wide: 'ganzes Cloud- / CDN-Netz (⚠)', oe_save: 'Speichern', oe_usb: 'USB-Stick {n}', oe_jffs: 'Router (/jffs)', oe_count: '{n} Einträge', oe_count1: '1 Eintrag', oe_need_name: 'Bitte einen Namen eingeben.', oe_need_items: 'Bitte mindestens eine ASN oder Domain eingeben.', oe_bad: 'Das sind weder ASNs noch Domains und werden weggelassen:\n{l}\n\nTrotzdem speichern?', oe_c_del: 'Eigene Vorlage "{n}" ({f}) löschen?', own_title: 'Eigene Vorlagen', own_sub: 'Als .txt-Datei zum Teilen herunterladen oder eine Vorlagen-Datei von jemand anderem hinzufügen.', own_dl: 'Vorlagen herunterladen', own_add: 'Vorlagen hinzufügen', own_replace: 'ersetzen statt ergänzen', own_count: '{n} eigene Vorlage(n) (★).', own_none: 'Noch keine eigenen Vorlagen.', own_bad_file: 'Die Datei enthält keine Vorlagen-Zeilen (kategorie|Name|ASNs und Domains|).', own_c_add: '{n} Vorlage(n) hinzufügen? Zeilen mit gleicher Kategorie und gleichem Namen ersetzen die bisherigen. {b} Zeile(n) werden übersprungen (falsches Format).', own_c_replace: 'Deine eigenen Vorlagen auf dem Router durch {n} Vorlage(n) ersetzen? {b} Zeile(n) werden übersprungen (falsches Format). Eine presets.txt auf einem USB-Stick bleibt unverändert.', own_help: 'Die Datei enthält eine Vorlage pro Zeile: kategorie|Name|ASNs und Domains| (wide am Ende für ein ganzes Cloud- / CDN-Netz), z. B. stream|Mein Dienst|example.com cdn.example.net|. Kategorien: stream, tvde, news, gaming, social, work, shop, bank, services, smarthome, updates, cloud, test. Hinzugefügte Vorlagen liegen in /jffs/addons/asnmanager/presets.txt; der Download enthält alle eigenen Vorlagen, auch die vom USB-Stick.', preset_cat: 'Kategorie', preset_on: 'schon in der Liste -> {t}', preset_have: '{n} von {m} schon in der Liste (markiert) - erneutes Hinzufügen setzt sie auf das gewählte Ziel', preset_own_s: 'eigene', preset_own: 'Deine eigene Vorlage (presets.txt auf dem Router / USB-Stick)', pcat_stream: 'Streaming', pcat_tvde: 'TV & Mediatheken (DE / AT / CH)', pcat_news: 'Nachrichten', pcat_bank: 'Banken (DE)', pcat_services: 'Dienste & Behörden (DE)', pcat_smarthome: 'Smart Home & IoT', pcat_updates: 'Updates & Downloads', pcat_gaming: 'Gaming', pcat_social: 'Social & Messenger', pcat_work: 'Tools & Arbeit', pcat_shop: 'Shopping & Bezahlen', pcat_cloud: 'Cloud & CDN (ganze Netze)', pcat_test: 'Tests & IP-Check', preset_legend: 'Eine Vorlage fügt ASNs und / oder Domains hinzu (eine Domain gilt für alle Unterdomains). ⚠ = Cloud, CDN oder Hosting: über diese Netze läuft ein großer Teil des Internets, wer sie umleitet, leitet weit mehr als diesen einen Dienst um.', preset_wide: '"{n}": Über diese Netze läuft ein großer Teil des Internets (Cloud / CDN / Hosting).\nWer sie umleitet, leitet auch den Verkehr vieler anderer Dienste und Webseiten mit um - nicht nur diesen einen.\n\nTrotzdem hinzufügen?', tool_done: '{a}: fertig - Ergebnis siehe unten', tool_failed: '{a}: fehlgeschlagen - siehe Ausgabe unten', act_test: 'Route testen', act_trace: 'Traceroute', act_ifaces: 'Öffentliche IPs', act_status: 'ipset-Status', act_lookup: 'Suche', act_sghide: 'Vorschlag ausblenden', sg_hide: 'Diesen Vorschlag ausblenden', sg_unhide: 'Wieder einblenden', sg_showhid: 'Ausgeblendete zeigen ({n})',
+    act_remove: 'Entfernen', act_clear: 'Liste leeren', act_edit: 'Bearbeiten', act_schedule: 'Zeitplan', act_failover: 'Failover', act_statssave: 'USB-Sicherung', act_pimport: 'Eigene Vorlagen hinzufügen', dw_set_vpn: 'DNS des VPN-Anbieters eintragen', dw_ip2: 'zweiter (optional)', dw_auto: 'Automatisch', dw_bad_ip: '"{v}" ist keine IPv4-Adresse.', dw_need_ip: 'Bitte mindestens eine Adresse eingeben.', dw_vpn_why: 'Trag den DNS deines VPN-Anbieters für {t} hier ein (die Zeile DNS = ... seiner WireGuard-Datei) - nicht im VPN-Client des Routers: dort eingetragen schickt der Router die Abfragen der Geräte direkt zum Anbieter, an AdGuard Home und seinen Filtern vorbei. Hier laufen sie erst durch AdGuard Home und dann durch den Tunnel.', act_dnsfsrv: 'DNS der VPN-Leitung', dw_title: 'DNS passend zur Leitung', dw_sub: 'Jede Abfrage nimmt dieselbe Leitung wie der Verkehr danach', dw_intro: 'Normalerweise fragt der Router alle Namen über einen Weg ab (hier: {b}). Eine Seite, die ASN Manager über WAN schickt, würde dann trotzdem über ein VPN aufgelöst - Standort, CDN-Server und Leak-Tests passen nicht zusammen. Diese drei Schalter bringen das in Ordnung.', dw_base_unknown: 'dein normales DNS', dw_f_title: 'Seiten aus ASN Manager', dw_f_desc: 'Domains und ASNs aus deiner Liste werden über ihr Ziel aufgelöst - eine Seite auf WAN fragt einen DNS-Server über WAN, eine Seite auf WGC3 einen durch WGC3.', dw_d_title: 'Jedes Gerät nach VPN Director', dw_d_desc: 'Alle übrigen Seiten löst jedes Gerät über die Leitung auf, die der VPN Director ihm gibt. Braucht AdGuard Home (wird neu gestartet, wenn sich VPN Director oder Domains ändern).', dw_t_title: 'Abfragen über WAN verschlüsseln', dw_t_desc: 'Was über WAN abgefragt wird, geht per DNS over TLS raus - dein Provider sieht die Namen nicht mehr. Abfragen durch ein VPN schützt ohnehin der Tunnel.', dw_now: 'So läuft es gerade', dw_th_line: 'Leitung', dw_th_dns: 'DNS-Server', dw_th_prot: 'Geschützt', dw_th_for: 'Wofür', dw_normal: 'normales DNS', dw_unbound: 'Unbound (löst selbst auf)', dw_router_dns: 'DNS des Routers', dw_for_rest: 'alles andere', dw_devs: '{n} Gerät(e)', dw_other_devs: 'Geräte ohne VPN-Director-Eintrag', dw_doms: '{n} Domains', dw_names: '{n} gelernte Namen', dw_src_router_wan: 'aus den WAN-Einstellungen des Routers', dw_src_router: 'aus dem VPN-Client des Routers (umgeht AdGuard Home - besser hier eintragen)', dw_src_auto: 'automatisch gewählt (öffentlicher DNS durch den Tunnel)', dw_src_auto_wan: 'automatisch gewählt (kein WAN-DNS eingetragen)', dw_src_own: 'DNS des VPN-Anbieters (hier eingetragen)', dw_src_own_wan: 'eigene Angabe (dns_follow.conf)', dw_p_tunnel: 'VPN-Tunnel', dw_p_on: 'verschlüsselt (TLS)', dw_p_fw: 'verschlüsselt (Firmware-TLS)', dw_p_dc: 'verschlüsselt (dnscrypt-proxy)', dw_p_dcfw: 'verschlüsselt (dnscrypt-proxy; Firmware-DoT ist auch an - eins reicht)', dw_p_off: 'nicht verschlüsselt', dw_p_ub: 'nicht verschlüsselt (Unbound fragt die Nameserver)', dw_ub_hint: 'Unbound löst über WAN auf und fragt die Nameserver selbst - das ist immer unverschlüsselt. Zwei Wege: Unbound durch ein VPN schicken (outgoing-interface: 192.168.1.1 in unbound.conf plus den Router 192.168.1.1 im VPN Director, oder die VPN-Option von unbound_manager) - dann schützt der Tunnel; oder in Unbound die Weiterleitung per DNS over TLS einschalten (z. B. zu Quad9) - dann ist alles verschlüsselt, aber Unbound löst nicht mehr selbst auf.', dw_p_plain: 'nicht verschlüsselt - WAN > DNS Privacy Protocol einschalten', dw_p_agh: 'nur Geräte', dw_p_noubc: 'nur Geräte (Unbound antwortet nicht)', dw_p_nofw: 'nur Geräte', dw_p_unknown: 'nicht verschlüsselt (Server ohne TLS)', dw_more: 'Wie funktioniert das?', dw_more_1: 'Für jeden DNS-Server einer Leitung legt ASN Manager eine Routing-Regel an, damit die Abfrage des Routers wirklich durch diese Leitung geht. Fällt ein VPN aus, werden seine Abfragen blockiert, statt über WAN zu laufen.', dw_more_2: 'DNS-Server: bei WAN die im Router unter WAN eingetragenen; bei einem VPN der DNS des Anbieters, den du hier einträgst, sonst ein freier öffentlicher durch den Tunnel. Den DNS nicht im VPN-Client des Routers eintragen - der Router schickt die Abfragen dann an AdGuard Home vorbei. Ein Server gehört immer nur zu einer Leitung.', dw_more_3: 'Seiten aus ASN Manager: Domain-Einträge für alle Geräte und die Namen, die zu deinen ASN-Einträgen gesehen wurden (braucht Vorschläge nach Domain). Einträge nur für einzelne Geräte bleiben außen vor - DNS ist für alle Geräte gleich.', dw_more_4: 'Jedes Gerät: AdGuard Home bekommt für jedes Gerät aus dem VPN Director einen Client "<Gerät> (ASNM <Leitung>)". Deine Filter bleiben, andere Clients werden nicht angefasst, vor jeder Änderung gibt es eine Sicherung.', dw_more_5: 'Verschlüsselung: Mit Unbound leitet dieser die WAN-Namen per TLS weiter (Port 853); ohne Unbound läuft das normale DNS meist ohnehin über WAN - dann DNS over TLS im Router einschalten (WAN > DNS Privacy Protocol) oder dnscrypt-proxy (DoH / DNSCrypt) hinter dnsmasq nutzen.', dw_more_6: 'Ein Schalter auf Aus entfernt wieder alles, was er eingerichtet hat.', dnst_title: 'WAN-DNS verschlüsseln', dnst_desc: 'Abfragen, die über WAN gehen, werden verschlüsselt gesendet (DNS over TLS, Port 853) - dein Provider sieht nicht mehr, welche Namen du abfragst. Für die Namen erledigt das Unbound, für die Geräte auf WAN AdGuard Home. Ohne Unbound läuft das normale DNS meist ohnehin über WAN - dann verschlüsselt es die Firmware (WAN > DNS Privacy Protocol > DNS-over-TLS). Abfragen durch ein VPN verschlüsselt ohnehin der Tunnel.', dnst_on: '{t}: verschlüsselt (DNS over TLS)', dnst_agh: '{t}: nur für Geräte verschlüsselt (kein Unbound für die Namen)', dnst_noubc: '{t}: nur für Geräte verschlüsselt - unbound-control antwortet nicht (siehe dnsfollow status)', dnst_nofw: '{t}: nur für Geräte verschlüsselt - für die Namen lässt sich das DNS over TLS der Firmware hier nicht nutzen', dnst_b_tunnel: 'Normales DNS ({b}): durch den VPN-Tunnel verschlüsselt', dnst_b_fw: 'Normales DNS ({b}): durch die Firmware verschlüsselt (DNS over TLS)', dnst_b_ub: 'Normales DNS ({b}): Unbound fragt die Nameserver selbst - nicht verschlüsselt', dnst_b_plain: 'Normales DNS ({b}): NICHT verschlüsselt - WAN > Internetverbindung > DNS Privacy Protocol > DNS-over-TLS einschalten', dnst_unknown: '{t}: nicht verschlüsselt - für diesen DNS-Server ist kein TLS-Name bekannt (einen bekannten eintragen, z. B. 9.9.9.11)', dnsd_title: 'DNS pro Gerät (AdGuard Home)', dnsd_desc: 'Jedes Gerät bekommt zusätzlich den DNS des Ziels, über das der VPN Director es schickt (Geräte, die dort nicht stehen: WAN). AdGuard Home bekommt dafür pro Ziel einen Client "ASNM <Ziel>"; lokale Namen und die Domains von ASN Manager gehen weiter an dnsmasq, Filter bleiben wie sie sind. AdGuard Home wird neu gestartet, wenn sich der VPN Director oder die Domain-Einträge ändern.', dnsd_row: 'Geräte auf {t} (VPN Director, {n}): DNS {s}', dnsd_rest: 'Übrige Geräte ({l}): WAN, DNS {s}', dnsd_normal: 'wie bisher (normales DNS)', dnsd_confirm: '"DNS pro Gerät" einschalten? ASN Manager schreibt Clients "... (ASNM ...)" in die AdGuard-Home-Konfiguration (mit Sicherung) und startet AdGuard Home neu - DNS ist ein paar Sekunden weg. "DNS über dasselbe Ziel" wird mit eingeschaltet.', dnsd_confirm_off: '"DNS pro Gerät" ausschalten? Die Clients "... (ASNM ...)" werden aus AdGuard Home entfernt und AdGuard Home neu gestartet.', dnsf_title: 'DNS über dasselbe Ziel', dnsf_sub: 'Namen über denselben Weg auflösen, über den sie geleitet werden', dnsf_desc: 'Namen, die über ein anderes Ziel laufen als dein normales DNS, werden auch über dieses Ziel aufgelöst - z. B. fragt eine Seite auf WAN einen DNS-Server über WAN, IP-Adresse und DNS passen dann zusammen. Gilt für Domain-Einträge (für alle Geräte) und die gelernten Namen der ASN-Einträge (braucht "Vorschläge nach Domain"). Dein normales DNS bleibt unverändert.', dnsf_off: 'Aus', dnsf_on: 'An', dnsf_base: 'Normales DNS: {m} über {b} (unverändert)', dnsf_row: '{t}: DNS {s} - {d} Domain-Einträge, {l} gelernte Namen', dnsf_none: 'Noch keine Namen mit anderem Ziel.', dnsf_confirm: '"DNS über dasselbe Ziel" einschalten? dnsmasq wird einmal neu gestartet. Ausschalten entfernt alles wieder.', act_pedit: 'Eigene Vorlage', oe_open: 'Eigene Vorlagen bearbeiten', oe_new: '+ Neue Vorlage', oe_del: 'Löschen', oe_name: 'Name', oe_items: 'ASNs und Domains', oe_items_help: 'Einer pro Zeile (oder mit Leerzeichen getrennt). Eine Domain gilt für alle Unterdomains; ASNs als 13335 oder AS13335.', oe_file: 'Speichern in', oe_wide: 'ganzes Cloud- / CDN-Netz (⚠)', oe_save: 'Speichern', oe_usb: 'USB-Stick {n}', oe_jffs: 'Router (/jffs)', oe_count: '{n} Einträge', oe_count1: '1 Eintrag', oe_need_name: 'Bitte einen Namen eingeben.', oe_need_items: 'Bitte mindestens eine ASN oder Domain eingeben.', oe_bad: 'Das sind weder ASNs noch Domains und werden weggelassen:\n{l}\n\nTrotzdem speichern?', oe_c_del: 'Eigene Vorlage "{n}" ({f}) löschen?', own_title: 'Eigene Vorlagen', own_sub: 'Als .txt-Datei zum Teilen herunterladen oder eine Vorlagen-Datei von jemand anderem hinzufügen.', own_dl: 'Vorlagen herunterladen', own_add: 'Vorlagen hinzufügen', own_replace: 'ersetzen statt ergänzen', own_count: '{n} eigene Vorlage(n) (★).', own_none: 'Noch keine eigenen Vorlagen.', own_bad_file: 'Die Datei enthält keine Vorlagen-Zeilen (kategorie|Name|ASNs und Domains|).', own_c_add: '{n} Vorlage(n) hinzufügen? Zeilen mit gleicher Kategorie und gleichem Namen ersetzen die bisherigen. {b} Zeile(n) werden übersprungen (falsches Format).', own_c_replace: 'Deine eigenen Vorlagen auf dem Router durch {n} Vorlage(n) ersetzen? {b} Zeile(n) werden übersprungen (falsches Format). Eine presets.txt auf einem USB-Stick bleibt unverändert.', own_help: 'Die Datei enthält eine Vorlage pro Zeile: kategorie|Name|ASNs und Domains| (wide am Ende für ein ganzes Cloud- / CDN-Netz), z. B. stream|Mein Dienst|example.com cdn.example.net|. Kategorien: stream, tvde, news, gaming, social, work, shop, bank, services, smarthome, updates, cloud, test. Hinzugefügte Vorlagen liegen in /jffs/addons/asnmanager/presets.txt; der Download enthält alle eigenen Vorlagen, auch die vom USB-Stick.', preset_cat: 'Kategorie', preset_on: 'schon in der Liste -> {t}', preset_have: '{n} von {m} schon in der Liste (markiert) - erneutes Hinzufügen setzt sie auf das gewählte Ziel', preset_own_s: 'eigene', preset_own: 'Deine eigene Vorlage (presets.txt auf dem Router / USB-Stick)', pcat_stream: 'Streaming', pcat_tvde: 'TV & Mediatheken (DE / AT / CH)', pcat_news: 'Nachrichten', pcat_bank: 'Banken (DE)', pcat_services: 'Dienste & Behörden (DE)', pcat_smarthome: 'Smart Home & IoT', pcat_updates: 'Updates & Downloads', pcat_gaming: 'Gaming', pcat_social: 'Social & Messenger', pcat_work: 'Tools & Arbeit', pcat_shop: 'Shopping & Bezahlen', pcat_cloud: 'Cloud & CDN (ganze Netze)', pcat_test: 'Tests & IP-Check', preset_legend: 'Eine Vorlage fügt ASNs und / oder Domains hinzu (eine Domain gilt für alle Unterdomains). ⚠ = Cloud, CDN oder Hosting: über diese Netze läuft ein großer Teil des Internets, wer sie umleitet, leitet weit mehr als diesen einen Dienst um.', preset_wide: '"{n}": Über diese Netze läuft ein großer Teil des Internets (Cloud / CDN / Hosting).\nWer sie umleitet, leitet auch den Verkehr vieler anderer Dienste und Webseiten mit um - nicht nur diesen einen.\n\nTrotzdem hinzufügen?', tool_done: '{a}: fertig - Ergebnis siehe unten', tool_failed: '{a}: fehlgeschlagen - siehe Ausgabe unten', act_test: 'Route testen', act_trace: 'Traceroute', act_ifaces: 'Öffentliche IPs', act_status: 'ipset-Status', act_lookup: 'Suche', act_sghide: 'Vorschlag ausblenden', sg_hide: 'Diesen Vorschlag ausblenden', sg_unhide: 'Wieder einblenden', sg_showhid: 'Ausgeblendete zeigen ({n})',
     tab_asns: 'ASNs', tab_traffic: 'Traffic', tab_targets: 'Ziele & Failover', tab_diag: 'Diagnose', tab_settings: 'Einstellungen',
     sub_manual: 'ASNs eingeben', sub_lookup: 'Per Domain / IP suchen', sub_presets: 'Dienst-Vorlagen', rc_to_list: 'Zur ASN-Liste',
     sp_th: 'Speedtest', sp_btn: 'Test', sp_running: 'Speedtest läuft - etwa 30 Sekunden...',
@@ -783,6 +801,13 @@ var ASNM_I18N = {
     a_host: 'Bitte eine gültige Domain oder IPv4-Adresse eingeben.', footer: 'ASN Manager für Asuswrt-Merlin'
   }
 };
+// a language pack of the router language (lang.js, written by the router for FR, IT, ES, NL, PL, BR): missing texts stay English
+var ASNM_LOCALES = { en: 'en-US', de: 'de-DE' };
+if (window.ASNM_LANGPACK && ASNM_LANGPACK.code && ASNM_LANGPACK.t && !ASNM_I18N[ASNM_LANGPACK.code]) {
+    ASNM_I18N[ASNM_LANGPACK.code] = ASNM_LANGPACK.t;
+    ASNM_LOCALES[ASNM_LANGPACK.code] = ASNM_LANGPACK.locale || 'en-US';
+}
+function asnmLocale() { return ASNM_LOCALES[ASNM_LANG] || 'en-US'; }
 var ASNM_LANG = 'en';
 
 // Router messages are English -> translate the known ones
@@ -849,7 +874,7 @@ function asnmTrMsg(msg) {
     // "WAN1: down 94.4 Mbit/s, up 16.8 Mbit/s, ping 9.4 ms" - the script always reports Mbit/s; show it in the chosen unit
     var sp = /^([A-Z0-9]+): down ([0-9.]+) Mbit\/s, up ([0-9.]+) Mbit\/s, ping ([0-9.-]+) ms$/.exec(msg);
     if (sp) {
-        var loc = ASNM_LANG === 'de' ? 'de-DE' : 'en-US', u = asnmUnitLabel(), pg = (+sp[4]).toLocaleString(loc, { maximumFractionDigits: 1 });
+        var loc = asnmLocale(), u = asnmUnitLabel(), pg = (+sp[4]).toLocaleString(loc, { maximumFractionDigits: 1 });
         var dn = asnmFmtRate(+sp[2] * 125000), up = asnmFmtRate(+sp[3] * 125000);
         return ASNM_LANG === 'de' ? sp[1] + ': Download ' + dn + ' ' + u + ', Upload ' + up + ' ' + u + ', Ping ' + pg + ' ms'
                                   : sp[1] + ': down ' + dn + ' ' + u + ', up ' + up + ' ' + u + ', ping ' + pg + ' ms';
@@ -861,11 +886,12 @@ function asnmTrMsg(msg) {
 
 function asnmApplyI18n() {
     // Router language; ?lang=de / ?lang=en in the URL overrides it for testing
-    var lang = (document.getElementById('preferred_lang').value || '').toUpperCase() === 'DE' ? 'de' : 'en';
+    var rl = (document.getElementById('preferred_lang').value || '').toLowerCase(), lang = ASNM_I18N[rl] ? rl : 'en';
     ASNM_ROUTER_LANG = lang;
     if (asnmLangMode() === 'en') lang = 'en';
     if (ASNM_FORCE_LANG) lang = ASNM_FORCE_LANG;
-    var m = /[?&]lang=(de|en)\b/i.exec(window.location.search);
+    var m = /[?&]lang=([a-z]{2})\b/i.exec(window.location.search);
+    if (m && !ASNM_I18N[m[1].toLowerCase()]) m = null;
     if (m) lang = m[1].toLowerCase();
     ASNM_LANG = lang;
     var els = document.querySelectorAll('[data-i18n]');
@@ -891,7 +917,7 @@ var ASNM = {
         WGC1: 'WireGuard Client 1', WGC2: 'WireGuard Client 2', WGC3: 'WireGuard Client 3', WGC4: 'WireGuard Client 4', WGC5: 'WireGuard Client 5'
     },
     order: ['WAN', 'WAN1', 'WAN2', 'OVPN1', 'OVPN2', 'OVPN3', 'OVPN4', 'OVPN5', 'WGC1', 'WGC2', 'WGC3', 'WGC4', 'WGC5'],
-    timeouts: { speedtest: 150000, update: 240000, apply: 1800000, reload: 1800000, retry: 1800000, trace: 90000, ifaces: 90000, lookup: 30000 },
+    timeouts: { setting: 360000, dnsfsrv: 360000, speedtest: 150000, update: 240000, apply: 1800000, reload: 1800000, retry: 1800000, trace: 90000, ifaces: 90000, lookup: 30000 },
     reIp: /^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)$/,
     reHost: /^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$/,
     reEntry: /^(\d{1,10}):(WAN|WAN1|WAN2|OVPN[1-5]|WGC[1-5]):?([0-9.,\s]*)$/,
@@ -916,7 +942,7 @@ function asnmGet(file, ok, fail) {
 
 function asnmFmtTime(ts) {
     if (!ts) return t('never');
-    var d = new Date(ts * 1000), loc = ASNM_LANG === 'de' ? 'de-DE' : undefined;
+    var d = new Date(ts * 1000), loc = asnmLocale();
     return d.toLocaleDateString(loc) + ' ' + d.toLocaleTimeString(loc);
 }
 
@@ -1298,7 +1324,7 @@ function asnmSpCell(f) {
         var when = new Date(r.ts * 1000).toLocaleTimeString();
         if (r.e && r.e !== '-') h += '<div class="asnm-sp-res asnm-rc-bad">' + asnmEsc(t('sp_err_' + r.e) === 'sp_err_' + r.e ? t('sp_err_fail') : t('sp_err_' + r.e)) + ' · ' + asnmEsc(when) + '</div>';
         else h += '<div class="asnm-sp-res">↓ <b>' + asnmFmtRate(r.d) + '</b> ↑ <b>' + asnmFmtRate(r.u) + '</b> ' + asnmUnitLabel() + '<br/>' +
-                  asnmEsc(t('sp_ping', { l: (+r.l).toLocaleString(ASNM_LANG === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 1 }) })) + ' · ' + asnmEsc(when) + '</div>';
+                  asnmEsc(t('sp_ping', { l: (+r.l).toLocaleString(asnmLocale(), { maximumFractionDigits: 1 }) })) + ' · ' + asnmEsc(when) + '</div>';
     }
     return h;
 }
@@ -2113,7 +2139,7 @@ function asnmExportDone(txt, note) {
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.parentNode.removeChild(a); }, 1000);
 }
-var ASNM_SET_OK = { STATS: /^(enabled|disabled)$/, STATS_SAVING: /^(on|off)$/, STATS_MODE: /^(asn|iface)$/, RULES_MODE: /^(combined|single)$/, WEBUI_LOCATION: /^(vpn|addons)$/, SG_DOMAINS: /^(on|off)$/ };
+var ASNM_SET_OK = { STATS: /^(enabled|disabled)$/, STATS_SAVING: /^(on|off)$/, STATS_MODE: /^(asn|iface)$/, RULES_MODE: /^(combined|single)$/, WEBUI_LOCATION: /^(vpn|addons)$/, SG_DOMAINS: /^(on|off)$/, DNS_FOLLOW: /^(on|off)$/, DNS_DEVICE: /^(on|off)$/, DNS_TLS: /^(on|off)$/ };
 
 function asnmParseBackup(txt) {
     var lines = txt.replace(/\r/g, '').split('\n'), section = null, hasSections = /^\[(ASN_LIST|CUSTOM)\]/m.test(txt);
@@ -2252,7 +2278,7 @@ function asnmImportRun() {
         for (i = 0; i < r.failover.length; i++) { var p = r.failover[i][1].split(','); jobs.push(['failover', [r.failover[i][0], p[0] || '', p[1] || '']]); }
     }
     if (chk('asnm_rs_set')) {
-        var order = ['STATS_SAVING', 'STATS_MODE', 'RULES_MODE', 'WEBUI_LOCATION', 'SG_DOMAINS', 'STATS'];
+        var order = ['STATS_SAVING', 'STATS_MODE', 'RULES_MODE', 'WEBUI_LOCATION', 'SG_DOMAINS', 'DNS_FOLLOW', 'DNS_DEVICE', 'DNS_TLS', 'STATS'];
         for (i = 0; i < order.length; i++) if (r.settings[order[i]]) jobs.push(['setting', [order[i], r.settings[order[i]]]]);
     }
     if (!jobs.length) { alert(t('rs_nosel')); return; }
@@ -2312,10 +2338,10 @@ function asnmFmtBytes(n) {
     var u = ['B', 'KB', 'MB', 'GB', 'TB'], i = 0;
     while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
     var d = i === 0 ? 0 : (n < 10 ? 2 : (n < 100 ? 1 : 0));
-    return n.toLocaleString(ASNM_LANG === 'de' ? 'de-DE' : 'en-US', { minimumFractionDigits: d, maximumFractionDigits: d }) + ' ' + u[i];
+    return n.toLocaleString(asnmLocale(), { minimumFractionDigits: d, maximumFractionDigits: d }) + ' ' + u[i];
 }
 
-function asnmFmtNum(n) { return (+n || 0).toLocaleString(ASNM_LANG === 'de' ? 'de-DE' : 'en-US'); }
+function asnmFmtNum(n) { return (+n || 0).toLocaleString(asnmLocale()); }
 
 // Enter / Space on the header, the bar and the collapse link work like a click (but not on the buttons inside the header)
 function asnmTrKey(ev) {
@@ -2399,7 +2425,7 @@ function asnmTrClientLabel(ip) {
 }
 
 function asnmFmtPct(p) {
-    var loc = ASNM_LANG === 'de' ? 'de-DE' : 'en-US';
+    var loc = asnmLocale();
     if (!(p > 0)) return '0 %';
     if (p < 0.1) return '<' + (0.1).toLocaleString(loc, { minimumFractionDigits: 1 }) + ' %';
     if (p < 10) return p.toLocaleString(loc, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' %';
@@ -2415,7 +2441,7 @@ function asnmDevCount(n) {
 function asnmUnitLabel() { return ASNM_TR.unit === 'mbyte' ? 'MB/s' : 'Mbit/s'; }
 
 function asnmFmtRate(bps) {
-    var loc = ASNM_LANG === 'de' ? 'de-DE' : 'en-US', v = ASNM_TR.unit === 'mbyte' ? bps / 1e6 : bps * 8 / 1e6;
+    var loc = asnmLocale(), v = ASNM_TR.unit === 'mbyte' ? bps / 1e6 : bps * 8 / 1e6;
     if (!(bps > 0)) return '0';
     if (v < 0.01) return '<' + (0.01).toLocaleString(loc);
     var dg = v < 1 ? 2 : (v < 100 ? 1 : 0);
@@ -2426,6 +2452,104 @@ function asnmPerfMark() {
     var rm = (ASNM.data && ASNM.data.rules) || 'combined', sm = (ASNM_TR.data && ASNM_TR.data.mode) || 'asn';
     var m = { asnm_rm_combined: rm !== 'single', asnm_rm_single: rm === 'single', asnm_sm_asn: sm !== 'iface', asnm_sm_iface: sm === 'iface' };
     for (var id in m) { var e = document.getElementById(id); if (e) e.className = m[id] ? 'asnm-on' : ''; }
+    asnmDnsfRender();
+}
+
+// "DNS fitting the line": three switches + an overview of which DNS each line uses
+var ASNM_DNS_NAMES = { '9.9.9.11': 'Quad9 (ECS)', '149.112.112.11': 'Quad9 (ECS)', '9.9.9.9': 'Quad9', '149.112.112.112': 'Quad9', '9.9.9.10': 'Quad9', '1.1.1.1': 'Cloudflare', '1.0.0.1': 'Cloudflare',
+    '1.1.1.2': 'Cloudflare', '8.8.8.8': 'Google', '8.8.4.4': 'Google', '94.140.14.140': 'AdGuard DNS', '94.140.14.141': 'AdGuard DNS', '94.140.14.14': 'AdGuard DNS', '94.140.15.15': 'AdGuard DNS',
+    '185.222.222.222': 'DNS.SB', '45.11.45.11': 'DNS.SB', '76.76.2.0': 'Control D', '76.76.10.0': 'Control D', '208.67.222.222': 'OpenDNS', '208.67.220.220': 'OpenDNS' };
+function asnmDnsProvider(ips) {
+    var l = String(ips || '').split(' '), n = [], k;
+    for (k = 0; k < l.length; k++) if (l[k] && ASNM_DNS_NAMES[l[k]] && n.indexOf(ASNM_DNS_NAMES[l[k]]) < 0) n.push(ASNM_DNS_NAMES[l[k]]);
+    return n.join(', ');
+}
+function asnmDnsfRender() {
+    var f = (ASNM.data && ASNM.data.dnsf) || { on: 0 }, k, h, sw = { dnsf: f.on, dnst: f.tls, dnsd: f.dev };
+    for (k in sw) {
+        var a = document.getElementById('asnm_' + k + '_on'), b = document.getElementById('asnm_' + k + '_off');
+        if (a) { a.className = sw[k] ? 'asnm-on' : ''; b.className = sw[k] ? '' : 'asnm-on'; }
+    }
+    var w = document.getElementById('asnm_dnsd_wrap'); if (w) w.style.display = (f.agh || f.dev) ? '' : 'none';
+    var intro = document.getElementById('asnm_dw_intro');
+    if (intro) intro.textContent = t('dw_intro', { b: f.base || t('dw_base_unknown') });
+    var more = document.getElementById('asnm_dw_more_list');
+    if (more && !more.innerHTML) { h = ''; for (k = 1; k <= 6; k++) h += '<li>' + asnmEsc(t('dw_more_' + k)) + '</li>'; more.innerHTML = h; }
+    var box = document.getElementById('asnm_dw_now');
+    if (!box) return;
+    if (!f.on && !f.dev) { box.innerHTML = ''; return; }
+    // encryption per line ("WAN1:on base:tunnel")
+    var tl = {}, st = String(f.tlsst || '').split(' ');
+    for (k = 0; k < st.length; k++) { var kv = st[k].split(':'); if (kv.length === 2 && kv[1]) tl[kv[0]] = kv[1]; }
+    var devs = f.devs || {}, l = f.list || [];
+    function prot(tg, isBase) {
+        if (!/^WAN/.test(tg)) return '<span class="asnm-dw-ok">' + asnmEsc(t('dw_p_tunnel')) + '</span>';
+        var c = isBase ? tl.base : tl[tg];
+        if (!f.tls) return '<span class="asnm-dw-no">' + asnmEsc(t('dw_p_off')) + '</span>';
+        if (c === 'on' || c === 'fw' || c === 'dc' || c === 'dcfw') return '<span class="asnm-dw-ok">' + asnmEsc(t('dw_p_' + c)) + '</span>';
+        return '<span class="asnm-dw-no">' + asnmEsc(t('dw_p_' + (c || 'off'))) + '</span>';
+    }
+    h = '<h4>' + asnmEsc(t('dw_now')) + '</h4><div class="asnm-table-wrap"><table class="asnm-table"><tr><th>' + asnmEsc(t('dw_th_line')) + '</th><th>' + asnmEsc(t('dw_th_dns')) +
+        '</th><th>' + asnmEsc(t('dw_th_prot')) + '</th><th>' + asnmEsc(t('dw_th_for')) + '</th></tr>';
+    var bdev = devs[f.base] ? t('dw_devs', { n: devs[f.base] }) : '';
+    h += '<tr><td><b>' + asnmEsc(f.base || '?') + '</b><span class="asnm-dw-src">' + asnmEsc(t('dw_normal')) + '</span></td><td>' +
+         asnmEsc(f.mode === 'unbound' ? t('dw_unbound') : (f.mode === 'dnscrypt' ? 'dnscrypt-proxy' : t('dw_router_dns'))) + '</td><td>' + prot(f.base || '', true) + '</td><td>' +
+         asnmEsc(t('dw_for_rest') + (bdev ? ', ' + bdev : '')) + '</td></tr>';
+    for (k = 0; k < l.length; k++) {
+        var r = l[k], nm = asnmDnsProvider(r.dns), use = [];
+        if (r.d) use.push(t('dw_doms', { n: r.d }));
+        if (r.l) use.push(t('dw_names', { n: r.l }));
+        if (f.dev && devs[r.t]) use.push(t('dw_devs', { n: devs[r.t] }));
+        if (f.dev && r.t === 'WAN1' && f.base !== 'WAN1') use.push(t('dw_other_devs'));
+        var vpn = !/^WAN/.test(r.t);
+        h += '<tr><td><b>' + asnmEsc(r.t) + '</b></td><td>' + (nm ? asnmEsc(nm) + ' · ' : '') + asnmEsc(r.dns) +
+             '<span class="asnm-dw-src">' + asnmEsc(t('dw_src_' + (r.src || 'router') + (vpn ? '' : '_wan'))) + '</span>' +
+             (vpn ? '<a href="javascript:void(0)" class="asnm-dw-edit" onclick="asnmDwEdit(\'' + r.t + '\');">' + asnmEsc(t('dw_set_vpn')) + '</a>' : '') +
+             '</td><td>' + prot(r.t, false) + '</td><td>' + asnmEsc(use.length ? use.join(', ') : '–') + '</td></tr>';
+        if (vpn && ASNM.dwEdit === r.t) {
+            var cur = r.src === 'own' ? String(r.dns).split(' ') : [];
+            h += '<tr class="asnm-dw-edrow"><td colspan="4"><div class="asnm-help" style="margin-bottom:8px;">' + asnmEsc(t('dw_vpn_why', { t: r.t })) + '</div>' +
+                 '<div class="asnm-dw-ed"><input type="text" id="asnm_dw_ip1" maxlength="15" placeholder="10.2.0.1" value="' + asnmEsc(cur[0] || '') + '"/>' +
+                 '<input type="text" id="asnm_dw_ip2" maxlength="15" placeholder="' + asnmEsc(t('dw_ip2')) + '" value="' + asnmEsc(cur[1] || '') + '"/>' +
+                 '<input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" value="' + asnmEsc(t('oe_save')) + '" onclick="asnmDwSave(\'' + r.t + '\', 0);"/>' +
+                 (r.src === 'own' ? '<input type="button" class="button_gen asnm-ghost asnm-small-btn" value="' + asnmEsc(t('dw_auto')) + '" onclick="asnmDwSave(\'' + r.t + '\', 1);"/>' : '') +
+                 '<input type="button" class="button_gen asnm-ghost asnm-small-btn" value="' + asnmEsc(t('btn_cancel')) + '" onclick="asnmDwEdit(\'\');"/></div></td></tr>';
+        }
+    }
+    h += '</table></div>';
+    if (f.tls && tl.base === 'ub') h += '<div class="asnm-help" style="margin-top:8px;">' + asnmEsc(t('dw_ub_hint')) + '</div>';
+    if (f.derr) h += '<div class="asnm-status-err" style="margin-top:8px;">' + asnmEsc(f.derr) + '</div>';
+    box.innerHTML = h;
+}
+function asnmDwEdit(tg) { ASNM.dwEdit = ASNM.dwEdit === tg ? '' : tg; asnmDnsfRender(); }
+function asnmDwSave(tg, auto) {
+    var ips = [], k, v;
+    if (!auto) for (k = 1; k <= 2; k++) {
+        v = document.getElementById('asnm_dw_ip' + k).value.replace(/\s+/g, '');
+        if (!v) continue;
+        if (!/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.test(v) || v.split('.').some(function (o) { return +o > 255; })) { alert(t('dw_bad_ip', { v: v })); return; }
+        ips.push(v);
+    }
+    if (!auto && !ips.length) { alert(t('dw_need_ip')); return; }
+    ASNM.dwEdit = '';
+    asnmSend('dnsfsrv', [tg, ips.join(',')]);
+}
+function asnmDnstSet(on) {
+    var cur = ASNM.data && ASNM.data.dnsf && ASNM.data.dnsf.tls ? 1 : 0;
+    if (on === cur || ASNM.busy) return;
+    asnmSend('setting', ['DNS_TLS', on ? 'on' : 'off']);
+}
+function asnmDnsdSet(on) {
+    var cur = ASNM.data && ASNM.data.dnsf && ASNM.data.dnsf.dev ? 1 : 0;
+    if (on === cur || ASNM.busy) return;
+    if (!confirm(t(on ? 'dnsd_confirm' : 'dnsd_confirm_off'))) return;
+    asnmSend('setting', ['DNS_DEVICE', on ? 'on' : 'off']);
+}
+function asnmDnsfSet(on) {
+    var cur = ASNM.data && ASNM.data.dnsf && ASNM.data.dnsf.on ? 1 : 0;
+    if (on === cur || ASNM.busy) return;
+    if (on && !confirm(t('dnsf_confirm'))) return;
+    asnmSend('setting', ['DNS_FOLLOW', on ? 'on' : 'off']);
 }
 
 // the marking rules take effect after a rebuild: switch and rebuild in one go (from the saved lists, no download)
@@ -3719,6 +3843,24 @@ function initial() {
     <div class="asnm-field"><span class="asnm-label" data-i18n="perf_stats"></span><span class="asnm-help" data-i18n="perf_stats_desc"></span>
       <div class="asnm-row" style="margin-top:8px;"><div class="asnm-seg"><span id="asnm_sm_asn" onclick="asnmSetStatsMode('asn');" data-i18n="perf_stats_asn"></span><span id="asnm_sm_iface" onclick="asnmSetStatsMode('iface');" data-i18n="perf_stats_iface"></span></div></div>
     </div>
+  </div>
+  <div class="asnm-card" id="asnm_dnsf_card">
+    <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><div class="asnm-card-titles"><h3 data-i18n="dw_title"></h3><div class="asnm-card-sub" data-i18n="dw_sub"></div></div></div>
+    <div class="asnm-help" id="asnm_dw_intro"></div>
+    <div class="asnm-dw-row">
+      <div class="asnm-dw-txt"><span class="asnm-label" data-i18n="dw_f_title"></span><span class="asnm-help" data-i18n="dw_f_desc"></span></div>
+      <div class="asnm-seg"><span id="asnm_dnsf_off" onclick="asnmDnsfSet(0);" data-i18n="dnsf_off"></span><span id="asnm_dnsf_on" onclick="asnmDnsfSet(1);" data-i18n="dnsf_on"></span></div>
+    </div>
+    <div class="asnm-dw-row" id="asnm_dnsd_wrap" style="display:none;">
+      <div class="asnm-dw-txt"><span class="asnm-label" data-i18n="dw_d_title"></span><span class="asnm-help" data-i18n="dw_d_desc"></span></div>
+      <div class="asnm-seg"><span id="asnm_dnsd_off" onclick="asnmDnsdSet(0);" data-i18n="dnsf_off"></span><span id="asnm_dnsd_on" onclick="asnmDnsdSet(1);" data-i18n="dnsf_on"></span></div>
+    </div>
+    <div class="asnm-dw-row">
+      <div class="asnm-dw-txt"><span class="asnm-label" data-i18n="dw_t_title"></span><span class="asnm-help" data-i18n="dw_t_desc"></span></div>
+      <div class="asnm-seg"><span id="asnm_dnst_off" onclick="asnmDnstSet(0);" data-i18n="dnsf_off"></span><span id="asnm_dnst_on" onclick="asnmDnstSet(1);" data-i18n="dnsf_on"></span></div>
+    </div>
+    <div id="asnm_dw_now"></div>
+    <details class="asnm-dw-more"><summary data-i18n="dw_more"></summary><ul id="asnm_dw_more_list"></ul></details>
   </div>
   <div class="asnm-grid2">
     <div class="asnm-card">
