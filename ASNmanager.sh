@@ -654,6 +654,20 @@ cu_apply_ip() {
 # dnsmasq keeps a DNS cache?  (cache-size=0 = off, e.g. when AdGuard Home answers in front of it)
 cu_dnsmasq_cache_on() { ! grep -qE '^cache-size=0[[:space:]]*$' /etc/dnsmasq.conf 2>/dev/null; }
 
+# dnsmasq.conf.add with one of our blocks put in (at its old place, so the other blocks do not move - a moved block
+# looked like a change to the next writer and restarted dnsmasq a second time) or taken out ($3 empty / no file)
+# dm_block <begin> <end> <file with the lines> : prints the new dnsmasq.conf.add
+dm_block() {
+    awk -v b="$1" -v e="$2" -v f="$3" '
+        BEGIN { if (f != "") while ((getline l < f) > 0) add = add l "\n" }
+        $0 == b { skip = 1; if (add != "" && !done) printf "%s\n%s%s\n", b, add, e; done = 1; next }
+        skip { if ($0 == e) skip = 0; next }
+        { print }
+        END { if (add != "" && !done) printf "%s\n%s%s\n", b, add, e }' "${DNSMASQ_ADD}" 2>/dev/null
+    [ -f "$DNSMASQ_ADD" ] || { [ -n "$3" ] && [ -s "$3" ] && { echo "$1"; cat "$3"; echo "$2"; }; }
+    return 0
+}
+
 # writes (or removes) our block in dnsmasq.conf.add; dnsmasq is restarted only when the block changed.
 # $2 = force: a domain set was just created. dnsmasq adds an address only when it fetches the answer from its
 # upstream, not when it answers from its cache - so the cache is emptied with SIGHUP (no restart, DNS keeps
@@ -661,8 +675,7 @@ cu_dnsmasq_cache_on() { ! grep -qE '^cache-size=0[[:space:]]*$' /etc/dnsmasq.con
 # start-up of other DNS add-ons (AdGuard Home moves dnsmasq to another port, Unbound ...).
 cu_dnsmasq_write() {
     cdw_new=/tmp/asnmanager-dnsmasq.new
-    if [ -f "$DNSMASQ_ADD" ]; then sed "/^${CU_BEGIN}\$/,/^${CU_END}\$/d" "$DNSMASQ_ADD" > "$cdw_new"; else : > "$cdw_new"; fi
-    if [ -s "$1" ]; then { echo "$CU_BEGIN"; cat "$1"; echo "$CU_END"; } >> "$cdw_new"; fi
+    if [ -s "$1" ]; then dm_block "$CU_BEGIN" "$CU_END" "$1"; else dm_block "$CU_BEGIN" "$CU_END" ""; fi > "$cdw_new"
     if [ -f "$DNSMASQ_ADD" ]; then cdw_cur="$DNSMASQ_ADD"; else cdw_cur=/dev/null; fi
     if cmp -s "$cdw_new" "$cdw_cur"; then
         rm -f "$cdw_new"
@@ -3895,10 +3908,9 @@ sgd_file() { case "$(sgd_state)" in on) echo "$SGD_LOG" ;; ext) sgd_foreign ;; e
 # writes or removes our two lines in dnsmasq.conf.add; dnsmasq is restarted only when they changed
 sgd_write() {
     sgw_new=/tmp/asnmanager-dnslog.new
-    if [ -f "$DNSMASQ_ADD" ]; then sed "/^${SGD_BEGIN}\$/,/^${SGD_END}\$/d" "$DNSMASQ_ADD" > "$sgw_new"; else : > "$sgw_new"; fi
-    if sgd_on && [ -z "$(sgd_foreign)" ]; then
-        printf '%s\nlog-queries=extra\nlog-facility=%s\n%s\n' "$SGD_BEGIN" "$SGD_LOG" "$SGD_END" >> "$sgw_new"
-    fi
+    : > "$sgw_new.l"
+    if sgd_on && [ -z "$(sgd_foreign)" ]; then printf 'log-queries=extra\nlog-facility=%s\n' "$SGD_LOG" > "$sgw_new.l"; fi
+    dm_block "$SGD_BEGIN" "$SGD_END" "$sgw_new.l" > "$sgw_new"; rm -f "$sgw_new.l"
     if [ -f "$DNSMASQ_ADD" ]; then sgw_cur="$DNSMASQ_ADD"; else sgw_cur=/dev/null; fi
     if cmp -s "$sgw_new" "$sgw_cur"; then rm -f "$sgw_new"; return 0; fi
     if [ -s "$sgw_new" ]; then mkdir -p "$(dirname "$DNSMASQ_ADD")" && cp "$sgw_new" "$DNSMASQ_ADD"; else rm -f "$DNSMASQ_ADD"; fi
@@ -4190,8 +4202,8 @@ dnsf_clear() {
 # our block in dnsmasq.conf.add: "servers-file=..." while on; dnsmasq restarts only when the block changed
 dnsf_conf_write() {
     dw_new=/tmp/asnmanager-dnsf.add
-    if [ -f "$DNSMASQ_ADD" ]; then sed "/^${DNSF_BEGIN}\$/,/^${DNSF_END}\$/d" "$DNSMASQ_ADD" > "$dw_new"; else : > "$dw_new"; fi
-    dnsf_on && [ -f "$DNSF_SERVERS" ] && printf '%s\nservers-file=%s\n%s\n' "$DNSF_BEGIN" "$DNSF_SERVERS" "$DNSF_END" >> "$dw_new"
+    : > "$dw_new.l"; dnsf_on && [ -f "$DNSF_SERVERS" ] && printf 'servers-file=%s\n' "$DNSF_SERVERS" > "$dw_new.l"
+    dm_block "$DNSF_BEGIN" "$DNSF_END" "$dw_new.l" > "$dw_new"; rm -f "$dw_new.l"
     if [ -f "$DNSMASQ_ADD" ]; then dw_cur="$DNSMASQ_ADD"; else dw_cur=/dev/null; fi
     if cmp -s "$dw_new" "$dw_cur"; then rm -f "$dw_new"; return 1; fi
     if [ -s "$dw_new" ]; then mkdir -p "$(dirname "$DNSMASQ_ADD")" && cp "$dw_new" "$DNSMASQ_ADD"; else rm -f "$DNSMASQ_ADD"; fi
