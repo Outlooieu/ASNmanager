@@ -1317,6 +1317,7 @@ backup_text() {
     echo "DNS_DEVICE=$(dnsd_on && echo on || echo off)"
     echo "DNS_TLS=$(dnsf_tls_on && echo on || echo off)"
     echo "MAIL_NOTIFY=$(mail_mode)"
+    echo "FO_VPND=$(fo_vpnd_on && echo on || echo off)"
     return 0
 }
 
@@ -1389,7 +1390,8 @@ rs_setting() {
         DNS_DEVICE:on|DNS_DEVICE:off)  dnsd_set "$2" ;;
         DNS_TLS:on|DNS_TLS:off)        dnsf_tls_set "$2" ;;
         MAIL_NOTIFY:off|MAIL_NOTIFY:daily|MAIL_NOTIFY:weekly)  mail_set "$2" ;;
-        STATS:*|STATS_SAVING:*|STATS_MODE:*|RULES_MODE:*|WEBUI_LOCATION:*|SG_DOMAINS:*|DNS_FOLLOW:*|DNS_DEVICE:*|DNS_TLS:*|MAIL_NOTIFY:*)   echo "Invalid value '$2' for $1 skipped."; return 0 ;;
+        FO_VPND:on|FO_VPND:off)        fo_vpnd_set "$2" ;;
+        FO_VPND:*|STATS:*|STATS_SAVING:*|STATS_MODE:*|RULES_MODE:*|WEBUI_LOCATION:*|SG_DOMAINS:*|DNS_FOLLOW:*|DNS_DEVICE:*|DNS_TLS:*|MAIL_NOTIFY:*)   echo "Invalid value '$2' for $1 skipped."; return 0 ;;
         *)                echo "Unknown setting '$1' skipped."; return 0 ;;
     esac
     echo "Setting applied: $1 = $2."
@@ -4908,8 +4910,9 @@ dnsd_apply() {
         dnsd_foreign_ids "$da_y" | sort -u > "$da_tmp/foreign"
         : > "$da_tmp/names"
         for da_t in $( { cut -d' ' -f1 "$da_tmp/groups"; echo WAN1; } | sort -u); do
-            # failover: a target that is down looks up through the line its traffic uses now (its name stays)
-            da_e=$da_t; da_a=$(awk -v t="$da_t" '$1 == t && $2 != "BLOCK" { print $2 }' "$4" 2>/dev/null)
+            # failover (with "VPN Director follows the failover"): the devices of a target that is down look up through
+            # the line their traffic uses now (the client keeps its name)
+            da_e=$da_t; da_a=""; fo_vpnd_on && da_a=$(awk -v t="$da_t" '$1 == t && $2 != "BLOCK" { print $2 }' "$4" 2>/dev/null)
             [ -n "$da_a" ] && { [ "$da_a" = "$2" ] || grep -q "^$da_a " "$1"; } && da_e=$da_a
             da_same=0; [ "$da_e" = "$2" ] && [ "$(echo "$2" | cut -c1-3)" = "WAN" ] && da_same=1   # normal DNS goes over WAN
             da_srv=""; [ "$da_e" != "$2" ] && da_srv=$(awk -v t="$da_e" '$1 == t { $1 = ""; print }' "$1")
@@ -5906,9 +5909,26 @@ fo_info() {   # table fwmark prio - same values as the worker
 # switch) - the list of the VPN Director itself is not changed. The router's own rule (e.g. Unbound through a VPN) goes
 # along, so the normal DNS keeps working. Removed again as soon as the target works.
 FO_VPND_PRIO=10700
+FO_VPND_FLAG="$ADDON_DIR/fo_vpnd"                 # option: the VPN Director follows the failover (off by default)
+fo_vpnd_on() { [ -f "$FO_VPND_FLAG" ]; }
+fo_vpnd_set() {
+    case "$1" in
+        on)  mkdir -p "$ADDON_DIR"; : > "$FO_VPND_FLAG" ;;
+        off) rm -f "$FO_VPND_FLAG" ;;
+        *)   echo "VPN Director follows the failover: $(fo_vpnd_on && echo on || echo off)"; return 0 ;;
+    esac
+    fo_vpnd_sync; fo_export
+    if dnsd_on; then ( "$SCRIPT_PATH" dnsfollow sync >/dev/null 2>&1 & ); fi
+    echo "VPN Director follows the failover: $1."
+}
+# enabled VPN Director rules per line: "LINE count" (for the page)
+fo_vpnd_counts() {
+    [ -r "$VPND_FILE" ] || return 0
+    tr '<' '\n' < "$VPND_FILE" | awk -F'>' '$1 == "1" && ($3 != "" || $4 != "") { i = toupper($5); if (i == "WAN") i = "WAN1"; n[i]++ } END { for (i in n) print i, n[i] }'
+}
 fo_vpnd_sync() {
     mkdir -p "$FO_RT"; fv_new="$FO_RT/vpnd.new"; : > "$fv_new"
-    if [ -s "$FO_CONF" ] && [ -r "$VPND_FILE" ]; then
+    if [ -s "$FO_CONF" ] && fo_vpnd_on && [ -r "$VPND_FILE" ]; then
         fo_active_map | while read -r fv_t fv_a; do
             if [ "$fv_a" = "BLOCK" ]; then fv_to="unreachable"
             else fv_tab=$(fo_info "$fv_a" | cut -d' ' -f1); [ -n "$fv_tab" ] || continue; fv_to="lookup $(fo_tname "$fv_tab")"; fi
@@ -6064,7 +6084,9 @@ fo_export() {
         done
         printf '],"health":{'
         awk '{ printf "%s\"%s\":\"%s\"", (NR > 1 ? "," : ""), $1, $2 }' "$FO_RT/health.txt" 2>/dev/null
-        printf '}}\n'
+        printf '},"vpnd":%d,"vd":{' "$(fo_vpnd_on && echo 1 || echo 0)"
+        fo_vpnd_counts | awk '{ printf "%s\"%s\":%d", (NR > 1 ? "," : ""), $1, $2 }'
+        printf '},"vdmoved":%d}\n' "$(cat "$FO_RT/vpnd.rules" 2>/dev/null | grep -c .)"
     } > "$WEB_DIR/failover.js.tmp" && mv -f "$WEB_DIR/failover.js.tmp" "$WEB_DIR/failover.js"
 }
 
@@ -6120,6 +6142,7 @@ fo_set() {
 
 fo_show() {
     [ -s "$FO_CONF" ] || { echo "No failover configured."; return 0; }
+    echo "VPN Director follows the failover: $(fo_vpnd_on && echo on || echo off)   (failover vpnd on|off)"
     while IFS='=' read -r fw_t fw_ch; do
         fw_act=$(cat "$FO_RT/active_$fw_t" 2>/dev/null)
         echo "${fw_t} -> $(echo "$fw_ch" | sed 's/,/ -> /g')   active: ${fw_act:-(not checked yet)}"
@@ -6858,8 +6881,9 @@ cli_main() {
                 cron)    fo_cron_sync ;;
                 set)     fo_set "$2" "$3" ;;
                 clear)   fo_set "$2" "" ;;
+                vpnd)    fo_vpnd_set "$2" ;;
                 show|"") fo_show ;;
-                *)       echo "Usage: failover show | set <TARGET> <FALLBACK>[,<FALLBACK>] | clear <TARGET> | once"; false ;;
+                *)       echo "Usage: failover show | set <TARGET> <FALLBACK>[,<FALLBACK>] | clear <TARGET> | vpnd on|off | once"; false ;;
             esac ;;
         check)
             case "$1" in
