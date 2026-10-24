@@ -5901,6 +5901,42 @@ fo_info() {   # table fwmark prio - same values as the worker
         WGC1) echo "211 0x6100 9996" ;; WGC2) echo "212 0x6200 9997" ;; WGC3) echo "213 0x6300 9998" ;; WGC4) echo "214 0x6400 9999" ;; WGC5) echo "215 0x6500 10000" ;;
     esac
 }
+# devices in the VPN Director on a target that is down go with its failover too: its rules (enabled, with a device or
+# destination) are copied with the table of the line in use, before the VPN Director (11xxx/12xxx, also before its kill
+# switch) - the list of the VPN Director itself is not changed. The router's own rule (e.g. Unbound through a VPN) goes
+# along, so the normal DNS keeps working. Removed again as soon as the target works.
+FO_VPND_PRIO=10700
+fo_vpnd_sync() {
+    mkdir -p "$FO_RT"; fv_new="$FO_RT/vpnd.new"; : > "$fv_new"
+    if [ -s "$FO_CONF" ] && [ -r "$VPND_FILE" ]; then
+        fo_active_map | while read -r fv_t fv_a; do
+            if [ "$fv_a" = "BLOCK" ]; then fv_to="unreachable"
+            else fv_tab=$(fo_info "$fv_a" | cut -d' ' -f1); [ -n "$fv_tab" ] || continue; fv_to="lookup $(fo_tname "$fv_tab")"; fi
+            tr '<' '\n' < "$VPND_FILE" | awk -F'>' -v t="$fv_t" '$1 == "1" { i = toupper($5); if (i == "WAN") i = "WAN1"
+                if (i == t && ($3 != "" || $4 != "")) print $3 ">" $4 }' |
+            while IFS='>' read -r fv_s fv_d; do echo "${fv_s:-all}>${fv_d:-all}>$fv_to>$fv_t>$fv_a"; done
+        done > "$fv_new"
+    fi
+    if cmp -s "$fv_new" "$FO_RT/vpnd.rules" 2>/dev/null && [ "$(ip rule show 2>/dev/null | grep -c "^${FO_VPND_PRIO}:")" = "$(grep -c . "$fv_new")" ]; then
+        rm -f "$fv_new"; return 0
+    fi
+    while ip rule del prio "$FO_VPND_PRIO" 2>/dev/null; do :; done
+    while IFS='>' read -r fv_s fv_d fv_to fv_t fv_a; do
+        [ "$fv_s" = "all" ] && [ "$fv_d" = "all" ] && continue          # never a rule for everything
+        set --; [ "$fv_s" != "all" ] && set -- from "$fv_s"; [ "$fv_d" != "all" ] && set -- "$@" to "$fv_d"
+        ip rule add "$@" $fv_to prio "$FO_VPND_PRIO" 2>/dev/null
+    done < "$fv_new"
+    fv_was=$(cut -d'>' -f4,5 "$FO_RT/vpnd.rules" 2>/dev/null | sort -u | tr '\n' ' ')
+    mv -f "$fv_new" "$FO_RT/vpnd.rules"; ip route flush cache 2>/dev/null
+    fv_now=$(cut -d'>' -f4,5 "$FO_RT/vpnd.rules" | sort -u | tr '\n' ' ')
+    if [ -n "$fv_now" ]; then
+        logger -t ASNmanager "Failover: $(grep -c . "$FO_RT/vpnd.rules") VPN Director rule(s) follow it ($(echo $fv_now | sed 's/>/ -> /g'))"
+    elif [ -n "$fv_was" ]; then
+        logger -t ASNmanager "Failover: VPN Director rules use their own lines again"
+    fi
+    return 0
+}
+
 # targets that are down and moved to another one right now: "target active" (active may be BLOCK)
 fo_active_map() {
     [ -s "$FO_CONF" ] || return 0
@@ -5997,6 +6033,7 @@ fo_round() {
         fo_set_rule "$fo_t" "$fo_act"
         fo_self_rule "$fo_t" "$fo_act"
     done < "$FO_CONF"
+    fo_vpnd_sync
     fo_export
     [ $fo_changed -eq 1 ] && rc_check >/dev/null 2>&1
     # DNS follows: the names of the target that is down are looked up through the line in use (in the background:
@@ -6073,6 +6110,8 @@ fo_set() {
         fo_set_rule "$fs_t" "$fs_t"; fo_self_rule "$fs_t" "$fs_t"
         rm -f "$FO_RT/active_$fs_t" "$FO_RT/since_$fs_t"
         [ -s "$FO_CONF" ] || rm -f "$FO_CONF"
+        fo_vpnd_sync
+        if dnsf_on || dnsd_on; then ( "$SCRIPT_PATH" dnsfollow sync >/dev/null 2>&1 & ); fi
         fo_cron_sync
         fo_export
         echo "Failover for ${fs_t} removed."
@@ -6086,12 +6125,15 @@ fo_show() {
         echo "${fw_t} -> $(echo "$fw_ch" | sed 's/,/ -> /g')   active: ${fw_act:-(not checked yet)}"
     done < "$FO_CONF"
     [ -f "$FO_RT/health.txt" ] && sed 's/^/  /' "$FO_RT/health.txt"
+    [ -s "$FO_RT/vpnd.rules" ] && awk -F'>' '{ printf "  VPN Director (%s is down): %s%s -> %s\n", $4, ($1 == "all" ? "" : "from " $1 " "), ($2 == "all" ? "" : "to " $2), $5 }' "$FO_RT/vpnd.rules"
+    return 0
 }
 
 # complete removal (uninstall): ip rules are removed with the other rules
 fo_purge() {
     cru d ASN_Failover 2>/dev/null
     while ip rule del prio "$FO_SELF_PRIO" 2>/dev/null; do :; done
+    while ip rule del prio "$FO_VPND_PRIO" 2>/dev/null; do :; done
     [ -f "$SERVICES_START" ] && sed -i "/# ${FO_HOOK}\$/d" "$SERVICES_START"
     rm -rf "$FO_RT" "$FO_CONF" "$WEB_DIR/failover.js"
 }
