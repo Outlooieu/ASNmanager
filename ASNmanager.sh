@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.21
+version=3.9.22
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.21"
+SCRIPT_VERSION="3.9.22"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -5972,9 +5972,11 @@ UPD_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/AS
 UPD_NOTES="https://github.com/${GITHUB_USER}/${GITHUB_REPO}/blob/main/CHANGELOG.md"
 
 # Downloads the installer file to $1 and prints its version. Empty output = GitHub not reachable / not ASN Manager.
+# $2 = "head": only the first 4 KB (enough for the version - the check runs every time the page opens)
 upd_fetch() {
     rm -f "$1"
-    curl -s -S -k --connect-timeout 8 -m 60 "$UPD_URL?t=$(date +%s)" -o "$1" 2>/dev/null && [ -s "$1" ] || return 1
+    uf_r=""; [ "$2" = "head" ] && uf_r="-r 0-4095"
+    curl -s -S -k --connect-timeout 8 -m 60 $uf_r "$UPD_URL?t=$(date +%s)" -o "$1" 2>/dev/null && [ -s "$1" ] || return 1
     sed -i 's/\r$//' "$1" 2>/dev/null
     grep -q '^SCRIPT_VERSION="' "$1" || return 1
     grep -m 1 '^SCRIPT_VERSION=' "$1" | cut -d'"' -f2 | tr -cd '0-9.'
@@ -5985,7 +5987,7 @@ upd_check() {
     [ -d "$(dirname "$WEB_DIR")" ] || return 0
     mkdir -p "$WEB_DIR" 2>/dev/null || return 0
     u_tmp="/tmp/${WEBUI_NS}-upd-check.tmp"
-    u_rv=$(upd_fetch "$u_tmp"); rm -f "$u_tmp"
+    u_rv=$(upd_fetch "$u_tmp" head); rm -f "$u_tmp"
     # the router language was changed meanwhile: fetch its pack
     lc_now=$(lang_code); [ -n "$lc_now" ] && [ ! -s "$ADDON_DIR/lang/$lc_now.js" ] && lang_fetch
     u_newer=0; u_err=""

@@ -1,3 +1,7 @@
+## v3.9.22
+
+- Update check every time the WebUI page is opened (before: when the last check was older than 6 hours); not again within a minute (quick reload). The check only fetches the first 4 KB of the script on GitHub
+
 ## v3.9.21
 
 - **DNS per device: domain entries for single devices get their own DNS** - a domain entry only for some devices (e.g. `*.dnsleaktest.com` -> WGC4 for 192.168.1.50) is looked up through its target for exactly those devices: their AdGuard Home client gets `[/domain/]<DNS of the target>`, routed through the target like the other lookups of "DNS fitting the line" (a VPN that is down blocks them). IP address and DNS then fit for these devices, all others are unchanged. Devices that are not in the VPN Director get a client of their own for it. Only for domains whose sets AdGuard Home fills itself (ipset copy of the Merlin installer) - otherwise dnsmasq keeps them, so the entry still learns its addresses

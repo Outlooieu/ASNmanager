@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.9.21 -->
+<!-- ASNmanager-WebUI v3.9.22 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -493,7 +493,7 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
-var ASNM_PAGE_VER = '3.9.21';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.9.22';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -3465,7 +3465,8 @@ function asnmUpdRender() {
     }
 }
 
-// reads the last result; looks at GitHub again if the result is older than 6 hours (or missing)
+// reads the last result; every time the page opens it looks at GitHub again (not when the last look is less than a
+// minute old - a quick reload)
 function asnmUpdLoad(auto) {
     asnmGet('update.js', function (txt) {
         try { ASNM_UPD.data = JSON.parse(txt); } catch (e) { ASNM_UPD.data = null; }
@@ -3475,7 +3476,7 @@ function asnmUpdLoad(auto) {
         }
         asnmUpdRender();
         var age = ASNM_UPD.data ? Date.now() / 1000 - ASNM_UPD.data.ts : 1e9;
-        if (auto && age > 21600) asnmUpdCheck(false);
+        if (auto && age > 60) asnmUpdCheck(false);
     }, function () { asnmUpdRender(); if (auto) asnmUpdCheck(false); });
 }
 
