@@ -4625,7 +4625,8 @@ dnsd_have() {
 # the clients through the API: $1 = items file, $2 = yaml; 0 = done (no restart needed)
 dnsd_api_apply() {
     [ -s "$AGH_AUTH" ] || return 1
-    agh_up && ! agh_busy || return 1
+    # AdGuard Home may be restarting right now (its start script does that after a dnsmasq restart): wait for it
+    if ! agh_up || agh_busy; then agh_settle && ! agh_busy || return 1; fi
     dp_t=$(dirname "$1")
     dnsd_items_json "$1" > "$dp_t/json"
     cut -f1 "$dp_t/json" > "$dp_t/newn"
