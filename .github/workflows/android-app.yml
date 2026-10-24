@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
     paths: ['android/**', '.github/workflows/android-app.yml']
-    tags: ['app-v*']
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -24,7 +25,7 @@ jobs:
           gradle-version: '8.7'
       - name: Version
         run: |
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then v="${GITHUB_REF_NAME#app-v}"; else v="1.0.${GITHUB_RUN_NUMBER}"; fi
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME#app-v}" != "${GITHUB_REF_NAME}" ]; then v="${GITHUB_REF_NAME#app-v}"; else v="1.0.${GITHUB_RUN_NUMBER}"; fi
           echo "APP_VERSION_NAME=$v" >> "$GITHUB_ENV"
           echo "APP_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
       - name: Signing key
@@ -62,7 +63,7 @@ jobs:
           name: ASNManager-${{ env.APP_VERSION_NAME }}
           path: ASNManager-*.apk
       - name: Release
-        if: github.ref_type == 'tag'
+        if: github.event_name == 'release' && startsWith(github.ref_name, 'app-v')
         uses: softprops/action-gh-release@v2
         with:
           name: ASN Manager app ${{ env.APP_VERSION_NAME }}

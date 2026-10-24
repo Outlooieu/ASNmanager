@@ -15,4 +15,4 @@ Download `ASNManager-<version>.apk` from the [releases](https://github.com/Outlo
 
 ## Build
 
-GitHub Actions builds it (`.github/workflows/android-app.yml`): every change in `android/` builds an APK (workflow artifact), a tag `app-v1.2.3` makes a release. With the repository secrets `KEYSTORE_B64`, `KEYSTORE_PASSWORD` and `KEY_ALIAS` the APK is signed with the same key every time (updates install over the old version); without them it is a debug build.
+GitHub Actions builds it (`.github/workflows/android-app.yml`): every change in `android/` builds an APK (workflow artifact), a release with the tag `app-v1.2.3` gets the APK attached. With the repository secrets `KEYSTORE_B64`, `KEYSTORE_PASSWORD` and `KEY_ALIAS` the APK is signed with the same key every time (updates install over the old version); without them it is a debug build.
