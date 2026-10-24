@@ -4498,7 +4498,7 @@ dnsf_status() {
         if [ "$st_a" = "BLOCK" ]; then echo "  FAILOVER: $st_t is down and blocked - its lookups stay blocked"
         else echo "  FAILOVER: $st_t is down - its names and devices are looked up through the DNS of $st_a"; fi
     done
-    echo "  rules: $(ip rule show 2>/dev/null | grep -c "^${DNSF_PRIO}:\|^$((DNSF_PRIO + 1)):") (prio $DNSF_PRIO/$((DNSF_PRIO + 1))), servers file: $(grep -c . "$DNSF_SERVERS" 2>/dev/null || echo 0) lines"
+    echo "  rules: $(ip rule show 2>/dev/null | grep -c "^${DNSF_PRIO}:\|^$((DNSF_PRIO + 1)):\|^${DNSF_VPRIO}:\|^$((DNSF_VPRIO + 1)):") (prio $DNSF_PRIO/$((DNSF_PRIO + 1))$([ -s "$DNSF_VMAP" ] && echo ", stand-ins $DNSF_VPRIO/$((DNSF_VPRIO + 1))")), servers file: $(grep -c . "$DNSF_SERVERS" 2>/dev/null || echo 0) lines"
     if dnsd_on; then
         sed -n 's/^dev //p' "$DNSF_STATE" | while read -r st_t st_n; do echo "  devices on $st_t (VPN Director): $st_n"; done
         echo "  other devices ($(sed -n 's/^lan //p' "$DNSF_STATE")): WAN1"
