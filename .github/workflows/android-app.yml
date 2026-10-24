@@ -4,8 +4,6 @@ on:
   push:
     branches: [main]
     paths: ['android/**', '.github/workflows/android-app.yml']
-  release:
-    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -25,7 +23,7 @@ jobs:
           gradle-version: '8.7'
       - name: Version
         run: |
-          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME#app-v}" != "${GITHUB_REF_NAME}" ]; then v="${GITHUB_REF_NAME#app-v}"; else v="1.0.${GITHUB_RUN_NUMBER}"; fi
+          v=$(tr -cd '0-9.' < android/VERSION)
           echo "APP_VERSION_NAME=$v" >> "$GITHUB_ENV"
           echo "APP_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
       - name: Signing key
@@ -63,9 +61,10 @@ jobs:
           name: ASNManager-${{ env.APP_VERSION_NAME }}
           path: ASNManager-*.apk
       - name: Release
-        if: github.event_name == 'release' && startsWith(github.ref_name, 'app-v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: app-v${{ env.APP_VERSION_NAME }}
+          target_commitish: ${{ github.sha }}
           name: ASN Manager app ${{ env.APP_VERSION_NAME }}
           files: ASNManager-*.apk
           body: Android app for the ASN Manager WebUI. Install the APK on your phone (allow installing from this source). See android/README.md.
