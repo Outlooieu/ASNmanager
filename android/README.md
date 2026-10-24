@@ -9,10 +9,6 @@ A small app that opens the ASN Manager WebUI of your router and signs in for you
 - The router allows one administrator at a time: by default the app signs out when you leave it (back button), so your PC can sign in again. Menu: Reload, Open in browser, Sign out, Router settings.
 - From outside your home only through a VPN (e.g. the WireGuard server of the router). Do not open the router page to the internet.
 
-## Install
-
-Download `ASNManager-<version>.apk` from the [releases](https://github.com/Outlooieu/ASNmanager/releases) and open it on the phone (allow installing apps from this source). Android 8 or newer.
-
 ## Build
 
-GitHub Actions builds it (`.github/workflows/android-app.yml`): every change in `android/` on main builds the APK and puts it into the release `app-v<version>` (version in `android/VERSION`). With the repository secrets `KEYSTORE_B64`, `KEYSTORE_PASSWORD` and `KEY_ALIAS` the APK is signed with the same key every time (updates install over the old version); without them it is a debug build.
+The APK is not published in this repository. GitHub Actions only checks that it builds (`.github/workflows/android-app.yml`).

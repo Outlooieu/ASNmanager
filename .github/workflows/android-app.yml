@@ -56,15 +56,11 @@ jobs:
         run: |
           f=$(ls android/app/build/outputs/apk/${APK_TYPE}/*.apk | head -n 1)
           cp "$f" "ASNManager-${APP_VERSION_NAME}.apk"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ASNManager-${{ env.APP_VERSION_NAME }}
-          path: ASNManager-*.apk
-      - name: Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: app-v${{ env.APP_VERSION_NAME }}
-          target_commitish: ${{ github.sha }}
-          name: ASN Manager app ${{ env.APP_VERSION_NAME }}
-          files: ASNManager-*.apk
-          body: Android app for the ASN Manager WebUI. Install the APK on your phone (allow installing from this source). See android/README.md.
+      # the APK is not published here (public repository): an earlier release of it is removed
+      - name: Remove public app releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for t in $(gh release list -R "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName' | grep '^app-v' || true); do
+            gh release delete "$t" -R "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          done
