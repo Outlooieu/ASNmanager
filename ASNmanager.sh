@@ -5959,8 +5959,9 @@ fo_vpnd_sync() {
     while ip rule del prio "$FO_VPND_PRIO" 2>/dev/null; do :; done
     while ip rule del prio $((FO_VPND_PRIO - 1)) 2>/dev/null; do :; done
     # first: everything the main table reaches without its default route (LAN, guest networks, VPN server clients, the
-    # WAN network) stays as it is - only internet traffic follows the failover
-    [ -s "$fv_new" ] && ip rule add lookup main suppress_prefixlength 0 prio $((FO_VPND_PRIO - 1)) 2>/dev/null
+    # WAN network) stays as it is - only internet traffic follows the failover. Prefix length 1: a VPN that sets its
+    # routes as 0.0.0.0/1 + 128.0.0.0/1 (like the firmware does in its own tables) must not catch everything in main
+    [ -s "$fv_new" ] && ip rule add lookup main suppress_prefixlength 1 prio $((FO_VPND_PRIO - 1)) 2>/dev/null
     while IFS='>' read -r fv_s fv_d fv_to fv_t fv_a; do
         [ "$fv_s" = "all" ] && [ "$fv_d" = "all" ] && continue          # never a rule for everything
         set --; [ "$fv_s" != "all" ] && set -- from "$fv_s"; [ "$fv_d" != "all" ] && set -- "$@" to "$fv_d"
