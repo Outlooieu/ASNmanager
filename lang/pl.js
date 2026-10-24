@@ -223,6 +223,7 @@ window.ASNM_LANGPACK = {"code": "pl", "locale": "pl-PL", "name": "Polski", "t": 
 "dw_other_devs": "urządzenia spoza VPN Director",
 "dw_doms": "{n} domen",
 "dw_names": "{n} poznanych nazw",
+"dw_ddoms": "Domeny dla pojedynczych urządzeń: {n}",
 "dw_src_router_wan": "z ustawień WAN routera",
 "dw_src_router": "z klienta VPN routera (omija AdGuard Home - lepiej podaj go tutaj)",
 "dw_src_auto": "wybrany automatycznie (publiczny DNS przez tunel)",

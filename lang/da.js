@@ -223,6 +223,7 @@ window.ASNM_LANGPACK = {"code": "da", "locale": "da-DK", "name": "Dansk", "t": {
 "dw_other_devs": "enheder uden for VPN Director",
 "dw_doms": "{n} domæner",
 "dw_names": "{n} lærte navne",
+"dw_ddoms": "{n} domæne(r) til enkelte enheder",
 "dw_src_router_wan": "fra routerens WAN-indstillinger",
 "dw_src_router": "fra routerens VPN-klient (går uden om AdGuard Home - angiv den hellere her)",
 "dw_src_auto": "valgt automatisk (offentlig DNS gennem tunnelen)",

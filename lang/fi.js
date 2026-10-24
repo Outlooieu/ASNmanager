@@ -223,6 +223,7 @@ window.ASNM_LANGPACK = {"code": "fi", "locale": "fi-FI", "name": "Suomi", "t": {
 "dw_other_devs": "laitteet, jotka eivät ole VPN Directorissa",
 "dw_doms": "{n} verkkotunnusta",
 "dw_names": "{n} opittua nimeä",
+"dw_ddoms": "{n} verkkotunnusta yksittäisille laitteille",
 "dw_src_router_wan": "reitittimen WAN-asetuksista",
 "dw_src_router": "reitittimen VPN-asiakkaasta (ohittaa AdGuard Homen - anna se mieluummin tässä)",
 "dw_src_auto": "valittu automaattisesti (julkinen DNS tunnelin kautta)",

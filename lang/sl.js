@@ -223,6 +223,7 @@ window.ASNM_LANGPACK = {"code": "sl", "locale": "sl-SI", "name": "Slovenščina"
 "dw_other_devs": "naprave, ki niso v VPN Director",
 "dw_doms": "Domen: {n}",
 "dw_names": "Naučenih imen: {n}",
+"dw_ddoms": "Domen za posamezne naprave: {n}",
 "dw_src_router_wan": "iz nastavitev WAN usmerjevalnika",
 "dw_src_router": "iz odjemalca VPN usmerjevalnika (obide AdGuard Home - raje ga vnesite tukaj)",
 "dw_src_auto": "izbrano samodejno (javni DNS skozi tunel)",

@@ -223,6 +223,7 @@ window.ASNM_LANGPACK = {"code": "cz", "locale": "cs-CZ", "name": "Čeština", "t
 "dw_other_devs": "zařízení mimo VPN Director",
 "dw_doms": "{n} domén",
 "dw_names": "{n} naučených názvů",
+"dw_ddoms": "Domény pro jednotlivá zařízení: {n}",
 "dw_src_router_wan": "z nastavení WAN routeru",
 "dw_src_router": "z klienta VPN v routeru (obchází AdGuard Home - raději zadejte sem)",
 "dw_src_auto": "zvoleno automaticky (veřejný DNS přes tunel)",

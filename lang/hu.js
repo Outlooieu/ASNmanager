@@ -223,6 +223,7 @@ window.ASNM_LANGPACK = {"code": "hu", "locale": "hu-HU", "name": "Magyar", "t": 
 "dw_other_devs": "a VPN Directorban nem szereplő eszközök",
 "dw_doms": "{n} domain",
 "dw_names": "{n} tanult név",
+"dw_ddoms": "{n} domain egyes eszközökhöz",
 "dw_src_router_wan": "a router WAN-beállításaiból",
 "dw_src_router": "a router VPN-klienséből (megkerüli az AdGuard Home-ot - inkább itt add meg)",
 "dw_src_auto": "automatikusan választva (nyilvános DNS az alagúton át)",

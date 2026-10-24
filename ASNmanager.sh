@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.20
+version=3.9.21
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.20"
+SCRIPT_VERSION="3.9.21"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -2309,7 +2309,8 @@ cli_explain() {
                 [ "$ex_k" = "dom" ] || continue
                 case "$ex_t" in "$ex_v"|*".$ex_v") ;; *) continue ;; esac
                 ex_any=1; ex_n=$(note_of "dom:$ex_v")
-                echo "Domain entry: *.$ex_v ($ex_id) -> $ex_d, ${ex_s:+only for $ex_s}${ex_s:-all devices}${ex_n:+ - \"$ex_n\"}; $(cu_learned "$ex_id" "$ex_d" "$ex_s") address(es) learned"
+                ex_w="all devices"; [ -n "$ex_s" ] && ex_w="only for $ex_s"
+                echo "Domain entry: *.$ex_v ($ex_id) -> $ex_d, $ex_w${ex_n:+ - \"$ex_n\"}; $(cu_learned "$ex_id" "$ex_d" "$ex_s") address(es) learned"
             done < "$CUSTOM_FILE"
         fi
         [ $ex_any -eq 1 ] || echo "Domain entry: none covers $ex_t"
@@ -4196,8 +4197,24 @@ dnsf_conf_write() {
 }
 
 # builds the names per target, the servers file and the rules
+# one sync at a time (the VPN Director hook, the 5-minute check and the user may start one at the same moment - two of
+# them would both restart AdGuard Home); a second one waits for the first and then runs with the new state
+DNSF_LOCK=/tmp/asnmanager-dnsf.lock
 dnsf_sync() {
-    if ! dnsf_on && ! dnsd_on; then dnsf_clear; [ -f "$DNSD_SUM" ] && agh_present && dnsd_apply "" ""; return 0; fi
+    dsl_i=0
+    while ! mkdir "$DNSF_LOCK" 2>/dev/null; do
+        dsl_p=$(cat "$DNSF_LOCK/pid" 2>/dev/null)
+        if [ -n "$dsl_p" ] && ! kill -0 "$dsl_p" 2>/dev/null; then rm -rf "$DNSF_LOCK"; continue; fi   # left by a killed run
+        [ $dsl_i -ge 400 ] && { echo "Another DNS sync is still running."; return 1; }
+        sleep 1; dsl_i=$((dsl_i + 1))
+    done
+    echo $$ > "$DNSF_LOCK/pid"
+    dnsf_sync_run; dsl_r=$?
+    rm -rf "$DNSF_LOCK"
+    return $dsl_r
+}
+dnsf_sync_run() {
+    if ! dnsf_on && ! dnsd_on; then dnsf_clear; agh_present && grep -qE "^ +(- )?$DNSD_OURS" "$(agh_yaml)" 2>/dev/null && dnsd_apply "" ""; return 0; fi
     set -- $(dnsf_base); ds_mode=$1; ds_base=$2
     ds_tmp=/tmp/asnmanager-dnsf.$$; mkdir -p "$ds_tmp"
     # 1) which set routes to which target: marking rules for all devices (no "-s")
@@ -4243,12 +4260,15 @@ dnsf_sync() {
     fi
     # 4) domain entries for all devices: "name target"
     awk -F: '$4 == "dom" && $3 == "" && $1 ~ /^C[0-9]+$/ { print $5 "\t" $2 }' "$CUSTOM_FILE" 2>/dev/null > "$ds_tmp/doms"
+    # 4b) domain entries for single devices (only DNS per device can give them their own DNS): "name target ip,ip"
+    : > "$ds_tmp/ddoms"
+    dnsd_on && awk -F: '$4 == "dom" && $3 != "" && $1 ~ /^C[0-9]+$/ { print $5 "\t" $2 "\t" $3 }' "$CUSTOM_FILE" 2>/dev/null > "$ds_tmp/ddoms"
     # 5) DNS servers per target (none for the target the normal DNS uses); a server may serve one target only and,
     #    for a VPN, must not be one dnsmasq / the router use anyway (their lookups would follow it)
     ds_used=" $(dnsf_upstreams)"; : > "$ds_tmp/srv"; : > "$ds_tmp/srcs"
     # without "DNS follows the route" only the device part runs: no names, but DNS servers for the device targets
     dnsf_on || { : > "$ds_tmp/doms"; : > "$ds_tmp/learned"; }
-    for ds_t in $( { cut -f2 "$ds_tmp/doms" "$ds_tmp/learned"; dnsd_on && dnsd_targets "$ds_base"; } | sort -u); do
+    for ds_t in $( { cut -f2 "$ds_tmp/doms" "$ds_tmp/learned" "$ds_tmp/ddoms"; dnsd_on && dnsd_targets "$ds_base"; } | sort -u); do
         [ "$ds_t" = "$ds_base" ] && continue
         echo " $VALID_DESTS " | grep -q " $ds_t " || continue
         ds_s=$(dnsf_servers_of "$ds_t"); ds_ok=1
@@ -4358,10 +4378,11 @@ dnsf_sync() {
     if ! dnsf_conf_write && [ $ds_changed -eq 1 ]; then killall -HUP dnsmasq 2>/dev/null; fi
     if [ -s "$ds_tmp/ubf" ] || [ -s "$DNSF_UBSTATE" ]; then dnsf_ub_sync "$ds_tmp/ubf"; fi
     # 10) last: AdGuard Home clients per device (or their removal) - its restart also restarts dnsmasq, nothing else may run then
-    if dnsd_on || [ -f "$DNSD_SUM" ]; then agh_present && dnsd_apply "$ds_tmp/srv_agh" "$ds_base"; fi
+    if dnsd_on || [ -f "$DNSD_SUM" ] || grep -qE "^ +(- )?$DNSD_OURS" "$(agh_yaml)" 2>/dev/null; then agh_present && dnsd_apply "$ds_tmp/srv_agh" "$ds_base" "$ds_tmp/ddoms"; fi
     { echo "mode=$ds_mode"; echo "base=$ds_base"; echo "names=$(wc -l < "$ds_tmp/learned")"; echo "tls=$(echo $ds_tls)"; echo "btls=$ds_btls"
       while read -r ds_t ds_ips; do echo "srv $ds_t $ds_ips"; done < "$ds_tmp/srv"
       sed 's/^/cnt /' "$ds_tmp/state"; sed 's/^/src /' "$ds_tmp/srcs"
+      cut -f2 "$ds_tmp/ddoms" | sort | uniq -c | awk '{ print "ddom", $2, $1 }' 
       if dnsd_on; then dnsd_groups | awk '{ n[$1]++ } END { for (t in n) print "dev", t, n[t] }'; echo "lan $(dnsd_lan)"; fi
       [ -s "$DNSD_ERR" ] && echo "derr $(head -n 1 "$DNSD_ERR")"; } > "$DNSF_STATE"
     rm -rf "$ds_tmp"
@@ -4385,7 +4406,7 @@ dnsf_status() {
         st_c=$(sed -n "s/^cnt $st_t //p" "$DNSF_STATE"); [ -n "$st_c" ] || st_c="0 0"
         st_e=""; case " $(sed -n 's/^tls=//p' "$DNSF_STATE") " in
             *" $st_t:on "*) st_e=" (encrypted, DNS over TLS via Unbound)" ;; *" $st_t:agh "*) st_e=" (encrypted for devices only - no Unbound)" ;; *" $st_t:nofw "*) st_e=" (encrypted for devices only - names: the firmware DNS over TLS would move the normal DNS too)" ;; *" $st_t:noubc "*) st_e=" (encrypted for devices only - unbound-control does not answer: $(ubc status 2>&1 | head -n 1))" ;; *" $st_t:unknown "*) st_e=" (NOT encrypted: no TLS name known for this server)" ;; esac
-        echo "  $st_t: DNS $st_ips$st_e - $(echo "$st_c" | cut -d' ' -f1) domain entries, $(echo "$st_c" | cut -d' ' -f2) learned names"
+        echo "  $st_t: DNS $st_ips$st_e - $(echo "$st_c" | cut -d' ' -f1) domain entries, $(echo "$st_c" | cut -d' ' -f2) learned names$(st_dd=$(sed -n "s/^ddom $st_t //p" "$DNSF_STATE"); [ -n "$st_dd" ] && echo ", $st_dd for single devices")"
     done
     echo "  rules: $(ip rule show 2>/dev/null | grep -c "^${DNSF_PRIO}:\|^$((DNSF_PRIO + 1)):") (prio $DNSF_PRIO/$((DNSF_PRIO + 1))), servers file: $(grep -c . "$DNSF_SERVERS" 2>/dev/null || echo 0) lines"
     if dnsd_on; then
@@ -4408,7 +4429,8 @@ dnsf_json() {
         awk '/^srv / { t = $2; d = ""; for (i = 3; i <= NF; i++) d = d (d == "" ? "" : " ") $i; s[t] = d; o[++n] = t }
              /^cnt / { cd[$2] = $3; cl[$2] = $4 }
              /^src / { sr[$2] = $3 }
-             END { for (i = 1; i <= n; i++) printf "%s{\"t\":\"%s\",\"dns\":\"%s\",\"d\":%d,\"l\":%d,\"src\":\"%s\"}", (i > 1 ? "," : ""), o[i], s[o[i]], cd[o[i]], cl[o[i]], sr[o[i]] }' "$DNSF_STATE"
+             /^ddom / { dd[$2] = $3 }
+             END { for (i = 1; i <= n; i++) printf "%s{\"t\":\"%s\",\"dns\":\"%s\",\"d\":%d,\"l\":%d,\"dd\":%d,\"src\":\"%s\"}", (i > 1 ? "," : ""), o[i], s[o[i]], cd[o[i]], cl[o[i]], dd[o[i]], sr[o[i]] }' "$DNSF_STATE"
         printf ']'
     fi
     printf '}'
@@ -4439,6 +4461,20 @@ agh_up() { pidof AdGuardHome >/dev/null 2>&1 && netstat -lnu 2>/dev/null | grep 
 # its steps end with a line in the system log ("action=stop_adguardhome ... result=completed"); an installer without
 # those lines: wait until the state stays the same for 20 seconds
 AGH_LOG=/tmp/syslog.log
+# the start script of AdGuard Home is busy or stuck: an action holds its lock, more than one monitor runs, or the
+# DNS hand-off marker is left while AdGuard Home does not run (a stop that failed) - then ASN Manager does not touch it
+AGH_LOCK=/tmp/AdGuardHome-service-lock/action
+AGH_HANDOFF=/tmp/AdGuardHome.dns-handoff/active
+agh_monitors() { ps w 2>/dev/null | grep -c '[S]99AdGuardHome monitor-start'; }
+agh_busy() {
+    [ -d "$AGH_LOCK" ] && return 0
+    [ "$(agh_monitors)" -gt 1 ] && return 0
+    [ -e "$AGH_HANDOFF" ] && ! pidof AdGuardHome >/dev/null 2>&1 && return 0
+    return 1
+}
+agh_stuck_msg() {
+    echo "AdGuard Home's start script is busy or stuck (lock $AGH_LOCK, $(agh_monitors) monitor(s), hand-off marker $( [ -e "$AGH_HANDOFF" ] && echo present || echo none )) - ASN Manager changed nothing and tries again later. If AdGuard Home does not run: kill the S99AdGuardHome monitor-start processes (kill -9), rm -rf /tmp/AdGuardHome.dns-handoff /tmp/AdGuardHome-start-traps.* $AGH_LOCK, then /opt/etc/init.d/S99AdGuardHome start - or reboot the router."
+}
 agh_log_n() { an=$(grep -cE "$1" "$AGH_LOG" 2>/dev/null); echo "${an:-0}"; }
 # AdGuard Home may be restarting by itself right now (its installer does that after a dnsmasq restart, e.g. after
 # "apply"): wait until it runs, answers and its start script has written nothing for 10 seconds
@@ -4447,7 +4483,7 @@ agh_settle() {
     while [ $ase_i -lt 180 ]; do
         sleep 2; ase_i=$((ase_i + 2))
         ase_n=$(agh_log_n 'S99AdGuardHome')
-        if [ "$ase_n" = "$ase_l" ] && agh_up && nslookup router.asus.com 127.0.0.1 >/dev/null 2>&1; then
+        if [ "$ase_n" = "$ase_l" ] && ! agh_busy && agh_up && nslookup router.asus.com 127.0.0.1 >/dev/null 2>&1; then
             ase_q=$((ase_q + 2)); [ $ase_q -ge 10 ] && return 0
         else ase_q=0; fi
         ase_l=$ase_n
@@ -4462,6 +4498,7 @@ agh_stop_wait() {
         sleep 2; asw_i=$((asw_i + 2))
         asw_n=$(agh_log_n 'action=stop_adguardhome.*result=completed'); [ "$asw_n" -lt "$asw_n0" ] && asw_n0=0
         if pidof AdGuardHome >/dev/null 2>&1; then asw_q=0; continue; fi
+        [ -d "$AGH_LOCK" ] && { asw_q=0; continue; }           # its stop is still at work
         asw_q=$((asw_q + 2))
         [ "$asw_n" -gt "$asw_n0" ] && [ $asw_q -ge 4 ] && return 0
         [ $asw_q -ge 20 ] && return 0
@@ -4488,13 +4525,14 @@ agh_start_wait() {
 # "target ip" of the VPN Director: active rules for a device (source, no destination)
 dnsd_groups() {
     [ -r "$VPND_FILE" ] || return 0
-    tr '<' '\n' < "$VPND_FILE" | awk -F'>' '$1 == "1" && $3 != "" && $4 == "" {
-        t = toupper($5); if (t == "WAN") t = "WAN1"; print t, $3 }' | sort -u
+    # one address as "a.b.c.d/32" is the same device as "a.b.c.d"; the router itself (its own rule, e.g. for Unbound) is no device
+    tr '<' '\n' < "$VPND_FILE" | awk -F'>' -v rt="$(nvram get lan_ipaddr 2>/dev/null)" '$1 == "1" && $3 != "" && $4 == "" {
+        t = toupper($5); if (t == "WAN") t = "WAN1"; ip = $3; sub(/\/32$/, "", ip); if (ip == rt) next; print t, ip }' | sort -u
 }
 # "ip<TAB>description" of the VPN Director rules for devices
 dnsd_descs() {
     [ -r "$VPND_FILE" ] || return 0
-    tr '<' '\n' < "$VPND_FILE" | awk -F'>' '$1 == "1" && $3 != "" && $4 == "" && $2 != "" { print $3 "\t" $2 }'
+    tr '<' '\n' < "$VPND_FILE" | awk -F'>' '$1 == "1" && $3 != "" && $4 == "" && $2 != "" { ip = $3; sub(/\/32$/, "", ip); print ip "\t" $2 }'
 }
 # a readable name for a device (as AdGuard Home showed it before): name set in the router client list, static DHCP
 # name, DHCP host name, the name seen last time, the description of its VPN Director rule - the address otherwise.
@@ -4506,7 +4544,7 @@ dnsd_name() {
         dn_mac=$(awk -v i="$dn_ip" '$3 == i { print toupper($2); exit }' /var/lib/misc/dnsmasq.leases 2>/dev/null)
         [ -n "$dn_mac" ] || dn_mac=$(awk -v i="$dn_ip" '$1 == i && $4 != "00:00:00:00:00:00" { print toupper($4); exit }' /proc/net/arp 2>/dev/null)
         [ -n "$dn_mac" ] && dn_n=$(nvram get custom_clientlist 2>/dev/null | tr '<' '\n' | awk -F'>' -v m="$dn_mac" 'toupper($2) == m { print $1; exit }' | dnsd_clean)
-        [ -n "$dn_n" ] || dn_n=$(awk -v i="$dn_ip" '$1 == i { print $2; exit }' /etc/hosts.dnsmasq 2>/dev/null | dnsd_clean)
+        [ -n "$dn_n" ] || dn_n=$(awk -v i="$dn_ip" '$1 == i { print $2; exit }' /etc/hosts.dnsmasq /jffs/addons/YazDHCP.d/.hostnames 2>/dev/null | dnsd_clean)
         [ -n "$dn_n" ] || dn_n=$(awk -v i="$dn_ip" '$3 == i && $4 != "*" { print $4; exit }' /var/lib/misc/dnsmasq.leases 2>/dev/null | dnsd_clean)
     esac
     if [ -n "$dn_n" ]; then
@@ -4589,7 +4627,28 @@ dnsd_yaml_write() {
         END { if (inb) endblock() }' "$2"
 }
 
-# $1 = file "target ip ip" (DNS servers), $2 = target of the normal DNS
+# upstreams of one device for the domain entries only for it: "[/a.com/b.com/]server" per server of their target
+# ($1 = device ip, $2 = its own target, $3 = target of the normal DNS, $4 = servers file, $5 = entries file, $6 = dnsmasq,
+#  $7 = ipset file of AdGuard Home). Only names AdGuard Home puts into the sets itself (its ipset copy) - otherwise the
+#  entry would learn nothing, so dnsmasq keeps them. Prints "N name" lines for the names, then the upstream lines.
+dnsd_spec() {
+    [ -s "$5" ] && [ -n "$7" ] && [ -r "$7" ] || return 0
+    awk -F'\t' -v ip="$1" -v own="$2" -v base="$3" -v srvf="$4" -v dm="$6" -v ipf="$7" '
+        BEGIN { while ((getline l < srvf) > 0) { n = split(l, a, " "); k = a[1]; sub(/^[^ ]* /, "", l); srv[k] = l }
+                # domains of the ipset copy of AdGuard Home ("a.com,b.com/set,set" or "/a.com/b.com/set,set")
+                while ((getline l < ipf) > 0) { n = split(l, p, "/"); if (n < 2 || p[n] !~ /ASN[CD]_/) continue
+                    for (i = 1; i < n; i++) { m = split(p[i], q, ","); for (j = 1; j <= m; j++) if (q[j] != "") fill[q[j]] = 1 } } }
+        {
+            n = split($3, d, ","); hit = 0; for (i = 1; i <= n; i++) if (d[i] == ip) hit = 1
+            if (!hit || $2 == own) next
+            if (!($1 in fill)) next                                # AdGuard Home does not fill its set: leave it to dnsmasq
+            if ($2 == base) to = dm; else if ($2 in srv) to = srv[$2]; else next
+            print "N " $1; names[to] = names[to] $1 "/"
+        }
+        END { for (to in names) { n = split(to, s, " "); for (i = 1; i <= n; i++) print "        - '\''[/" names[to] "]" s[i] "'\''" } }' "$5"
+}
+
+# $1 = file "target ip ip" (DNS servers), $2 = target of the normal DNS, $3 = domain entries for single devices
 dnsd_apply() {
     rm -f "$DNSD_ERR"
     da_y=$(agh_yaml) || { echo "AdGuard Home not found." > "$DNSD_ERR"; return 1; }
@@ -4604,12 +4663,17 @@ dnsd_apply() {
         da_doms=$(awk -F: '$4 == "dom" && $1 ~ /^C[0-9]+$/ { print $5 }' "$CUSTOM_FILE" 2>/dev/null | sort -u | tr '\n' '/')
         dnsd_groups > "$da_tmp/groups"
         da_lan=$(dnsd_lan)
+        da_ipf=$(sed -n 's/^ *ipset_file: *//p' "$da_y" | tr -d "\"' " | head -n 1)
+        # devices with domain entries only for them that are not in the VPN Director: their normal way is WAN
+        [ -s "$3" ] && cut -f3 "$3" | tr ',' '\n' | grep -E '^[0-9.]+$' | sort -u | while read -r da_x; do
+            awk -v i="$da_x" '$2 == i { f = 1 } END { exit !f }' "$da_tmp/groups" || echo "WAN1 $da_x"
+        done >> "$da_tmp/groups"
         # one client per device (named like the device, so AdGuard Home keeps showing its name); devices of the normal
         # target get one without own upstreams (it must win over the LAN range); the LAN range catches all others
         dnsd_foreign_ids "$da_y" | sort -u > "$da_tmp/foreign"
         : > "$da_tmp/names"
         for da_t in $( { cut -d' ' -f1 "$da_tmp/groups"; echo WAN1; } | sort -u); do
-            [ "$da_t" = "$2" ] && [ "$(echo "$2" | cut -c1-3)" = "WAN" ] && continue      # normal DNS goes over WAN: nothing to do for it
+            da_same=0; [ "$da_t" = "$2" ] && [ "$(echo "$2" | cut -c1-3)" = "WAN" ] && da_same=1   # normal DNS goes over WAN
             da_srv=""; [ "$da_t" != "$2" ] && da_srv=$(awk -v t="$da_t" '$1 == t { $1 = ""; print }' "$1")
             da_ids=$(awk -v t="$da_t" '$1 == t { print $2 }' "$da_tmp/groups")
             [ "$da_t" = "WAN1" ] && [ "$da_t" != "$2" ] && [ -n "$da_lan" ] && da_ids="$da_ids @LAN@"
@@ -4622,6 +4686,14 @@ dnsd_apply() {
                     fi
                     da_n=$(dnsd_name "$da_i")
                 fi
+                # own DNS for the domain entries only for this device
+                : > "$da_tmp/spec"; case "$da_i" in */*) ;; *) dnsd_spec "$da_i" "$da_t" "$2" "$1" "$3" "$da_dm" "$da_ipf" > "$da_tmp/spec" ;; esac
+                [ $da_same -eq 1 ] && [ ! -s "$da_tmp/spec" ] && continue                            # nothing differs from the global upstreams
+                da_ddoms=$da_doms
+                if [ -s "$da_tmp/spec" ]; then
+                    sed -n 's/^N //p' "$da_tmp/spec" > "$da_tmp/specn"
+                    da_ddoms=$(echo "$da_doms" | tr '/' '\n' | grep -v '^$' | grep -vxF -f "$da_tmp/specn" | tr '\n' '/')
+                fi
                 grep -qxF "$da_n" "$da_tmp/names" && da_n="$da_n $da_i"
                 echo "$da_n" >> "$da_tmp/names"
                 {
@@ -4629,11 +4701,13 @@ dnsd_apply() {
                     echo "      ids:"
                     echo "        - $da_i"
                     echo "      tags: []"
-                    if [ -n "$(echo $da_srv)" ]; then
+                    if [ -n "$(echo $da_srv)" ] || [ -s "$da_tmp/spec" ]; then
                         echo "      upstreams:"
                         sed 's/^/        - /' "$da_tmp/local"
-                        [ -n "$da_doms" ] && echo "        - '[/${da_doms}]${da_dm}'"
-                        for da_s in $da_srv; do echo "        - $da_s"; done
+                        [ -n "$da_ddoms" ] && echo "        - '[/${da_ddoms}]${da_dm}'"
+                        grep -v '^N ' "$da_tmp/spec"
+                        if [ -n "$(echo $da_srv)" ]; then for da_s in $da_srv; do echo "        - $da_s"; done
+                        else echo "        - $da_dm"; fi                                             # the rest as everyone else
                     else
                         echo "      upstreams: []"
                     fi
@@ -4668,16 +4742,22 @@ dnsd_apply() {
     if ! grep -q '^  persistent:' "$da_tmp/new.yaml" || [ "$(grep -E '^[a-z_]+:' "$da_tmp/new.yaml")" != "$(grep -E '^[a-z_]+:' "$da_y")" ]; then
         echo "AdGuard Home configuration not changed: the result looked wrong." > "$DNSD_ERR"; rm -rf "$da_tmp"; return 1
     fi
-    agh_settle
+    if ! agh_settle || agh_busy; then
+        agh_stuck_msg > "$DNSD_ERR"; logger -t ASNmanager "DNS per device: $(cat "$DNSD_ERR")"; rm -rf "$da_tmp"; return 1
+    fi
     cp -f "$da_y" "$DNSD_BAK"
     # stopped completely first (it may write its configuration while stopping), then written, then started and checked
-    agh_stop_wait
+    if ! agh_stop_wait || agh_busy; then
+        # its stop did not finish: nothing written; its own monitor brings it back, or the user has to clean up
+        agh_stuck_msg > "$DNSD_ERR"; logger -t ASNmanager "DNS per device: stopping AdGuard Home did not finish - $(cat "$DNSD_ERR")"
+        rm -rf "$da_tmp"; return 1
+    fi
     dnsd_yaml_write "$da_tmp/items" "$da_y" > "$da_tmp/new.yaml" && cp -f "$da_tmp/new.yaml" "$da_y"
     if agh_start_wait && grep -q '^  persistent:' "$da_y"; then
         echo "$da_sum" > "$DNSD_SUM"
         logger -t ASNmanager "DNS per device: $(echo "$da_names" | sed '/^$/d' | wc -l) AdGuard Home clients written, AdGuard Home restarted"
     else
-        agh_stop_wait; cp -f "$DNSD_BAK" "$da_y"; agh_start_wait
+        if agh_busy; then cp -f "$DNSD_BAK" "$da_y"; else agh_stop_wait; cp -f "$DNSD_BAK" "$da_y"; agh_busy || agh_start_wait; fi
         rm -f "$DNSD_SUM"
         rm -f "$DNSD_FLAG"
         echo "AdGuard Home did not start with the new clients - its old configuration was put back and \"DNS per device\" was turned off (see the system log)." > "$DNSD_ERR"

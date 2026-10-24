@@ -223,6 +223,7 @@ window.ASNM_LANGPACK = {"code": "nl", "locale": "nl-NL", "name": "Nederlands", "
 "dw_other_devs": "apparaten die niet in de VPN Director staan",
 "dw_doms": "{n} domeinen",
 "dw_names": "{n} geleerde namen",
+"dw_ddoms": "{n} domein(en) voor afzonderlijke apparaten",
 "dw_src_router_wan": "uit de WAN-instellingen van de router",
 "dw_src_router": "uit de VPN-client van de router (omzeilt AdGuard Home - beter hier invoeren)",
 "dw_src_auto": "automatisch gekozen (openbare DNS door de tunnel)",

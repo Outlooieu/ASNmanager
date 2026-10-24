@@ -223,6 +223,7 @@ window.ASNM_LANGPACK = {"code": "ro", "locale": "ro-RO", "name": "Română", "t"
 "dw_other_devs": "dispozitive care nu sunt în VPN Director",
 "dw_doms": "{n} domenii",
 "dw_names": "{n} nume învățate",
+"dw_ddoms": "{n} domeniu(i) pentru anumite dispozitive",
 "dw_src_router_wan": "din setările WAN ale routerului",
 "dw_src_router": "din clientul VPN al routerului (ocolește AdGuard Home - mai bine introdu-l aici)",
 "dw_src_auto": "ales automat (DNS public prin tunel)",

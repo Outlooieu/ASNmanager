@@ -223,6 +223,7 @@ window.ASNM_LANGPACK = {"code": "ru", "locale": "ru-RU", "name": "Русский
 "dw_other_devs": "устройства не из VPN Director",
 "dw_doms": "Доменов: {n}",
 "dw_names": "Изученных имён: {n}",
+"dw_ddoms": "Доменов для отдельных устройств: {n}",
 "dw_src_router_wan": "из настроек WAN роутера",
 "dw_src_router": "из VPN-клиента роутера (обходит AdGuard Home - лучше укажите здесь)",
 "dw_src_auto": "выбран автоматически (публичный DNS через туннель)",

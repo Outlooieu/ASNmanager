@@ -223,6 +223,7 @@ window.ASNM_LANGPACK = {"code": "tr", "locale": "tr-TR", "name": "Türkçe", "t"
 "dw_other_devs": "VPN Director'da olmayan cihazlar",
 "dw_doms": "{n} alan adı",
 "dw_names": "{n} öğrenilmiş ad",
+"dw_ddoms": "Tek cihazlar için {n} alan adı",
 "dw_src_router_wan": "yönlendiricinin WAN ayarlarından",
 "dw_src_router": "yönlendiricinin VPN istemcisinden (AdGuard Home'u atlar - buraya girmeniz daha iyi)",
 "dw_src_auto": "otomatik seçildi (tünel üzerinden genel DNS)",
