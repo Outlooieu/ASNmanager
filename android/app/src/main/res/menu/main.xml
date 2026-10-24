@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/m_reload" android:title="@string/menu_reload" />
+    <item android:id="@+id/m_browser" android:title="@string/menu_browser" />
+    <item android:id="@+id/m_logout" android:title="@string/menu_logout" />
+    <item android:id="@+id/m_settings" android:title="@string/menu_settings" />
+</menu>

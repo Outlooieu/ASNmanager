@@ -1,0 +1,30 @@
+<resources>
+    <string name="setup_title">Router</string>
+    <string name="setup_intro">Die App öffnet die ASN-Manager-Seite deines Routers und meldet dich an. Nimm die Adresse, die du im Browser für den Router eingibst, z. B. http://192.168.1.1 oder https://192.168.1.1:8443. Von unterwegs nur über ein VPN (z. B. den WireGuard-Server des Routers) - die Router-Seite nicht ins Internet freigeben.</string>
+    <string name="setup_url">Router-Adresse</string>
+    <string name="setup_user">Benutzername</string>
+    <string name="setup_pass">Passwort</string>
+    <string name="setup_save">Speichern und verbinden</string>
+    <string name="setup_logout">Beim Verlassen der App abmelden</string>
+    <string name="setup_logout_help">Der Router erlaubt nur einen Administrator gleichzeitig. Abmelden gibt die Router-Seite wieder für deinen PC frei.</string>
+    <string name="setup_forget_cert">Gespeichertes Router-Zertifikat vergessen</string>
+    <string name="setup_bad_url">Bitte eine Adresse mit http:// oder https:// eingeben</string>
+    <string name="setup_need">Bitte alle Felder ausfüllen.</string>
+    <string name="setup_stored">Das Passwort wird verschlüsselt nur auf diesem Handy gespeichert.</string>
+    <string name="menu_reload">Neu laden</string>
+    <string name="menu_settings">Router-Einstellungen</string>
+    <string name="menu_logout">Abmelden</string>
+    <string name="menu_browser">Im Browser öffnen</string>
+    <string name="st_login">Anmeldung…</string>
+    <string name="st_search">Suche die ASN-Manager-Seite…</string>
+    <string name="st_notfound">Die ASN-Manager-Seite wurde auf dem Router nicht gefunden. Ist die WebUI installiert (SSH-Menü, WebUI)?</string>
+    <string name="st_loginfail">Anmeldung fehlgeschlagen. Benutzername und Passwort prüfen - oder ein anderer Administrator ist angemeldet (der Router erlaubt nur einen).</string>
+    <string name="st_neterr">Der Router ist nicht erreichbar: %1$s</string>
+    <string name="st_retry">Nochmal</string>
+    <string name="cert_title">Router-Zertifikat</string>
+    <string name="cert_new">Der Router nutzt ein eigenes Zertifikat (bei Routern normal). Vertrauen?\n\nSHA-256:\n%1$s\n\nDie App merkt es sich und warnt, falls es sich jemals ändert.</string>
+    <string name="cert_changed">ACHTUNG: Das Zertifikat des Routers hat sich geändert!\n\nNeues SHA-256:\n%1$s\n\nWenn du es nicht selbst erneuert hast (z. B. nach einem Reset), nicht fortfahren.</string>
+    <string name="cert_trust">Vertrauen</string>
+    <string name="saved">In Downloads gespeichert: %1$s</string>
+    <string name="cancel">Abbrechen</string>
+</resources>
