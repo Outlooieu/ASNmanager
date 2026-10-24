@@ -1,12 +1,12 @@
 #!/bin/sh
-version=3.9.22
+version=3.9.23
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
-SCRIPT_VERSION="3.9.22"
+SCRIPT_VERSION="3.9.23"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -1303,6 +1303,7 @@ backup_text() {
     echo "DNS_FOLLOW=$(dnsf_on && echo on || echo off)"
     echo "DNS_DEVICE=$(dnsd_on && echo on || echo off)"
     echo "DNS_TLS=$(dnsf_tls_on && echo on || echo off)"
+    echo "MAIL_NOTIFY=$(mail_mode)"
     return 0
 }
 
@@ -1374,7 +1375,8 @@ rs_setting() {
         DNS_FOLLOW:on|DNS_FOLLOW:off)  dnsf_set "$2" ;;
         DNS_DEVICE:on|DNS_DEVICE:off)  dnsd_set "$2" ;;
         DNS_TLS:on|DNS_TLS:off)        dnsf_tls_set "$2" ;;
-        STATS:*|STATS_SAVING:*|STATS_MODE:*|RULES_MODE:*|WEBUI_LOCATION:*|SG_DOMAINS:*|DNS_FOLLOW:*|DNS_DEVICE:*|DNS_TLS:*)   echo "Invalid value '$2' for $1 skipped."; return 0 ;;
+        MAIL_NOTIFY:off|MAIL_NOTIFY:daily|MAIL_NOTIFY:weekly)  mail_set "$2" ;;
+        STATS:*|STATS_SAVING:*|STATS_MODE:*|RULES_MODE:*|WEBUI_LOCATION:*|SG_DOMAINS:*|DNS_FOLLOW:*|DNS_DEVICE:*|DNS_TLS:*|MAIL_NOTIFY:*)   echo "Invalid value '$2' for $1 skipped."; return 0 ;;
         *)                echo "Unknown setting '$1' skipped."; return 0 ;;
     esac
     echo "Setting applied: $1 = $2."
@@ -2963,6 +2965,7 @@ web_export() {
         preset_all | awk -F'|' '{ gsub(/["\\]/, "", $2); printf "%s{\"cat\":\"%s\",\"name\":\"%s\",\"items\":\"%s\",\"wide\":%d,\"own\":%d,\"file\":\"%s\"}", (NR > 1 ? "," : ""), $1, $2, $3, ($4 == "wide"), ($5 == "own"), $6 }'
         printf ']'
         dnsf_json
+        mail_json
         printf ',"pfiles":["/jffs/addons/asnmanager/presets.txt"'
         for pf_d in /tmp/mnt/*/ASNmanager; do [ -d "$pf_d" ] && printf ',"%s"' "$pf_d/presets.txt" | tr -d '\\'; done
         printf ']}\n'
@@ -3192,6 +3195,7 @@ web_job() {
         speedtest) st_run "$a1" > "$OUT" 2>&1 ;;
         setting)  rs_setting "$a1" "$a2" > "$OUT" 2>&1 ;;
         dnsfsrv)  dnsf_server_set "$a1" $(echo "$a2" | tr ',' ' ') > "$OUT" 2>&1 ;;
+        mailtest) mail_test > "$OUT" 2>&1 ;;
         failover) fbs=""; [ -n "$a2" ] && fbs="$a2"; [ -n "$a3" ] && fbs="${fbs:+$fbs,}$a3"
                   fo_set "$a1" "$fbs" > "$OUT" 2>&1 ;;
         *)        echo "Unknown action '$act'" > "$OUT"; false ;;
@@ -5997,6 +6001,135 @@ upd_check() {
         "$(date +%s)" "$SCRIPT_VERSION" "$u_rv" "$u_newer" "$u_err" "$UPD_NOTES" > "$WEB_DIR/update.js.tmp" && mv -f "$WEB_DIR/update.js.tmp" "$WEB_DIR/update.js"
 }
 
+# ---------- e-mail when a new version is out (uses the e-mail settings of amtm) ----------
+# Only a notice - nothing is installed. Checked once a day (from the 5-minute check, from 09:00 on); one e-mail per
+# new version at most, and at most one a day (or a week): several releases on one day come as one e-mail that lists
+# all their changes.
+MAIL_DIR=/jffs/addons/amtm/mail
+MAIL_FLAG="$ADDON_DIR/mail_notify"
+MAIL_STATE="$ADDON_DIR/mail_state"
+MAIL_HOUR=9
+CHANGELOG_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/CHANGELOG.md"
+mail_mode() { mm_m=$(cat "$MAIL_FLAG" 2>/dev/null); case "$mm_m" in daily|weekly) echo "$mm_m" ;; *) echo off ;; esac; }
+mail_amtm_ok() { [ -s "$MAIL_DIR/email.conf" ] && [ -s "$MAIL_DIR/emailpw.enc" ]; }
+mail_st() { sed -n "s/^$1=//p" "$MAIL_STATE" 2>/dev/null | head -n 1; }
+mail_st_set() {
+    { grep -v "^$1=" "$MAIL_STATE" 2>/dev/null; echo "$1=$2"; } > "$MAIL_STATE.new" && mv -f "$MAIL_STATE.new" "$MAIL_STATE"
+}
+mail_set() {
+    case "$1" in
+        daily|weekly) mail_amtm_ok || echo "Note: amtm has no e-mail settings yet (amtm > em) - nothing can be sent until then."
+                      mkdir -p "$ADDON_DIR"; echo "$1" > "$MAIL_FLAG"; echo "E-mail on new versions: $1." ;;
+        off)          rm -f "$MAIL_FLAG"; echo "E-mail on new versions: off." ;;
+        *)            echo "Usage: mail off|daily|weekly|test|check|status"; return 1 ;;
+    esac
+    [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1
+    return 0
+}
+# $1 = subject, $2 = file with the text; uses email.conf / emailpw.enc of amtm (as amtm and Diversion do)
+mail_send() {
+    mail_amtm_ok || { echo "amtm has no e-mail settings (amtm > em)."; return 1; }
+    (
+        . "$MAIL_DIR/email.conf"
+        [ -n "$TO_ADDRESS" ] && [ -n "$SMTP" ] || { echo "amtm e-mail settings are incomplete."; exit 1; }
+        ms_name=${FRIENDLY_ROUTER_NAME:-$(nvram get productid 2>/dev/null)}
+        ms_body=/tmp/asnmanager-mail.txt
+        {
+            echo "From: \"ASN Manager ($ms_name)\" <$FROM_ADDRESS>"
+            echo "To: \"${TO_NAME:-$TO_ADDRESS}\" <$TO_ADDRESS>"
+            echo "Subject: $1"
+            echo "Date: $(date -R)"
+            echo "MIME-Version: 1.0"
+            echo "Content-Type: text/plain; charset=UTF-8"
+            echo "Content-Transfer-Encoding: 8bit"
+            echo ""
+            cat "$2"
+        } > "$ms_body"
+        ms_out=$(/usr/sbin/curl -sS -m 60 --url "$PROTOCOL://$SMTP:$PORT/$SMTP" --mail-from "$FROM_ADDRESS" --mail-rcpt "$TO_ADDRESS" \
+            --upload-file "$ms_body" --ssl-reqd --crlf \
+            --user "$USERNAME:$(/usr/sbin/openssl aes-256-cbc $emailPwEnc -d -in "$MAIL_DIR/emailpw.enc" -pass pass:ditbabot,isoi 2>/dev/null)" $SSL_FLAG 2>&1)
+        ms_rc=$?; rm -f "$ms_body"
+        [ $ms_rc -eq 0 ] || { echo "Sending failed: $(echo "$ms_out" | tail -n 1)"; exit 1; }
+        echo "E-mail sent to $TO_ADDRESS."
+    )
+}
+# the sections of CHANGELOG.md newer than $1 up to $2, as plain text
+mail_changes() {
+    mc_f=/tmp/asnmanager-changelog.md
+    curl -s -k --connect-timeout 8 -m 60 "$CHANGELOG_URL?t=$(date +%s)" -o "$mc_f" 2>/dev/null && [ -s "$mc_f" ] || { rm -f "$mc_f"; return 1; }
+    awk -v cur="$1" -v rem="$2" '
+        function cmp(a, b,   x, y, i) { split(a, x, "."); split(b, y, "."); for (i = 1; i <= 3; i++) { if (x[i] + 0 > y[i] + 0) return 1; if (x[i] + 0 < y[i] + 0) return -1 } return 0 }
+        /^## v[0-9]/ { v = substr($2, 2); show = (cmp(v, cur) > 0 && cmp(v, rem) <= 0); if (show) { if (n++) print ""; print "v" v } ; next }
+        show && NF { gsub(/\*\*/, ""); gsub(/`/, ""); if (++lines <= 200) print }
+        END { if (lines > 200) print "... (more in the full changelog)" }' "$mc_f"
+    rm -f "$mc_f"
+}
+# $1 = "force": check now (also when already checked today)
+mail_check() {
+    [ "$(mail_mode)" = "off" ] && return 0
+    mc_today=$(date +%Y%m%d)
+    if [ "$1" != "force" ]; then
+        [ "$(mail_st checked)" = "$mc_today" ] && return 0
+        [ "$(date +%H | sed 's/^0//')" -ge "$MAIL_HOUR" ] || return 0
+    fi
+    mail_st_set checked "$mc_today"
+    mc_tmp="/tmp/${WEBUI_NS}-mail-check.tmp"; mc_rv=$(upd_fetch "$mc_tmp" head); rm -f "$mc_tmp"
+    [ -n "$mc_rv" ] || { mail_st_set err "GitHub not reachable"; return 1; }
+    is_remote_newer "$SCRIPT_VERSION" "$mc_rv" || { mail_st_set err ""; return 0; }
+    [ "$(mail_st sent)" = "$mc_rv" ] && return 0                                   # already told about this version
+    mc_last=$(mail_st sent_ts); case "$mc_last" in ''|*[!0-9]*) mc_last=0 ;; esac
+    [ "$(mail_mode)" = "weekly" ] && [ $(( $(date +%s) - mc_last )) -lt 590400 ] && return 0   # about 7 days (a little less, so the same weekday works)
+    mc_txt=/tmp/asnmanager-mail-body.txt
+    {
+        echo "A new version of ASN Manager is available on $(nvram get productid 2>/dev/null)."
+        echo ""
+        echo "Installed:  v$SCRIPT_VERSION"
+        echo "Available:  v$mc_rv"
+        echo ""
+        echo "Changes since your version:"
+        echo ""
+        mail_changes "$SCRIPT_VERSION" "$mc_rv" || echo "(the changelog could not be fetched)"
+        echo ""
+        echo "Full changelog: $UPD_NOTES"
+        echo ""
+        echo "Nothing was installed. To update: WebUI > ASN Manager > Update now, or SSH menu > update."
+        echo "You get at most one e-mail per new version and $( [ "$(mail_mode)" = weekly ] && echo week || echo day ) - Settings > E-mail on new versions."
+    } > "$mc_txt"
+    if mc_out=$(mail_send "ASN Manager v$mc_rv available (installed: v$SCRIPT_VERSION)" "$mc_txt"); then
+        mail_st_set sent "$mc_rv"; mail_st_set sent_ts "$(date +%s)"; mail_st_set err ""
+        logger -t ASNmanager "E-mail: v$mc_rv announced"
+    else
+        mail_st_set err "$mc_out"; mail_st_set checked ""                              # try again at the next check
+        logger -t ASNmanager "E-mail about v$mc_rv not sent: $mc_out"
+    fi
+    rm -f "$mc_txt"
+    [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1
+    return 0
+}
+mail_test() {
+    mt_txt=/tmp/asnmanager-mail-test.txt
+    {
+        echo "This is a test of ASN Manager v$SCRIPT_VERSION on $(nvram get productid 2>/dev/null)."
+        echo ""
+        echo "When a new version is out you get an e-mail like this one, with the changes since your version."
+        echo "Setting: $(mail_mode) (at most one e-mail per new version and day / week). Nothing is ever installed by it."
+    } > "$mt_txt"
+    mail_send "ASN Manager: test e-mail" "$mt_txt"; mt_rc=$?
+    rm -f "$mt_txt"; return $mt_rc
+}
+mail_status() {
+    echo "E-mail on new versions: $(mail_mode)"
+    mail_amtm_ok && echo "  amtm e-mail settings: found ($MAIL_DIR)" || echo "  amtm e-mail settings: missing - set them up in amtm (em)"
+    [ -n "$(mail_st sent)" ] && echo "  last e-mail: v$(mail_st sent) ($(date -d "@$(mail_st sent_ts)" '+%Y-%m-%d %H:%M' 2>/dev/null))"
+    [ -n "$(mail_st checked)" ] && echo "  last check: $(mail_st checked)"
+    [ -n "$(mail_st err)" ] && echo "  last error: $(mail_st err)"
+    return 0
+}
+mail_json() {
+    printf ',"mail":{"mode":"%s","amtm":%d,"sent":"%s","sts":"%s","err":"%s"}' "$(mail_mode)" "$(mail_amtm_ok && echo 1 || echo 0)" \
+        "$(mail_st sent | tr -cd '0-9.')" "$(mail_st sent_ts | tr -cd '0-9')" "$(mail_st err | tr -d '"\\' | cut -c1-200)"
+}
+
 # Installs a newer version from GitHub. Safe by design:
 #  - syntax check before anything is replaced, previous script kept as ASNmanager.sh.bak
 #  - the new file is written next to the script and renamed (atomic; the running old copy stays intact)
@@ -6331,6 +6464,7 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   restore <file> [--only asn,schedule,failover,settings] [--merge]   restore a backup (all or only the chosen parts)
   rescue                             stop stuck ASN Manager jobs, remove locks, restart failover and statistics
   amtmupdate [check]                 update for amtm (check: exit code 0 = amtm may update)
+  mail off|daily|weekly|test|check|status  e-mail on new versions (amtm e-mail settings; a notice only)
   webui install [local] | enable | disable | update | uninstall | mount | unmount | export
   webui location <vpn|addons>        show the tab in the VPN (default) or the Addons menu
 USAGE_EOF
@@ -6439,8 +6573,17 @@ cli_main() {
                      # new ASN names: write the page data again so they show up without a manual refresh
                      nm_before=$(md5sum "$NAMES_FILE" 2>/dev/null | cut -c1-32)
                      names_fill 12 >/dev/null 2>&1
-                     [ "$(md5sum "$NAMES_FILE" 2>/dev/null | cut -c1-32)" != "$nm_before" ] && [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1 ;;
+                     [ "$(md5sum "$NAMES_FILE" 2>/dev/null | cut -c1-32)" != "$nm_before" ] && [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1
+                     mail_check >/dev/null 2>&1 ;;
                 *)   rc_print ;;
+            esac ;;
+        mail)
+            case "$1" in
+                off|daily|weekly) mail_set "$1" ;;
+                test)        mail_test ;;
+                check)       mail_check force; mail_status ;;
+                status|"")   mail_status ;;
+                *)           echo "Usage: mail off|daily|weekly|test|check|status"; false ;;
             esac ;;
         update)
             case "$1" in

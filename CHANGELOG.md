@@ -1,3 +1,7 @@
+## v3.9.23
+
+- **E-mail on new versions** (Settings → "E-mail on new versions", off by default; suggested by AvalonOC): a notice with the installed version, the new version, the changes since your version (from the changelog) and the link to the full changelog - nothing is installed, updates stay manual. Uses the e-mail settings of amtm (`/jffs/addons/amtm/mail`). Checked once a day from 9:00 with the routing check; at most one e-mail per new version and per day or week, so several releases on one day come as one e-mail. "Send test e-mail" in the WebUI; command line `mail off|daily|weekly|test|check|status`; part of backups (`MAIL_NOTIFY`)
+
 ## v3.9.22
 
 - Update check every time the WebUI page is opened (before: when the last check was older than 6 hours); not again within a minute (quick reload). The check only fetches the first 4 KB of the script on GitHub
