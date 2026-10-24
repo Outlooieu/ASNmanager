@@ -3196,6 +3196,7 @@ web_job() {
         setting)  rs_setting "$a1" "$a2" > "$OUT" 2>&1 ;;
         dnsfsrv)  dnsf_server_set "$a1" $(echo "$a2" | tr ',' ' ') > "$OUT" 2>&1 ;;
         mailtest) mail_test > "$OUT" 2>&1 ;;
+        aghlogin) rm -f "$AGH_AUTH.refused"; agh_login "$a1" > "$OUT" 2>&1 ;;
         failover) fbs=""; [ -n "$a2" ] && fbs="$a2"; [ -n "$a3" ] && fbs="${fbs:+$fbs,}$a3"
                   fo_set "$a1" "$fbs" > "$OUT" 2>&1 ;;
         *)        echo "Unknown action '$act'" > "$OUT"; false ;;
@@ -4423,6 +4424,7 @@ dnsf_status() {
 # for data.js: ,"dnsf":{...}
 dnsf_json() {
     printf ',"dnsf":{"on":%d,"dev":%d,"agh":%d,"tls":%d,"tlsst":"%s"' "$(dnsf_on && echo 1 || echo 0)" "$(dnsd_on && echo 1 || echo 0)" "$(agh_present && echo 1 || echo 0)" "$(dnsf_tls_on && echo 1 || echo 0)" "$(sed -n 's/^tls=//p' "$DNSF_STATE" 2>/dev/null) base:$(sed -n 's/^btls=//p' "$DNSF_STATE" 2>/dev/null)"
+    printf ',"aghlogin":%d,"aghrefused":%d,"aghapi":"%s"' "$([ -s "$AGH_AUTH" ] && echo 1 || echo 0)" "$([ -s "$AGH_AUTH.refused" ] && echo 1 || echo 0)" "$(head -n 1 "$AGH_API_ST" 2>/dev/null | tr -d '"\\' | cut -c1-200)"
     if [ -f "$DNSF_STATE" ]; then
         printf ',"lan":"%s","derr":"%s","devs":{' "$(sed -n 's/^lan //p' "$DNSF_STATE")" "$(sed -n 's/^derr //p' "$DNSF_STATE" | tr -d '"\\')"
         sed -n 's/^dev //p' "$DNSF_STATE" | awk '{ printf "%s\"%s\":%d", (NR > 1 ? "," : ""), $1, $2 }'
@@ -4524,6 +4526,146 @@ agh_start_wait() {
         [ $asw_q -ge 20 ] && return 0
     done
     return 1
+}
+
+# ---------- AdGuard Home login: its clients are changed through its own API, without a restart ----------
+# The login is kept on the router only (base64 of "user:password", readable by root only, not in backups). Without it,
+# or when the API does not work, ASN Manager writes AdGuardHome.yaml and restarts AdGuard Home as before.
+AGH_AUTH="$ADDON_DIR/agh_auth"
+AGH_API_ST="$ADDON_DIR/agh_api.state"
+# address of its web interface (http.address, older: bind_host / bind_port; https when it forces https)
+agh_web() {
+    aw_y=$(agh_yaml) || return 1
+    awk '
+        /^http:/ { s = "http"; next } /^tls:/ { s = "tls"; next } /^[a-z]/ { s = "" }
+        s == "http" && /^  address:/ { v = $0; sub(/^  address: */, "", v); gsub(/["\047 ]/, "", v); addr = v }
+        /^bind_host:/ { v = $0; sub(/^bind_host: */, "", v); gsub(/["\047 ]/, "", v); bh = v }
+        /^bind_port:/ { v = $0; sub(/^bind_port: */, "", v); gsub(/["\047 ]/, "", v); bp = v }
+        s == "tls" && /^  enabled:/ { te = ($2 == "true") }
+        s == "tls" && /^  force_https:/ { fh = ($2 == "true") }
+        s == "tls" && /^  port_https:/ { ph = $2 + 0 }
+        END {
+            if (addr == "" && bp != "") addr = (bh == "" ? "0.0.0.0" : bh) ":" bp
+            if (addr == "") exit 1
+            n = split(addr, a, ":"); port = a[n]; host = substr(addr, 1, length(addr) - length(port) - 1); gsub(/[][]/, "", host)
+            if (host == "" || host == "0.0.0.0" || host == "::") host = "127.0.0.1"
+            if (te && fh && ph > 0) print "https://" host ":" ph; else print "http://" host ":" port
+        }' "$aw_y"
+}
+# agh_api <method> <path> [json] [output file] [auth file]: 0 = answered 2xx; AGH_HTTP = its status code
+# (the login goes to curl on stdin, so it never shows up in the process list)
+agh_api() {
+    aa_f=${5:-$AGH_AUTH}
+    [ -s "$aa_f" ] || { AGH_HTTP=nologin; return 2; }
+    aa_u=$(agh_web) || { AGH_HTTP=noweb; return 3; }
+    AGH_HTTP=$( { printf 'header = "Authorization: Basic %s"\n' "$(cat "$aa_f")"; [ -n "$3" ] && printf 'header = "Content-Type: application/json"\n'; } |
+        if [ -n "$3" ]; then curl -sk --connect-timeout 5 -m 20 -K - -X "$1" --data-binary "$3" -o "${4:-/dev/null}" -w '%{http_code}' "$aa_u$2"
+        else curl -sk --connect-timeout 5 -m 20 -K - -o "${4:-/dev/null}" -w '%{http_code}' "$aa_u$2"; fi 2>/dev/null)
+    case "$AGH_HTTP" in 2??) return 0 ;; esac
+    return 1
+}
+agh_api_why() {
+    case "$AGH_HTTP" in
+        401|403) echo "AdGuard Home refused the login (user name or password wrong)" ;;
+        000|"")  echo "the web interface of AdGuard Home did not answer at $(agh_web 2>/dev/null)" ;;
+        noweb)   echo "no address of the AdGuard Home web interface found in AdGuardHome.yaml" ;;
+        nologin) echo "no login saved" ;;
+        *)       echo "AdGuard Home answered HTTP $AGH_HTTP" ;;
+    esac
+}
+agh_api_state() { printf '%s\n' "$1" > "$AGH_API_ST"; }
+# agh_login <user> <password> | <base64 of user:password> (from the page) | off
+agh_login() {
+    case "$1" in
+        off|"") rm -f "$AGH_AUTH" "$AGH_API_ST"; echo "AdGuard Home login removed - client changes restart AdGuard Home again."; return 0 ;;
+    esac
+    agh_present || { echo "AdGuard Home not found."; return 1; }
+    if [ $# -ge 2 ]; then
+        al_b=$(printf '%s:%s' "$1" "$2" | { base64 2>/dev/null || openssl base64 -A 2>/dev/null; } | tr -d '\n')
+    else al_b=$1; fi
+    case "$al_b" in ''|*[!A-Za-z0-9+/=]*) echo "Login not saved: invalid input."; return 1 ;; esac
+    mkdir -p "$ADDON_DIR"
+    ( umask 077; printf '%s' "$al_b" > "$AGH_AUTH.new" ); chmod 600 "$AGH_AUTH.new"
+    if agh_api GET /control/clients "" "" "$AGH_AUTH.new"; then
+        mv -f "$AGH_AUTH.new" "$AGH_AUTH"; agh_api_state ok
+        echo "AdGuard Home login saved - its clients are now changed without restarting it."
+        return 0
+    fi
+    rm -f "$AGH_AUTH.new"
+    echo "Login not saved: $(agh_api_why)."
+    return 1
+}
+agh_login_status() {
+    if [ ! -s "$AGH_AUTH" ]; then echo "AdGuard Home login: not saved (client changes restart AdGuard Home)"; return 0; fi
+    if agh_api GET /control/clients; then agh_api_state ok; echo "AdGuard Home login: saved, works ($(agh_web))"
+    else echo "AdGuard Home login: saved, but $(agh_api_why)"; fi
+}
+# our client items (yaml lines as dnsd_apply builds them) as "name<TAB>json" lines for the API
+dnsd_items_json() {
+    awk '
+        function q(s) { gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); return "\"" s "\"" }
+        function out() {
+            if (name == "") return
+            printf "%s\t{\"name\":%s,\"ids\":[%s],\"tags\":[],\"upstreams\":[%s],\"use_global_settings\":true,\"filtering_enabled\":true,\"parental_enabled\":false,\"safebrowsing_enabled\":false,\"use_global_blocked_services\":true,\"ignore_querylog\":false,\"ignore_statistics\":false,\"upstreams_cache_enabled\":false,\"upstreams_cache_size\":0}\n", name, q(name), ids, ups
+            name = ""; ids = ""; ups = ""
+        }
+        /^    - name: / { out(); name = $0; sub(/^    - name: /, "", name); sec = ""; next }
+        /^      ids:/ { sec = "ids"; next }
+        /^      upstreams:/ { sec = "up"; next }
+        /^      [a-z_]+:/ { sec = ""; next }
+        /^        - / { v = $0; sub(/^        - /, "", v); if (v ~ /^\047.*\047$/) v = substr(v, 2, length(v) - 2)
+                        if (sec == "ids") ids = ids (ids == "" ? "" : ",") q(v); else if (sec == "up") ups = ups (ups == "" ? "" : ",") q(v) }
+        END { out() }' "$1"
+}
+# our clients as AdGuard Home has them now (it writes AdGuardHome.yaml itself after every change)
+dnsd_have() {
+    awk -v ours="$DNSD_OURS" '/^  persistent:/ { inb = 1; next } inb && /^  [a-z_]/ { inb = 0 }
+        inb { l = $0; sub(/^    - /, "      ", l); if (l ~ ("^      " ours)) { sub(/^      name: */, "", l); gsub(/^["\047]|["\047][[:space:]]*$/, "", l); print l } }' "$1"
+}
+# the clients through the API: $1 = items file, $2 = yaml; 0 = done (no restart needed)
+dnsd_api_apply() {
+    [ -s "$AGH_AUTH" ] || return 1
+    agh_up && ! agh_busy || return 1
+    dp_t=$(dirname "$1")
+    dnsd_items_json "$1" > "$dp_t/json"
+    cut -f1 "$dp_t/json" > "$dp_t/newn"
+    dnsd_have "$2" > "$dp_t/have"
+    dp_n=0
+    # removed first (their addresses may belong to a new client), then changed, then new
+    while IFS= read -r dp_x; do
+        [ -n "$dp_x" ] || continue
+        grep -qxF "$dp_x" "$dp_t/newn" && continue
+        agh_api POST /control/clients/delete "{\"name\":\"$dp_x\"}" || { dp_err=$(agh_api_why); break; }
+        dp_n=$((dp_n + 1))
+    done < "$dp_t/have"
+    if [ -z "$dp_err" ]; then
+        while IFS="$(printf '\t')" read -r dp_x dp_j; do
+            if grep -qxF "$dp_x" "$dp_t/have"; then agh_api POST /control/clients/update "{\"name\":\"$dp_x\",\"data\":$dp_j}"
+            else agh_api POST /control/clients/add "$dp_j"; fi || { dp_err="$(agh_api_why) (client $dp_x)"; break; }
+            dp_n=$((dp_n + 1))
+        done < "$dp_t/json"
+    fi
+    if [ -n "$dp_err" ]; then
+        agh_api_state "error: $dp_err"
+        # a refused login is not tried again (AdGuard Home would lock its login after a few failures)
+        case "$AGH_HTTP" in 401|403) mv -f "$AGH_AUTH" "$AGH_AUTH.refused" ;; esac
+        logger -t ASNmanager "DNS per device: AdGuard Home API failed - $dp_err - writing its configuration and restarting it instead"
+        return 1
+    fi
+    # it writes its configuration right away; check that ours are there
+    dp_i=0
+    while [ $dp_i -lt 10 ]; do
+        [ "$(dnsd_have "$2" | sort)" = "$(sort "$dp_t/newn" | sed '/^$/d')" ] && break
+        sleep 1; dp_i=$((dp_i + 1))
+    done
+    if [ $dp_i -ge 10 ]; then
+        agh_api_state "error: AdGuard Home took the changes but its configuration file did not show them"
+        logger -t ASNmanager "DNS per device: AdGuard Home API - the clients did not show up in $2 - writing it and restarting instead"
+        return 1
+    fi
+    agh_api_state ok
+    logger -t ASNmanager "DNS per device: $dp_n AdGuard Home client change(s) through its API - no restart"
+    return 0
 }
 
 # "target ip" of the VPN Director: active rules for a device (source, no destination)
@@ -4736,6 +4878,11 @@ dnsd_apply() {
         inb { l = $0; sub(/^    - /, "      ", l); if (l ~ ("^      " ours)) { sub(/^      name: */, "", l); gsub(/^["\047]|["\047][[:space:]]*$/, "", l); print l } }' "$da_y" | sort)
     da_ok=1; [ "$da_have" = "$(echo "$da_names" | sed '/^$/d' | sort)" ] || da_ok=0
     if [ "$(cat "$DNSD_SUM" 2>/dev/null)" = "$da_sum" ] && [ $da_ok -eq 1 ]; then rm -rf "$da_tmp"; return 0; fi
+    # with the login of AdGuard Home: through its API, no restart
+    if dnsd_api_apply "$da_tmp/items" "$da_y"; then
+        if [ -s "$da_tmp/items" ]; then echo "$da_sum" > "$DNSD_SUM"; else rm -f "$DNSD_SUM"; fi
+        rm -rf "$da_tmp"; return 0
+    fi
     # write: a uid per client, backup first, AdGuard Home restarted and checked
     while grep -q '@UID@' "$da_tmp/items"; do
         da_u=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || echo "$(date +%s)-$$-$RANDOM")
@@ -6465,6 +6612,7 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   rescue                             stop stuck ASN Manager jobs, remove locks, restart failover and statistics
   amtmupdate [check]                 update for amtm (check: exit code 0 = amtm may update)
   mail off|daily|weekly|test|check|status  e-mail on new versions (amtm e-mail settings; a notice only)
+  agh login <user> [password] | logout | status  login of AdGuard Home: "DNS per device" changes its clients without restarting it
   webui install [local] | enable | disable | update | uninstall | mount | unmount | export
   webui location <vpn|addons>        show the tab in the VPN (default) or the Addons menu
 USAGE_EOF
@@ -6584,6 +6732,15 @@ cli_main() {
                 check)       mail_check force; mail_status ;;
                 status|"")   mail_status ;;
                 *)           echo "Usage: mail off|daily|weekly|test|check|status"; false ;;
+            esac ;;
+        agh)
+            case "$1" in
+                login)       [ -n "$2" ] || { echo "Usage: agh login <user> [password] (asks for the password if left out)"; return 1; }
+                             al_p=$3; if [ -z "$al_p" ]; then printf 'AdGuard Home password: '; stty -echo 2>/dev/null; read -r al_p; stty echo 2>/dev/null; echo; fi
+                             rm -f "$AGH_AUTH.refused"; agh_login "$2" "$al_p" ;;
+                logout|off)  rm -f "$AGH_AUTH.refused"; agh_login off ;;
+                status|"")   agh_login_status ;;
+                *)           echo "Usage: agh login <user> [password] | logout | status"; false ;;
             esac ;;
         update)
             case "$1" in
