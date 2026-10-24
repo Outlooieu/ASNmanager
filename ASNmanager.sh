@@ -2416,6 +2416,43 @@ dg_dns_label() {
     [ "${dd_sp:-0}" -gt 0 ] && dd_out="$dd_out + $dd_sp own DNS rule(s) for single sites"
     echo "$dd_out"
 }
+# the server a device asks first ("normal" = global upstreams of AdGuard Home / dnsmasq)
+dg_dns_key() {
+    dk_l=""; [ -s "$2" ] && dk_l=$(awk -F'\t' -v i="$1" '
+        function n(s,  a) { split(s, a, "."); return ((a[1] * 256 + a[2]) * 256 + a[3]) * 256 + a[4] }
+        $1 == i { print $3; f = 1; exit }
+        $1 ~ /\// && !hb { split($1, p, "/"); z = 2 ^ (32 - p[2]); if (int(n(p[1]) / z) == int(n(i) / z)) { b = $3; hb = 1 } }
+        END { if (!f && hb) print b }' "$2")
+    dk_l=${dk_l%% *}
+    case "$dk_l" in ''|*:553) echo normal ;; *) echo "$dk_l" ;; esac
+}
+# the real resolver behind a DNS path: the address the name servers see (whoami.akamai.net answers with it), its name
+# and place - asked the same way the device asks (stand-ins and rules route it through the right line); cached 10 min
+dg_dns_real() {
+    dr_c=/tmp/asnmanager-dnsreal.cache; dr_now=$(date +%s)
+    dr_hit=$(awk -F'\t' -v k="$1" -v n="$dr_now" '$1 == k && n - $2 < 600 { print $3; exit }' "$dr_c" 2>/dev/null)
+    [ -n "$dr_hit" ] && { echo "$dr_hit"; return 0; }
+    dr_s=$1
+    case "$dr_s" in
+        normal) dr_s=127.0.0.1 ;;
+        tls://*) dr_n=${dr_s#tls://}; dr_s=""
+                 for dr_x in $(sed -n 's/^srv WAN[0-9]* //p' "$DNSF_STATE" 2>/dev/null); do [ "$(dnsf_tls_name "$dr_x")" = "$dr_n" ] && { dr_s=$dr_x; break; }; done
+                 [ -n "$dr_s" ] || { echo "?"; return 0; } ;;
+    esac
+    dr_ip=$(nslookup whoami.akamai.net "$dr_s" 2>/dev/null | awk '/^Name:/ { f = 1; next } f && /^Address/ { print $3; exit }')
+    if [ -z "$dr_ip" ]; then dr_out="no answer"
+    else
+        dr_j=$(curl -s -m 6 "https://ipinfo.io/$dr_ip/json" 2>/dev/null | tr '\n' ' ')
+        dr_h=$(echo "$dr_j" | sed -n 's/.*"hostname": *"\([^"]*\)".*/\1/p')
+        dr_ci=$(echo "$dr_j" | sed -n 's/.*"city": *"\([^"]*\)".*/\1/p')
+        dr_co=$(echo "$dr_j" | sed -n 's/.*"country": *"\([^"]*\)".*/\1/p')
+        dr_o=$(echo "$dr_j" | sed -n 's/.*"org": *"\([^"]*\)".*/\1/p' | sed 's/^AS[0-9]* //')
+        dr_out="$dr_ip${dr_h:+ ($dr_h)}${dr_o:+ - $dr_o}${dr_ci:+, $dr_ci}${dr_co:+ $dr_co}"
+    fi
+    { awk -F'\t' -v k="$1" '$1 != k' "$dr_c" 2>/dev/null; printf '%s\t%s\t%s\n' "$1" "$dr_now" "$dr_out"; } > "$dr_c.new" && mv -f "$dr_c.new" "$dr_c"
+    echo "$dr_out"
+}
+
 # all devices active right now: normal way, DNS, open connections per line
 cli_devices() {
     nv_refresh
@@ -2428,14 +2465,30 @@ cli_devices() {
     dvs_ct=${DG_CT:-/proc/net/nf_conntrack}
     echo "Devices active right now (seen by the router in the last minutes):"
     printf '%-15s %-20s %-7s %-34s %s\n' "IP" "NAME" "WAY" "CONNECTIONS NOW (per line)" "DNS"
+    dvs_k=/tmp/asnmanager-dvs.keys; : > "$dvs_k"
     awk '$3 == "0x2" && $6 ~ /^br/ { print $1 }' /proc/net/arp 2>/dev/null | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | while read -r dvs_ip; do
         dvs_w=$(dg_target_of_dev "$(dg_route_dev 1.1.1.1 "$dvs_ip")")
         dvs_l=$(awk -v ip="$dvs_ip" -v nf="$dvs_n" 'BEGIN { while ((getline l < nf) > 0) { split(l, a, " "); w[a[1]] = a[2] } }
             { k = 0; s = ""; for (i = 1; i <= NF; i++) { if ($i ~ /^src=/ && s == "") s = substr($i, 5); if ($i ~ /^dst=/) { k++; if (k == 2) d = substr($i, 5) } }
               if (s == ip && (d in w)) c[w[d]]++ }
             END { for (x in c) o = o (o == "" ? "" : " ") x ":" c[x]; print o }' "$dvs_ct" 2>/dev/null)
-        printf '%-15s %-20s %-7s %-34s %s\n' "$dvs_ip" "$(dg_devname "$dvs_ip" | cut -c1-20)" "${dvs_w:-?}" "${dvs_l:--}" "$(dg_dns_label "$dvs_ip" "$dvs_c")"
+        dvs_lb=$(dg_dns_label "$dvs_ip" "$dvs_c")
+        dvs_key="$(dg_dns_key "$dvs_ip" "$dvs_c")|$(echo "$dvs_lb" | sed 's/ + [0-9]* own DNS rule.*//')"
+        grep -qxF "$dvs_key" "$dvs_k" || echo "$dvs_key" >> "$dvs_k"
+        dvs_no=$(grep -nxF "$dvs_key" "$dvs_k" | cut -d: -f1)
+        dvs_sp=$(echo "$dvs_lb" | sed -n 's/.* + \([0-9]*\) own DNS rule.*/ +\1 sites/p')
+        printf '%-15s %-20s %-7s %-34s %s\n' "$dvs_ip" "$(dg_devname "$dvs_ip" | cut -c1-20)" "${dvs_w:-?}" "${dvs_l:--}" "[$dvs_no]$dvs_sp"
     done
+    echo ""
+    echo "DNS - what the devices ask, and the real resolver behind it (the address name servers and leak tests see):"
+    dvs_i=0
+    while IFS='|' read -r dvs_kk dvs_lab; do
+        dvs_i=$((dvs_i + 1))
+        echo "  [$dvs_i] $dvs_lab"
+        echo "       -> $(dg_dns_real "$dvs_kk")"
+    done < "$dvs_k"
+    echo "  (+N sites: own DNS rules of the device for single sites - see the device check)"
+    rm -f "$dvs_k"
     echo ""
     echo "WAY = the normal way of the device (VPN Director); CONNECTIONS = lines its open connections use right now (entries of"
     echo "ASN Manager send single sites over other lines; a connection keeps the line it was opened on)."
@@ -2481,6 +2534,7 @@ cli_device() {
     echo "Normal way without an ASN Manager rule (test 1.1.1.1): ${dv_def:-?} ($(dg_target_of_dev "$dv_def"))"
     dg_agh_clients > /tmp/asnmanager-dv.agh 2>/dev/null
     echo "DNS of this device: $(dg_dns_label "$dv_ip" /tmp/asnmanager-dv.agh)$(awk -F'\t' -v i="$dv_ip" '$1 == i { print "   (AdGuard Home client: " $2 ")"; exit }' /tmp/asnmanager-dv.agh)"
+    echo "   real resolver (what leak tests show): $(dg_dns_real "$(dg_dns_key "$dv_ip" /tmp/asnmanager-dv.agh)")"
     rm -f /tmp/asnmanager-dv.agh
     echo ""
     # current connections: destination, traffic, which rule, which interface (top 15 by bytes)
