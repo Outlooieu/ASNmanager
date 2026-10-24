@@ -2374,6 +2374,75 @@ cli_explain() {
 }
 
 # device <IP>: which rules apply to a device and where its traffic goes right now
+# ---------- DNS of a device, overview of all devices ----------
+# AdGuard Home clients: "id<TAB>name<TAB>plain upstreams<TAB>number of own DNS rules for single sites"
+dg_agh_clients() {
+    dac_y=$(agh_yaml) || return 0
+    awk '/^  persistent:/ { p = 1; next } p && /^  [a-z]/ { out(); p = 0 } !p { next }
+        function out(  i) { if (nm != "") for (i in id) print i "\t" nm "\t" u "\t" sp; split("", id); nm = ""; u = ""; sp = 0 }
+        /^    - / { out() }
+        { l = $0; sub(/^    - /, "      ", l) }
+        l ~ /^      name: / { nm = l; sub(/^      name: */, "", nm); gsub(/^["\047]|["\047][[:space:]]*$/, "", nm); s = ""; next }
+        l ~ /^      ids:/ { s = "i"; next } l ~ /^      upstreams:/ { s = "u"; next } l ~ /^      [a-z_]+:/ { s = ""; next }
+        /^        - / { v = $0; sub(/^        - /, "", v); gsub(/\047/, "", v)
+            if (s == "i") id[v] = 1
+            else if (s == "u") { if (v !~ /^\[/) u = u (u == "" ? "" : " ") v; else if (v !~ /:553$/ && v !~ /^\[\/[a-z.]*lan\/\]/ && v !~ /^\[\/\/\]/) sp++ } }
+        END { if (p) out() }' "$dac_y"
+}
+# one line: which DNS the device asks ($1 = device ip, $2 = file of dg_agh_clients)
+dg_dns_label() {
+    dd_norm="normal DNS: $(dnsf_base | awk '{ print $1 " via " $2 }')"
+    dd_l=""; [ -s "$2" ] && dd_l=$(awk -F'\t' -v i="$1" '
+        function n(s,  a) { split(s, a, "."); return ((a[1] * 256 + a[2]) * 256 + a[3]) * 256 + a[4] }
+        $1 == i { print; f = 1; exit }
+        $1 ~ /\// && b == "" { split($1, p, "/"); z = 2 ^ (32 - p[2]); if (int(n(p[1]) / z) == int(n(i) / z)) b = $0 }
+        END { if (!f && b != "") print b }' "$2")
+    if [ -z "$dd_l" ]; then echo "$dd_norm"; return 0; fi
+    dd_u=$(echo "$dd_l" | cut -f3); dd_sp=$(echo "$dd_l" | cut -f4)
+    if [ -z "$dd_u" ]; then dd_out="$dd_norm"
+    else
+        dd_out=$(for dd_x in $dd_u; do echo "$dd_x"; done | awk -v vm="$DNSF_VMAP" -v st="$DNSF_STATE" -v norm="$dd_norm" '
+            BEGIN { while ((getline l < vm) > 0) { split(l, a, " "); v[a[1]] = a[2]; vt[a[1]] = a[3] }
+                    while ((getline l < st) > 0) if (l ~ /^srv /) { k = split(l, a, " "); for (i = 3; i <= k; i++) t[a[i]] = a[2] } }
+            { x = $0
+              if (x ~ /:553$/) d = "dnsmasq (" norm ")"
+              else if (x in v) d = v[x] " (provider DNS, through " vt[x] ")"
+              else if (x ~ /^tls:\/\//) d = x " (encrypted)"
+              else if (x in t) d = x " (through " t[x] ")"
+              else d = x
+              if (!(d in seen)) { seen[d] = 1; o = o (o == "" ? "" : ", ") d } }
+            END { print o }')
+    fi
+    [ "${dd_sp:-0}" -gt 0 ] && dd_out="$dd_out + $dd_sp own DNS rule(s) for single sites"
+    echo "$dd_out"
+}
+# all devices active right now: normal way, DNS, open connections per line
+cli_devices() {
+    nv_refresh
+    dvs_c=/tmp/asnmanager-dvs.agh; dg_agh_clients > "$dvs_c" 2>/dev/null
+    dvs_n=/tmp/asnmanager-dvs.nat; { echo "$(nvram get wan0_ipaddr) WAN1"; echo "$(nvram get wan1_ipaddr) WAN2"
+        for dvs_t in OVPN1 OVPN2 OVPN3 OVPN4 OVPN5 WGC1 WGC2 WGC3 WGC4 WGC5; do
+            dvs_d=$(get_ifname "$dvs_t"); [ -n "$dvs_d" ] || continue
+            ip -4 addr show "$dvs_d" 2>/dev/null | awk -v t="$dvs_t" '/inet / { split($2, a, "/"); print a[1], t }'
+        done; } | awk '$1 != "" && $1 != "0.0.0.0"' > "$dvs_n"
+    dvs_ct=${DG_CT:-/proc/net/nf_conntrack}
+    echo "Devices active right now (seen by the router in the last minutes):"
+    printf '%-15s %-20s %-7s %-34s %s\n' "IP" "NAME" "WAY" "CONNECTIONS NOW (per line)" "DNS"
+    awk '$3 == "0x2" && $6 ~ /^br/ { print $1 }' /proc/net/arp 2>/dev/null | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | while read -r dvs_ip; do
+        dvs_w=$(dg_target_of_dev "$(dg_route_dev 1.1.1.1 "$dvs_ip")")
+        dvs_l=$(awk -v ip="$dvs_ip" -v nf="$dvs_n" 'BEGIN { while ((getline l < nf) > 0) { split(l, a, " "); w[a[1]] = a[2] } }
+            { k = 0; s = ""; for (i = 1; i <= NF; i++) { if ($i ~ /^src=/ && s == "") s = substr($i, 5); if ($i ~ /^dst=/) { k++; if (k == 2) d = substr($i, 5) } }
+              if (s == ip && (d in w)) c[w[d]]++ }
+            END { for (x in c) o = o (o == "" ? "" : " ") x ":" c[x]; print o }' "$dvs_ct" 2>/dev/null)
+        printf '%-15s %-20s %-7s %-34s %s\n' "$dvs_ip" "$(dg_devname "$dvs_ip" | cut -c1-20)" "${dvs_w:-?}" "${dvs_l:--}" "$(dg_dns_label "$dvs_ip" "$dvs_c")"
+    done
+    echo ""
+    echo "WAY = the normal way of the device (VPN Director); CONNECTIONS = lines its open connections use right now (entries of"
+    echo "ASN Manager send single sites over other lines; a connection keeps the line it was opened on)."
+    rm -f "$dvs_c" "$dvs_n"
+    return 0
+}
+
 cli_device() {
     dv_ip="$1"
     is_valid_ip "$dv_ip" || { echo "Usage: device <IP of the device>"; return 1; }
@@ -2410,6 +2479,9 @@ cli_device() {
     else echo "VPN Director rules for this device (or for all): none"; fi
     dv_def=$(dg_route_dev 1.1.1.1 "$dv_ip")
     echo "Normal way without an ASN Manager rule (test 1.1.1.1): ${dv_def:-?} ($(dg_target_of_dev "$dv_def"))"
+    dg_agh_clients > /tmp/asnmanager-dv.agh 2>/dev/null
+    echo "DNS of this device: $(dg_dns_label "$dv_ip" /tmp/asnmanager-dv.agh)$(awk -F'\t' -v i="$dv_ip" '$1 == i { print "   (AdGuard Home client: " $2 ")"; exit }' /tmp/asnmanager-dv.agh)"
+    rm -f /tmp/asnmanager-dv.agh
     echo ""
     # current connections: destination, traffic, which rule, which interface (top 15 by bytes)
     dv_ct=${DG_CT:-/proc/net/nf_conntrack}
@@ -3205,6 +3277,7 @@ web_job() {
         sghide)   sg_hide "$a1" "$a2" > "$OUT" 2>&1 ;;
         explain)  cli_explain "$a1" "$a2" > "$OUT" 2>&1 ;;
         device)   cli_device "$a1" > "$OUT" 2>&1 ;;
+        devices)  cli_devices > "$OUT" 2>&1 ;;
         dnschain) cli_dnschain > "$OUT" 2>&1 ;;
         diagpack) cli_diagpack "$a1" > "$OUT" 2>&1 ;;
         speedtest) st_run "$a1" > "$OUT" 2>&1 ;;
@@ -6804,6 +6877,7 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   rescue                             stop stuck ASN Manager jobs, remove locks, restart failover and statistics
   amtmupdate [check]                 update for amtm (check: exit code 0 = amtm may update)
   mail off|daily|weekly|test|check|status  e-mail on new versions (amtm e-mail settings; a notice only)
+  devices                            all active devices: normal way, open connections per line, DNS
   agh login <user> [password] | logout | status  login of AdGuard Home: "DNS per device" changes its clients without restarting it
   webui install [local] | enable | disable | update | uninstall | mount | unmount | export
   webui location <vpn|addons>        show the tab in the VPN (default) or the Addons menu
@@ -6942,6 +7016,7 @@ cli_main() {
                 *)           echo "Usage: update check | install"; false ;;
             esac ;;
         service_event) service_event "$1" "$2"; return 0 ;;
+        devices)  cli_devices ;;
         help|-h|--help) cli_usage ;;
         *)        cli_usage; false ;;
     esac

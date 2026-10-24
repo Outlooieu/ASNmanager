@@ -626,7 +626,7 @@ var ASNM_I18N = {
     dp_full: 'Domains in clear text (only if a domain rule is the problem)',
     btn_dp: 'Create bundle', dp_missing: 'The bundle was not found on the router - please create it again.', dp_download: 'Download', dp_github: 'Report on GitHub',
     dp_issue_title: 'Problem: ', dp_issue_body: 'ASN Manager v{v}\n\nWhat does not work / what did you expect?\n\n\nPlease attach the diagnostic bundle ({f}) here: drag the file into this text field.',
-    btn_ipset: 'ipset status', btn_pubip: 'Public IPs', output_default: 'Output of apply, tests and checks appears here.',
+    btn_devices: 'Devices & DNS', act_devices: 'Devices & DNS', btn_ipset: 'ipset status', btn_pubip: 'Public IPs', output_default: 'Output of apply, tests and checks appears here.',
     backup_title: 'Backup & restore', backup_export: 'Export', backup_export_desc: 'Download the list (ASNs, IP ranges, domains, notes), schedule, failover chains and settings as .conf file',
     btn_export: 'Download backup', backup_import: 'Import', backup_import_desc: 'You choose what is restored. Compatible with backups from the terminal menu',
     btn_import: 'Choose file...', import_found: '{n} valid entries found in {file}{bad}.', import_bad: ', {n} invalid lines ignored',
@@ -779,7 +779,7 @@ var ASNM_I18N = {
     dp_full: 'Domains im Klartext (nur wenn eine Domain-Regel das Problem ist)',
     btn_dp: 'Paket erstellen', dp_missing: 'Das Paket wurde auf dem Router nicht gefunden - bitte neu erstellen.', dp_download: 'Herunterladen', dp_github: 'Auf GitHub melden',
     dp_issue_title: 'Problem: ', dp_issue_body: 'ASN Manager v{v}\n\nWas funktioniert nicht / was hast du erwartet?\n\n\nBitte hier das Diagnose-Paket ({f}) anhängen: die Datei in dieses Textfeld ziehen.',
-    btn_ipset: 'ipset-Status', btn_pubip: 'Öffentliche IPs', output_default: 'Hier erscheint die Ausgabe von Anwenden, Tests und Prüfungen.',
+    btn_devices: 'Geräte & DNS', act_devices: 'Geräte & DNS', btn_ipset: 'ipset-Status', btn_pubip: 'Öffentliche IPs', output_default: 'Hier erscheint die Ausgabe von Anwenden, Tests und Prüfungen.',
     backup_title: 'Sicherung & Wiederherstellung', backup_export: 'Export', backup_export_desc: 'Liste (ASNs, IP-Bereiche, Domains, Notizen), Zeitplan, Failover-Ketten und Einstellungen als .conf-Datei herunterladen',
     btn_export: 'Sicherung herunterladen', backup_import: 'Import', backup_import_desc: 'Du wählst, was wiederhergestellt wird. Kompatibel mit Sicherungen aus dem Terminal-Menü',
     btn_import: 'Datei wählen...', import_found: '{n} gültige Einträge in {file} gefunden{bad}.', import_bad: ', {n} ungültige Zeilen ignoriert',
@@ -922,7 +922,7 @@ var ASNM = {
         WGC1: 'WireGuard Client 1', WGC2: 'WireGuard Client 2', WGC3: 'WireGuard Client 3', WGC4: 'WireGuard Client 4', WGC5: 'WireGuard Client 5'
     },
     order: ['WAN', 'WAN1', 'WAN2', 'OVPN1', 'OVPN2', 'OVPN3', 'OVPN4', 'OVPN5', 'WGC1', 'WGC2', 'WGC3', 'WGC4', 'WGC5'],
-    timeouts: { setting: 360000, mailtest: 90000, dnsfsrv: 360000, speedtest: 150000, update: 240000, apply: 1800000, reload: 1800000, retry: 1800000, trace: 90000, ifaces: 90000, lookup: 30000 },
+    timeouts: { devices: 120000, setting: 360000, mailtest: 90000, dnsfsrv: 360000, speedtest: 150000, update: 240000, apply: 1800000, reload: 1800000, retry: 1800000, trace: 90000, ifaces: 90000, lookup: 30000 },
     reIp: /^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)$/,
     reHost: /^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$/,
     reEntry: /^(\d{1,10}):(WAN|WAN1|WAN2|OVPN[1-5]|WGC[1-5]):?([0-9.,\s]*)$/,
@@ -1566,11 +1566,11 @@ function asnmJobDone(job) {
     asnmSetBusy(false);
     asnmHideProgress();
     // tools of the Diagnostics tab: their last output line means nothing on its own - the result is in the output box there
-    var tools = ['test', 'trace', 'ifaces', 'status', 'explain', 'device', 'dnschain', 'diagpack', 'lookup'];
+    var tools = ['test', 'trace', 'ifaces', 'status', 'explain', 'device', 'devices', 'dnschain', 'diagpack', 'lookup'];
     if (tools.indexOf(job.action) >= 0) asnmSetStatus(t(ok ? 'tool_done' : 'tool_failed', { a: asnmActLabel(job.action) }), !ok);
     else asnmSetStatus(asnmTrMsg(job.msg) || (ok ? t('done') : t('failed')), !ok);
 
-    if (['apply', 'reload', 'retry', 'test', 'trace', 'lookup', 'ifaces', 'status', 'explain', 'device', 'dnschain', 'diagpack'].indexOf(job.action) >= 0) {
+    if (['apply', 'reload', 'retry', 'test', 'trace', 'lookup', 'ifaces', 'status', 'explain', 'device', 'devices', 'dnschain', 'diagpack'].indexOf(job.action) >= 0) {
         asnmGet('output.htm', function (txt) { document.getElementById('asnm_output').textContent = txt || t('no_output'); });
     }
     if (job.action === 'lookup') {
@@ -3872,6 +3872,7 @@ function initial() {
           <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_dnschain" onclick="asnmTool('dnschain');"/>
           <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_ipset" onclick="asnmTool('status');"/>
           <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_pubip" onclick="asnmTool('ifaces');"/>
+          <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_devices" onclick="asnmTool('devices');"/>
         </div></div>
     </div>
     <pre id="asnm_output" class="asnm-output" data-i18n="output_default"></pre>
