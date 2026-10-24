@@ -5909,6 +5909,19 @@ fo_info() {   # table fwmark prio - same values as the worker
 # switch) - the list of the VPN Director itself is not changed. The router's own rule (e.g. Unbound through a VPN) goes
 # along, so the normal DNS keeps working. Removed again as soon as the target works.
 FO_VPND_PRIO=10700
+# routing table of the firmware for a line (the VPN Director's own: wgc1 ... / ovpnc1 ..., main for WAN)
+fo_fwtable() {
+    case "$1" in
+        WAN|WAN1) echo main ;;
+        WGC[1-5]) ff_t=wgc${1#WGC} ;;
+        OVPN[1-5]) ff_t=ovpnc${1#OVPN} ;;
+        *) return 1 ;;
+    esac
+    [ -n "$ff_t" ] || return 1
+    # only when the firmware has it filled (the line runs); otherwise no rule - the VPN Director decides as before
+    ip route show table "$ff_t" 2>/dev/null | grep -q '^default' || { ff_t=""; return 1; }
+    echo "$ff_t"; ff_t=""
+}
 FO_VPND_FLAG="$ADDON_DIR/fo_vpnd"                 # option: the VPN Director follows the failover (off by default)
 fo_vpnd_on() { [ -f "$FO_VPND_FLAG" ]; }
 fo_vpnd_set() {
@@ -5930,17 +5943,24 @@ fo_vpnd_sync() {
     mkdir -p "$FO_RT"; fv_new="$FO_RT/vpnd.new"; : > "$fv_new"
     if [ -s "$FO_CONF" ] && fo_vpnd_on && [ -r "$VPND_FILE" ]; then
         fo_active_map | while read -r fv_t fv_a; do
+            # the table of the firmware for that line (it holds the LAN routes as well, like the VPN Director uses it) -
+            # never the routing table of ASN Manager (default route only: the router itself would answer into the tunnel)
             if [ "$fv_a" = "BLOCK" ]; then fv_to="unreachable"
-            else fv_tab=$(fo_info "$fv_a" | cut -d' ' -f1); [ -n "$fv_tab" ] || continue; fv_to="lookup $(fo_tname "$fv_tab")"; fi
+            else fv_tab=$(fo_fwtable "$fv_a"); [ -n "$fv_tab" ] || continue; fv_to="lookup $fv_tab"; fi
             tr '<' '\n' < "$VPND_FILE" | awk -F'>' -v t="$fv_t" '$1 == "1" { i = toupper($5); if (i == "WAN") i = "WAN1"
                 if (i == t && ($3 != "" || $4 != "")) print $3 ">" $4 }' |
             while IFS='>' read -r fv_s fv_d; do echo "${fv_s:-all}>${fv_d:-all}>$fv_to>$fv_t>$fv_a"; done
         done > "$fv_new"
     fi
-    if cmp -s "$fv_new" "$FO_RT/vpnd.rules" 2>/dev/null && [ "$(ip rule show 2>/dev/null | grep -c "^${FO_VPND_PRIO}:")" = "$(grep -c . "$fv_new")" ]; then
+    if cmp -s "$fv_new" "$FO_RT/vpnd.rules" 2>/dev/null && [ "$(ip rule show 2>/dev/null | grep -c "^${FO_VPND_PRIO}:")" = "$(grep -c . "$fv_new")" ] &&
+       { [ ! -s "$fv_new" ] || ip rule show 2>/dev/null | grep -q "^$((FO_VPND_PRIO - 1)):"; }; then
         rm -f "$fv_new"; return 0
     fi
     while ip rule del prio "$FO_VPND_PRIO" 2>/dev/null; do :; done
+    while ip rule del prio $((FO_VPND_PRIO - 1)) 2>/dev/null; do :; done
+    # first: everything the main table reaches without its default route (LAN, guest networks, VPN server clients, the
+    # WAN network) stays as it is - only internet traffic follows the failover
+    [ -s "$fv_new" ] && ip rule add lookup main suppress_prefixlength 0 prio $((FO_VPND_PRIO - 1)) 2>/dev/null
     while IFS='>' read -r fv_s fv_d fv_to fv_t fv_a; do
         [ "$fv_s" = "all" ] && [ "$fv_d" = "all" ] && continue          # never a rule for everything
         set --; [ "$fv_s" != "all" ] && set -- from "$fv_s"; [ "$fv_d" != "all" ] && set -- "$@" to "$fv_d"
@@ -6157,6 +6177,7 @@ fo_purge() {
     cru d ASN_Failover 2>/dev/null
     while ip rule del prio "$FO_SELF_PRIO" 2>/dev/null; do :; done
     while ip rule del prio "$FO_VPND_PRIO" 2>/dev/null; do :; done
+    while ip rule del prio $((FO_VPND_PRIO - 1)) 2>/dev/null; do :; done
     [ -f "$SERVICES_START" ] && sed -i "/# ${FO_HOOK}\$/d" "$SERVICES_START"
     rm -rf "$FO_RT" "$FO_CONF" "$WEB_DIR/failover.js"
 }
