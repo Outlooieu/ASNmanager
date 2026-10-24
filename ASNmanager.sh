@@ -4018,6 +4018,12 @@ DNSF_SERVERS="$ADDON_DIR/dnsf_servers.conf"      # read by dnsmasq (servers-file
 DNSF_STATE=/tmp/asnmanager-dnsf.state            # last result, for the WebUI / status
 DNSF_RULES=/tmp/asnmanager-dnsf.rules            # the rules set last time
 DNSF_PRIO=10500                                  # before the VPN Director (11xxx), after the ASN marks (99xx)
+# one DNS address on several VPN lines (one provider, a server at the end of each of its tunnels): every line gets a
+# stand-in address 198.18.53.x (a range for tests only, never on the internet); lookups to it get the mark of the
+# line, are rewritten to the real address and leave through that line only (rule before the ASN marks and failover)
+DNSF_VPRIO=9860
+DNSF_VNET=198.18.53
+DNSF_VMAP=/tmp/asnmanager-dnsf.vmap
 DNSF_MAX=${DNSF_MAX:-2000}                       # at most this many learned names
 DNSF_BEGIN="# ASNmanager dnsfollow begin"
 DNSF_END="# ASNmanager dnsfollow end"
@@ -4167,7 +4173,7 @@ dnsf_server_set() {
     dss_ips=$(echo $dss_ips | cut -d' ' -f1-2)
     for dss_i in $dss_ips; do
         dss_o=$(sed -n 's/^srv //p' "$DNSF_STATE" 2>/dev/null | awk -v t="$dss_t" -v i="$dss_i" '$1 != t { for (k = 2; k <= NF; k++) if ($k == i) print $1 }' | head -n 1)
-        [ -n "$dss_o" ] && { echo "$dss_i is already the DNS server of $dss_o - one server can belong to one line only."; return 1; }
+        case "$dss_o" in ''|OVPN*|WGC*) ;; *) echo "$dss_i is already the DNS server of $dss_o - it cannot go through $dss_t as well."; return 1 ;; esac
         case " $(dnsf_upstreams) " in *" $dss_i "*) echo "$dss_i is used by your normal DNS - it cannot go through $dss_t."; return 1 ;; esac
     done
     mkdir -p "$ADDON_DIR"; touch "$DNSF_CONF"
@@ -4190,8 +4196,37 @@ dnsf_set() {
 }
 
 # removes everything: rules, servers file, our dnsmasq block
+# stand-in DNS addresses (see DNSF_VPRIO): mark (mangle OUTPUT) and rewrite to the real address (nat OUTPUT), only for
+# the router itself; rebuilt when the list changed or a firewall restart removed the chains
+dnsf_vnat() {
+    dv_ok=1
+    for dv_tb in nat mangle; do iptables -t $dv_tb -C OUTPUT -j ASNM_DNSV 2>/dev/null || dv_ok=0; done
+    if [ -s "$1" ]; then
+        cmp -s "$1" "$DNSF_VMAP" && [ $dv_ok -eq 1 ] && return 0
+        for dv_tb in nat mangle; do
+            iptables -t $dv_tb -N ASNM_DNSV 2>/dev/null; iptables -t $dv_tb -F ASNM_DNSV
+            iptables -t $dv_tb -C OUTPUT -j ASNM_DNSV 2>/dev/null || iptables -t $dv_tb -I OUTPUT -j ASNM_DNSV
+        done
+        while read -r dv_v dv_r dv_t; do
+            dv_m=$(get_target_info "$dv_t" | cut -d' ' -f2); [ -n "$dv_m" ] || continue
+            iptables -t mangle -A ASNM_DNSV -d "$dv_v/32" -j MARK --set-xmark "$dv_m/$MARK_MASK"
+            for dv_p in udp tcp; do iptables -t nat -A ASNM_DNSV -d "$dv_v/32" -p $dv_p --dport 53 -j DNAT --to-destination "$dv_r"; done
+        done < "$1"
+        cp "$1" "$DNSF_VMAP"
+        logger -t ASNmanager "DNS follows the route: $(wc -l < "$1") stand-in DNS address(es) for servers on several VPN lines"
+    else
+        [ -s "$DNSF_VMAP" ] || iptables -t nat -L ASNM_DNSV -n >/dev/null 2>&1 || return 0
+        for dv_tb in nat mangle; do
+            while iptables -t $dv_tb -D OUTPUT -j ASNM_DNSV 2>/dev/null; do :; done
+            iptables -t $dv_tb -F ASNM_DNSV 2>/dev/null; iptables -t $dv_tb -X ASNM_DNSV 2>/dev/null
+        done
+        rm -f "$DNSF_VMAP"
+    fi
+    return 0
+}
 dnsf_clear() {
-    for dc_p in $DNSF_PRIO $((DNSF_PRIO + 1)); do
+    : > /tmp/asnmanager-dnsf.novmap; dnsf_vnat /tmp/asnmanager-dnsf.novmap; rm -f /tmp/asnmanager-dnsf.novmap
+    for dc_p in $DNSF_PRIO $((DNSF_PRIO + 1)) $DNSF_VPRIO $((DNSF_VPRIO + 1)); do
         while ip rule show 2>/dev/null | grep -q "^${dc_p}:"; do ip rule del prio "$dc_p" 2>/dev/null || break; done
     done
     rm -f "$DNSF_RULES" "$DNSF_STATE"
@@ -4295,7 +4330,12 @@ dnsf_sync_run() {
         # where the servers come from: own (dns_follow.conf), router (WAN / VPN client settings), auto (free public ones)
         ds_src=router; grep -q "^$ds_t=" "$DNSF_CONF" 2>/dev/null && ds_src=own
         for ds_ip in $(echo "$ds_s" | tr ',' ' '); do
-            grep -q " $ds_ip\$\| $ds_ip " "$ds_tmp/srv" && ds_ok=0
+            # the same own server on several VPN lines: each gets a stand-in address (5c)
+            if [ "$ds_src" = own ] && case "$ds_t" in OVPN*|WGC*) true ;; *) false ;; esac; then
+                grep -E "^(WAN[0-9]*) " "$ds_tmp/srv" | grep -q " $ds_ip\$\| $ds_ip " && ds_ok=0
+            else
+                grep -q " $ds_ip\$\| $ds_ip " "$ds_tmp/srv" && ds_ok=0
+            fi
             case "$ds_t" in WAN*) ;; *) case "$ds_used " in *" $ds_ip "*) ds_ok=0 ;; esac ;; esac
         done
         if [ -z "$ds_s" ] || [ $ds_ok -eq 0 ]; then
@@ -4312,6 +4352,18 @@ dnsf_sync_run() {
         fi
         [ -n "$ds_s" ] && { echo "$ds_t $(echo "$ds_s" | tr ',' ' ')" >> "$ds_tmp/srv"; echo "$ds_t $ds_src" >> "$ds_tmp/srcs"; }
     done
+    # 5c) stand-in addresses for a server on more than one VPN line: srv_v (used for dnsmasq, AdGuard Home and the
+    #     rules) and vmap "stand-in real target"; srv keeps the real ones (status)
+    : > "$ds_tmp/vmap"
+    awk -v vnet="$DNSF_VNET" -v vmapf="$ds_tmp/vmap" '
+        { line[NR] = $0; if ($1 ~ /^(OVPN|WGC)[1-5]$/) for (i = 2; i <= NF; i++) c[$i]++ }
+        END { for (r = 1; r <= NR; r++) { n = split(line[r], a, " "); t = a[1]; o = t
+                for (i = 2; i <= n; i++) { ip = a[i]
+                    if (t ~ /^(OVPN|WGC)[1-5]$/ && c[ip] > 1) {
+                        k = (t ~ /^WGC/ ? 10 : 0) + substr(t, length(t)) + (i - 2) * 20; v = vnet "." k
+                        print v, ip, t > vmapf; ip = v }
+                    o = o " " ip }
+                print o } }' "$ds_tmp/srv" > "$ds_tmp/srv_v"
     # 5a) is the normal DNS encrypted? tunnel = a VPN carries it, fw = DNS over TLS of the firmware, ub = Unbound asks the
     #     name servers itself over WAN (not encrypted), plain = dnsmasq asks the WAN DNS without encryption
     ds_btls=""
@@ -4325,7 +4377,7 @@ dnsf_sync_run() {
     fi
     # 5b) encrypted: WAN targets whose servers all have a TLS name; with Unbound their names go to Unbound (DNS over
     #     TLS, port 853 - routed by the same rules), AdGuard Home gets tls://name
-    : > "$ds_tmp/tlst"; cp "$ds_tmp/srv" "$ds_tmp/srv_agh"; ds_tls=""
+    : > "$ds_tmp/tlst"; cp "$ds_tmp/srv_v" "$ds_tmp/srv_agh"; ds_tls=""
     if dnsf_tls_on; then
         while read -r ds_t ds_ips; do
             case "$ds_t" in WAN*) ;; *) continue ;; esac
@@ -4345,7 +4397,7 @@ dnsf_sync_run() {
     # 6) servers file: domain entries win over learned names; a learned name of the normal target below a domain
     #    of another target gets "#" (= the normal servers); names of an encrypted WAN target go to Unbound instead
     : > "$ds_tmp/ubf"
-    awk -F'\t' -v base="$ds_base" -v srvf="$ds_tmp/srv" -v sf="$ds_tmp/servers" -v stf="$ds_tmp/state" -v tlsf="$ds_tmp/tlst" -v ubf="$ds_tmp/ubf" -v actf="$ds_tmp/act" '
+    awk -F'\t' -v base="$ds_base" -v srvf="$ds_tmp/srv_v" -v sf="$ds_tmp/servers" -v stf="$ds_tmp/state" -v tlsf="$ds_tmp/tlst" -v ubf="$ds_tmp/ubf" -v actf="$ds_tmp/act" '
         BEGIN { while ((getline l < srvf) > 0) { n = split(l, a, " "); s[a[1]] = l }
                 while ((getline l < actf) > 0) { split(l, a, " "); if (a[2] != "BLOCK") act[a[1]] = a[2] }
                 while ((getline l < tlsf) > 0) { t = l; sub(/ .*/, "", t); u = l; sub(/^[^ ]* /, "", u); tls[t] = u } }
@@ -4381,19 +4433,29 @@ dnsf_sync_run() {
             echo "$ds_ip $ds_tab" >> "$ds_tmp/rules"
             case "$ds_t" in WAN*) ;; *) echo "$ds_ip unreachable" >> "$ds_tmp/rules" ;; esac
         done
-    done < "$ds_tmp/srv"
-    ds_nrules=$(ip rule show 2>/dev/null | grep -c "^${DNSF_PRIO}:\|^$((DNSF_PRIO + 1)):")
+    done < "$ds_tmp/srv_v"
+    # stand-in addresses: after the rewrite the lookup goes to the real address with the mark of its line
+    while read -r ds_v ds_r ds_t; do
+        ds_tab=$(get_target_info "$ds_t" | cut -d' ' -f1); ds_m=$(get_target_info "$ds_t" | cut -d' ' -f2)
+        echo "m:$ds_m $ds_r $ds_tab" >> "$ds_tmp/rules"; echo "m:$ds_m $ds_r unreachable" >> "$ds_tmp/rules"
+    done < "$ds_tmp/vmap"
+    ds_nrules=$(ip rule show 2>/dev/null | grep -c "^${DNSF_PRIO}:\|^$((DNSF_PRIO + 1)):\|^${DNSF_VPRIO}:\|^$((DNSF_VPRIO + 1)):")
     if ! cmp -s "$ds_tmp/rules" "$DNSF_RULES" || [ "$ds_nrules" -ne "$(wc -l < "$ds_tmp/rules")" ]; then
-        for ds_p in $DNSF_PRIO $((DNSF_PRIO + 1)); do
+        for ds_p in $DNSF_PRIO $((DNSF_PRIO + 1)) $DNSF_VPRIO $((DNSF_VPRIO + 1)); do
             while ip rule show 2>/dev/null | grep -q "^${ds_p}:"; do ip rule del prio "$ds_p" 2>/dev/null || break; done
         done
-        while read -r ds_ip ds_tab; do
-            if [ "$ds_tab" = "unreachable" ]; then ip rule add iif lo to "$ds_ip/32" unreachable prio $((DNSF_PRIO + 1)) 2>/dev/null
-            else ip rule add iif lo to "$ds_ip/32" lookup "$ds_tab" prio "$DNSF_PRIO" 2>/dev/null; fi
+        while read -r ds_a ds_b ds_c; do
+            case "$ds_a" in
+                m:*) if [ "$ds_c" = "unreachable" ]; then ip rule add iif lo fwmark "${ds_a#m:}/$MARK_MASK" to "$ds_b/32" unreachable prio $((DNSF_VPRIO + 1)) 2>/dev/null
+                     else ip rule add iif lo fwmark "${ds_a#m:}/$MARK_MASK" to "$ds_b/32" lookup "$ds_c" prio "$DNSF_VPRIO" 2>/dev/null; fi ;;
+                *)   if [ "$ds_b" = "unreachable" ]; then ip rule add iif lo to "$ds_a/32" unreachable prio $((DNSF_PRIO + 1)) 2>/dev/null
+                     else ip rule add iif lo to "$ds_a/32" lookup "$ds_b" prio "$DNSF_PRIO" 2>/dev/null; fi ;;
+            esac
         done < "$ds_tmp/rules"
         cp "$ds_tmp/rules" "$DNSF_RULES"
         ip route flush cache 2>/dev/null
     fi
+    dnsf_vnat "$ds_tmp/vmap"
     # 8) servers file: written (flash) only when it changed; dnsmasq reads it again on SIGHUP
     dnsf_on || : > "$ds_tmp/servers"
     ds_changed=0
@@ -4404,7 +4466,7 @@ dnsf_sync_run() {
     if dnsd_on || [ -f "$DNSD_SUM" ] || grep -qE "^ +(- )?$DNSD_OURS" "$(agh_yaml)" 2>/dev/null; then agh_present && dnsd_apply "$ds_tmp/srv_agh" "$ds_base" "$ds_tmp/ddoms" "$ds_tmp/act"; fi
     { echo "mode=$ds_mode"; echo "base=$ds_base"; echo "names=$(wc -l < "$ds_tmp/learned")"; echo "tls=$(echo $ds_tls)"; echo "btls=$ds_btls"
       while read -r ds_t ds_ips; do echo "srv $ds_t $ds_ips"; done < "$ds_tmp/srv"
-      sed 's/^/cnt /' "$ds_tmp/state"; sed 's/^/src /' "$ds_tmp/srcs"; sed 's/^/act /' "$ds_tmp/act"
+      sed 's/^/cnt /' "$ds_tmp/state"; sed 's/^/src /' "$ds_tmp/srcs"; sed 's/^/act /' "$ds_tmp/act"; sed 's/^/vip /' "$ds_tmp/vmap"
       cut -f2 "$ds_tmp/ddoms" | sort | uniq -c | awk '{ print "ddom", $2, $1 }' 
       if dnsd_on; then dnsd_groups | awk '{ n[$1]++ } END { for (t in n) print "dev", t, n[t] }'; echo "lan $(dnsd_lan)"; fi
       [ -s "$DNSD_ERR" ] && echo "derr $(head -n 1 "$DNSD_ERR")"; } > "$DNSF_STATE"
@@ -4431,6 +4493,7 @@ dnsf_status() {
             *" $st_t:on "*) st_e=" (encrypted, DNS over TLS via Unbound)" ;; *" $st_t:agh "*) st_e=" (encrypted for devices only - no Unbound)" ;; *" $st_t:nofw "*) st_e=" (encrypted for devices only - names: the firmware DNS over TLS would move the normal DNS too)" ;; *" $st_t:noubc "*) st_e=" (encrypted for devices only - unbound-control does not answer: $(ubc status 2>&1 | head -n 1))" ;; *" $st_t:unknown "*) st_e=" (NOT encrypted: no TLS name known for this server)" ;; esac
         echo "  $st_t: DNS $st_ips$st_e - $(echo "$st_c" | cut -d' ' -f1) domain entries, $(echo "$st_c" | cut -d' ' -f2) learned names$(st_dd=$(sed -n "s/^ddom $st_t //p" "$DNSF_STATE"); [ -n "$st_dd" ] && echo ", $st_dd for single devices")"
     done
+    sed -n 's/^vip //p' "$DNSF_STATE" | while read -r st_v st_r st_t; do echo "  $st_t: $st_r is on several VPN lines - asked as $st_v (rewritten, leaves through $st_t only)"; done
     sed -n 's/^act //p' "$DNSF_STATE" | while read -r st_t st_a; do
         if [ "$st_a" = "BLOCK" ]; then echo "  FAILOVER: $st_t is down and blocked - its lookups stay blocked"
         else echo "  FAILOVER: $st_t is down - its names and devices are looked up through the DNS of $st_a"; fi
