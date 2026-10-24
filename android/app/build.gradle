@@ -7,8 +7,8 @@ android {
         applicationId 'de.outlooieu.asnmanager'
         minSdk 26
         targetSdk 34
-        versionCode (System.getenv('APP_VERSION_CODE') ?: '1') as int
-        versionName System.getenv('APP_VERSION_NAME') ?: '1.0.0'
+        versionCode Integer.parseInt(System.getenv('APP_VERSION_CODE') ?: '1')
+        versionName(System.getenv('APP_VERSION_NAME') ?: '1.0.0')
     }
     signingConfigs {
         release {
