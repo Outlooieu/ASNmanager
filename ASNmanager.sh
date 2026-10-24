@@ -4280,12 +4280,15 @@ dnsf_sync_run() {
     # 4b) domain entries for single devices (only DNS per device can give them their own DNS): "name target ip,ip"
     : > "$ds_tmp/ddoms"
     dnsd_on && awk -F: '$4 == "dom" && $3 != "" && $1 ~ /^C[0-9]+$/ { print $5 "\t" $2 "\t" $3 }' "$CUSTOM_FILE" 2>/dev/null > "$ds_tmp/ddoms"
+    # 4c) failover: a target that is down and whose traffic goes via another one (failover of ASN Manager) is looked up
+    #     through the DNS of that one: "target active" (its own servers stay blocked; "BLOCK" keeps them blocked)
+    fo_active_map > "$ds_tmp/act"
     # 5) DNS servers per target (none for the target the normal DNS uses); a server may serve one target only and,
     #    for a VPN, must not be one dnsmasq / the router use anyway (their lookups would follow it)
     ds_used=" $(dnsf_upstreams)"; : > "$ds_tmp/srv"; : > "$ds_tmp/srcs"
     # without "DNS follows the route" only the device part runs: no names, but DNS servers for the device targets
     dnsf_on || { : > "$ds_tmp/doms"; : > "$ds_tmp/learned"; }
-    for ds_t in $( { cut -f2 "$ds_tmp/doms" "$ds_tmp/learned" "$ds_tmp/ddoms"; dnsd_on && dnsd_targets "$ds_base"; } | sort -u); do
+    for ds_t in $( { cut -f2 "$ds_tmp/doms" "$ds_tmp/learned" "$ds_tmp/ddoms"; dnsd_on && dnsd_targets "$ds_base"; awk '$2 != "BLOCK" { print $2 }' "$ds_tmp/act"; } | sort -u); do
         [ "$ds_t" = "$ds_base" ] && continue
         echo " $VALID_DESTS " | grep -q " $ds_t " || continue
         ds_s=$(dnsf_servers_of "$ds_t"); ds_ok=1
@@ -4342,8 +4345,9 @@ dnsf_sync_run() {
     # 6) servers file: domain entries win over learned names; a learned name of the normal target below a domain
     #    of another target gets "#" (= the normal servers); names of an encrypted WAN target go to Unbound instead
     : > "$ds_tmp/ubf"
-    awk -F'\t' -v base="$ds_base" -v srvf="$ds_tmp/srv" -v sf="$ds_tmp/servers" -v stf="$ds_tmp/state" -v tlsf="$ds_tmp/tlst" -v ubf="$ds_tmp/ubf" '
+    awk -F'\t' -v base="$ds_base" -v srvf="$ds_tmp/srv" -v sf="$ds_tmp/servers" -v stf="$ds_tmp/state" -v tlsf="$ds_tmp/tlst" -v ubf="$ds_tmp/ubf" -v actf="$ds_tmp/act" '
         BEGIN { while ((getline l < srvf) > 0) { n = split(l, a, " "); s[a[1]] = l }
+                while ((getline l < actf) > 0) { split(l, a, " "); if (a[2] != "BLOCK") act[a[1]] = a[2] }
                 while ((getline l < tlsf) > 0) { t = l; sub(/ .*/, "", t); u = l; sub(/^[^ ]* /, "", u); tls[t] = u } }
         function covered(x,   y) { y = x; while (1) { if (y in dom) return dom[y]; if (index(y, ".") == 0) return ""; sub(/^[^.]*\./, "", y) } }
         FILENAME == ARGV[1] { dom[$1] = $2; next }
@@ -4353,11 +4357,13 @@ dnsf_sync_run() {
             for (x in lr) { c = covered(x); if (c == lr[x]) continue; if (c == "" && lr[x] == base) continue; put(x, lr[x], "l") }
             for (t in cnt) printf "%s %d %d\n", t, cnt[t, "d"], cnt[t, "l"] > stf
         }
-        function put(x, t, k,   n, a, i) {
+        function put(x, t, k,   n, a, i, e) {
             if (t == base) { print "server=/" x "/#" > sf; return }
-            if (!(t in s)) return
-            if (t in tls) print x "\t" tls[t] > ubf
-            else { n = split(s[t], a, " "); for (i = 2; i <= n; i++) print "server=/" x "/" a[i] > sf }
+            e = t; if ((t in act) && (act[t] == base || (act[t] in s))) e = act[t]        # failover: DNS of the line in use
+            if (e == base) { print "server=/" x "/#" > sf; cnt[t]++; cnt[t, k]++; return }
+            if (!(e in s)) return
+            if (e in tls) print x "\t" tls[e] > ubf
+            else { n = split(s[e], a, " "); for (i = 2; i <= n; i++) print "server=/" x "/" a[i] > sf }
             cnt[t]++; cnt[t, k]++
         }' "$ds_tmp/doms" "$ds_tmp/learned"
     touch "$ds_tmp/servers" "$ds_tmp/state" "$ds_tmp/ubf"
@@ -4395,10 +4401,10 @@ dnsf_sync_run() {
     if ! dnsf_conf_write && [ $ds_changed -eq 1 ]; then killall -HUP dnsmasq 2>/dev/null; fi
     if [ -s "$ds_tmp/ubf" ] || [ -s "$DNSF_UBSTATE" ]; then dnsf_ub_sync "$ds_tmp/ubf"; fi
     # 10) last: AdGuard Home clients per device (or their removal) - its restart also restarts dnsmasq, nothing else may run then
-    if dnsd_on || [ -f "$DNSD_SUM" ] || grep -qE "^ +(- )?$DNSD_OURS" "$(agh_yaml)" 2>/dev/null; then agh_present && dnsd_apply "$ds_tmp/srv_agh" "$ds_base" "$ds_tmp/ddoms"; fi
+    if dnsd_on || [ -f "$DNSD_SUM" ] || grep -qE "^ +(- )?$DNSD_OURS" "$(agh_yaml)" 2>/dev/null; then agh_present && dnsd_apply "$ds_tmp/srv_agh" "$ds_base" "$ds_tmp/ddoms" "$ds_tmp/act"; fi
     { echo "mode=$ds_mode"; echo "base=$ds_base"; echo "names=$(wc -l < "$ds_tmp/learned")"; echo "tls=$(echo $ds_tls)"; echo "btls=$ds_btls"
       while read -r ds_t ds_ips; do echo "srv $ds_t $ds_ips"; done < "$ds_tmp/srv"
-      sed 's/^/cnt /' "$ds_tmp/state"; sed 's/^/src /' "$ds_tmp/srcs"
+      sed 's/^/cnt /' "$ds_tmp/state"; sed 's/^/src /' "$ds_tmp/srcs"; sed 's/^/act /' "$ds_tmp/act"
       cut -f2 "$ds_tmp/ddoms" | sort | uniq -c | awk '{ print "ddom", $2, $1 }' 
       if dnsd_on; then dnsd_groups | awk '{ n[$1]++ } END { for (t in n) print "dev", t, n[t] }'; echo "lan $(dnsd_lan)"; fi
       [ -s "$DNSD_ERR" ] && echo "derr $(head -n 1 "$DNSD_ERR")"; } > "$DNSF_STATE"
@@ -4425,6 +4431,10 @@ dnsf_status() {
             *" $st_t:on "*) st_e=" (encrypted, DNS over TLS via Unbound)" ;; *" $st_t:agh "*) st_e=" (encrypted for devices only - no Unbound)" ;; *" $st_t:nofw "*) st_e=" (encrypted for devices only - names: the firmware DNS over TLS would move the normal DNS too)" ;; *" $st_t:noubc "*) st_e=" (encrypted for devices only - unbound-control does not answer: $(ubc status 2>&1 | head -n 1))" ;; *" $st_t:unknown "*) st_e=" (NOT encrypted: no TLS name known for this server)" ;; esac
         echo "  $st_t: DNS $st_ips$st_e - $(echo "$st_c" | cut -d' ' -f1) domain entries, $(echo "$st_c" | cut -d' ' -f2) learned names$(st_dd=$(sed -n "s/^ddom $st_t //p" "$DNSF_STATE"); [ -n "$st_dd" ] && echo ", $st_dd for single devices")"
     done
+    sed -n 's/^act //p' "$DNSF_STATE" | while read -r st_t st_a; do
+        if [ "$st_a" = "BLOCK" ]; then echo "  FAILOVER: $st_t is down and blocked - its lookups stay blocked"
+        else echo "  FAILOVER: $st_t is down - its names and devices are looked up through the DNS of $st_a"; fi
+    done
     echo "  rules: $(ip rule show 2>/dev/null | grep -c "^${DNSF_PRIO}:\|^$((DNSF_PRIO + 1)):") (prio $DNSF_PRIO/$((DNSF_PRIO + 1))), servers file: $(grep -c . "$DNSF_SERVERS" 2>/dev/null || echo 0) lines"
     if dnsd_on; then
         sed -n 's/^dev //p' "$DNSF_STATE" | while read -r st_t st_n; do echo "  devices on $st_t (VPN Director): $st_n"; done
@@ -4448,7 +4458,8 @@ dnsf_json() {
              /^cnt / { cd[$2] = $3; cl[$2] = $4 }
              /^src / { sr[$2] = $3 }
              /^ddom / { dd[$2] = $3 }
-             END { for (i = 1; i <= n; i++) printf "%s{\"t\":\"%s\",\"dns\":\"%s\",\"d\":%d,\"l\":%d,\"dd\":%d,\"src\":\"%s\"}", (i > 1 ? "," : ""), o[i], s[o[i]], cd[o[i]], cl[o[i]], dd[o[i]], sr[o[i]] }' "$DNSF_STATE"
+             /^act / { fo[$2] = $3 }
+             END { for (i = 1; i <= n; i++) printf "%s{\"t\":\"%s\",\"dns\":\"%s\",\"d\":%d,\"l\":%d,\"dd\":%d,\"src\":\"%s\",\"fo\":\"%s\"}", (i > 1 ? "," : ""), o[i], s[o[i]], cd[o[i]], cl[o[i]], dd[o[i]], sr[o[i]], fo[o[i]] }' "$DNSF_STATE"
         printf ']'
     fi
     printf '}'
@@ -4792,16 +4803,18 @@ dnsd_yaml_write() {
 #  entry would learn nothing, so dnsmasq keeps them. Prints "N name" lines for the names, then the upstream lines.
 dnsd_spec() {
     [ -s "$5" ] && [ -n "$7" ] && [ -r "$7" ] || return 0
-    awk -F'\t' -v ip="$1" -v own="$2" -v base="$3" -v srvf="$4" -v dm="$6" -v ipf="$7" '
+    awk -F'\t' -v ip="$1" -v own="$2" -v base="$3" -v srvf="$4" -v dm="$6" -v ipf="$7" -v actf="$8" '
         BEGIN { while ((getline l < srvf) > 0) { n = split(l, a, " "); k = a[1]; sub(/^[^ ]* /, "", l); srv[k] = l }
+                if (actf != "") while ((getline l < actf) > 0) { split(l, a, " "); if (a[2] != "BLOCK") act[a[1]] = a[2] }
                 # domains of the ipset copy of AdGuard Home ("a.com,b.com/set,set" or "/a.com/b.com/set,set")
                 while ((getline l < ipf) > 0) { n = split(l, p, "/"); if (n < 2 || p[n] !~ /ASN[CD]_/) continue
                     for (i = 1; i < n; i++) { m = split(p[i], q, ","); for (j = 1; j <= m; j++) if (q[j] != "") fill[q[j]] = 1 } } }
         {
             n = split($3, d, ","); hit = 0; for (i = 1; i <= n; i++) if (d[i] == ip) hit = 1
-            if (!hit || $2 == own) next
+            tg = $2; if ((tg in act) && (act[tg] == base || (act[tg] in srv))) tg = act[tg]     # failover: the line in use
+            if (!hit || tg == own) next
             if (!($1 in fill)) next                                # AdGuard Home does not fill its set: leave it to dnsmasq
-            if ($2 == base) to = dm; else if ($2 in srv) to = srv[$2]; else next
+            if (tg == base) to = dm; else if (tg in srv) to = srv[tg]; else next
             print "N " $1; names[to] = names[to] $1 "/"
         }
         END { for (to in names) { n = split(to, s, " "); for (i = 1; i <= n; i++) print "        - '\''[/" names[to] "]" s[i] "'\''" } }' "$5"
@@ -4832,8 +4845,11 @@ dnsd_apply() {
         dnsd_foreign_ids "$da_y" | sort -u > "$da_tmp/foreign"
         : > "$da_tmp/names"
         for da_t in $( { cut -d' ' -f1 "$da_tmp/groups"; echo WAN1; } | sort -u); do
-            da_same=0; [ "$da_t" = "$2" ] && [ "$(echo "$2" | cut -c1-3)" = "WAN" ] && da_same=1   # normal DNS goes over WAN
-            da_srv=""; [ "$da_t" != "$2" ] && da_srv=$(awk -v t="$da_t" '$1 == t { $1 = ""; print }' "$1")
+            # failover: a target that is down looks up through the line its traffic uses now (its name stays)
+            da_e=$da_t; da_a=$(awk -v t="$da_t" '$1 == t && $2 != "BLOCK" { print $2 }' "$4" 2>/dev/null)
+            [ -n "$da_a" ] && { [ "$da_a" = "$2" ] || grep -q "^$da_a " "$1"; } && da_e=$da_a
+            da_same=0; [ "$da_e" = "$2" ] && [ "$(echo "$2" | cut -c1-3)" = "WAN" ] && da_same=1   # normal DNS goes over WAN
+            da_srv=""; [ "$da_e" != "$2" ] && da_srv=$(awk -v t="$da_e" '$1 == t { $1 = ""; print }' "$1")
             da_ids=$(awk -v t="$da_t" '$1 == t { print $2 }' "$da_tmp/groups")
             [ "$da_t" = "WAN1" ] && [ "$da_t" != "$2" ] && [ -n "$da_lan" ] && da_ids="$da_ids @LAN@"
             for da_i in $da_ids; do
@@ -4846,7 +4862,7 @@ dnsd_apply() {
                     da_n=$(dnsd_name "$da_i")
                 fi
                 # own DNS for the domain entries only for this device
-                : > "$da_tmp/spec"; case "$da_i" in */*) ;; *) dnsd_spec "$da_i" "$da_t" "$2" "$1" "$3" "$da_dm" "$da_ipf" > "$da_tmp/spec" ;; esac
+                : > "$da_tmp/spec"; case "$da_i" in */*) ;; *) dnsd_spec "$da_i" "$da_e" "$2" "$1" "$3" "$da_dm" "$da_ipf" "$4" > "$da_tmp/spec" ;; esac
                 [ $da_same -eq 1 ] && [ ! -s "$da_tmp/spec" ] && continue                            # nothing differs from the global upstreams
                 da_ddoms=$da_doms
                 if [ -s "$da_tmp/spec" ]; then
@@ -5822,6 +5838,16 @@ fo_info() {   # table fwmark prio - same values as the worker
         WGC1) echo "211 0x6100 9996" ;; WGC2) echo "212 0x6200 9997" ;; WGC3) echo "213 0x6300 9998" ;; WGC4) echo "214 0x6400 9999" ;; WGC5) echo "215 0x6500 10000" ;;
     esac
 }
+# targets that are down and moved to another one right now: "target active" (active may be BLOCK)
+fo_active_map() {
+    [ -s "$FO_CONF" ] || return 0
+    while IFS='=' read -r fa_t fa_ch; do
+        [ -n "$fa_t" ] || continue
+        fa_a=$(cat "$FO_RT/active_$fa_t" 2>/dev/null)
+        [ -n "$fa_a" ] && [ "$fa_a" != "$fa_t" ] && echo "$fa_t $fa_a"
+    done < "$FO_CONF"
+    return 0
+}
 fo_tname() { case "$1" in 254) echo main ;; 253) echo default ;; 255) echo local ;; *) echo "$1" ;; esac; }
 
 fo_probe() {
@@ -5910,6 +5936,9 @@ fo_round() {
     done < "$FO_CONF"
     fo_export
     [ $fo_changed -eq 1 ] && rc_check >/dev/null 2>&1
+    # DNS follows: the names of the target that is down are looked up through the line in use (in the background:
+    # the sync waits for its lock and may wait for AdGuard Home)
+    if [ $fo_changed -eq 1 ] && { dnsf_on || dnsd_on; }; then ( "$SCRIPT_PATH" dnsfollow sync >/dev/null 2>&1 & ); fi
     return 0
 }
 
