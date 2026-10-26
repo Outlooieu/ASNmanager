@@ -494,6 +494,9 @@
 </style>
 <script>
 var ASNM_NS = 'asnmanager';
+// the settings of ALL add-ons: the firmware writes custom_settings.txt anew from what a page sends - so every command
+// sends them back along with its own (taken when the page loads, refreshed from the router after each job)
+var ASNM_CS = <% get_custom_settings(); %>;
 var ASNM_PAGE_VER = '3.9.24';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
@@ -1471,13 +1474,18 @@ function asnmPost(form, done) {
 
 function asnmClean(v) { return String(v == null ? '' : v).replace(/[|\s]+/g, ''); }
 
+function asnmCsLoad() {
+    asnmGet('cs.js', function (txt) { try { var o = JSON.parse(txt); if (o && typeof o === 'object') ASNM_CS = o; } catch (e) {} });
+}
 function asnmSend(action, args) {
     if (ASNM.busy) return false;
     var id = String(Date.now());
     var parts = [id, action];
     for (var i = 0; i < args.length; i++) parts.push(asnmClean(args[i]));
     var f = document.formAsnm;
-    var cmd = {}; cmd[ASNM_NS + '_cmd'] = parts.join('|');
+    var cmd = {}, k;
+    if (ASNM_CS && typeof ASNM_CS === 'object') for (k in ASNM_CS) if (ASNM_CS.hasOwnProperty(k) && k !== ASNM_NS + '_cmd') cmd[k] = ASNM_CS[k];
+    cmd[ASNM_NS + '_cmd'] = parts.join('|');
     f.elements['amng_custom'].value = JSON.stringify(cmd);
     f.elements['action_script'].value = 'start_' + ASNM_NS + 'cmd';
     asnmPost(f);
@@ -1591,6 +1599,7 @@ function asnmJobDone(job) {
     if (job.action === 'diagpack' && ok) asnmDiagPackReady();
     asnmRcLoad(false);                                                                                                // "apply" runs a routing check
     asnmFoLoad();
+    asnmCsLoad();
 
     if (ok && ASNM.queue.length) {
         var next = ASNM.queue.shift();
