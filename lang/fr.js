@@ -2,6 +2,12 @@
 window.ASNM_LANGPACK = {"code": "fr", "locale": "fr-FR", "name": "Français", "t": {
 "subtitle": "Acheminer des systèmes autonomes entiers via WAN, OpenVPN ou WireGuard.",
 "data_refreshed": "Données actualisées :",
+"sm_on": "Mode sans échec : ASN Manager a retiré toutes ses règles à {t} car le routeur ne fonctionnait pas correctement avec elles ({w}). Le routeur lui-même accédait à Internet. Les listes et réglages sont conservés ; au prochain redémarrage, ASN Manager se teste à nouveau.",
+"sm_off_btn": "Réactiver les règles",
+"sm_retry": "Le dernier démarrage s'est terminé en mode sans échec ({w}). ASN Manager a redémarré normalement et se teste.",
+"sm_testing": "Autotest en cours…",
+"act_smoff": "Quitter le mode sans échec",
+"sm_confirm": "Réactiver les règles d'ASN Manager ? L'autotest surveille ensuite à nouveau le routeur.",
 "banner_pending": "La liste ASN a changé depuis la dernière application. Cliquez sur <b>Appliquer les règles</b> pour activer les modifications.",
 "banner_failed": "{n} ASN n'ont pas pu être chargés (0 sous-réseau). Ils sont marqués en rouge ci-dessous - utilisez <b>Réessayer les échecs</b>.",
 "traffic_title": "Trafic par ASN",

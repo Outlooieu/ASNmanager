@@ -2,6 +2,12 @@
 window.ASNM_LANGPACK = {"code": "it", "locale": "it-IT", "name": "Italiano", "t": {
 "subtitle": "Instrada interi sistemi autonomi tramite WAN, OpenVPN o WireGuard.",
 "data_refreshed": "Dati aggiornati:",
+"sm_on": "Modalità sicura: ASN Manager ha rimosso tutte le sue regole alle {t} perché il router non funzionava correttamente con esse ({w}). Il router stesso raggiungeva internet. Liste e impostazioni restano; al prossimo riavvio ASN Manager si verifica di nuovo.",
+"sm_off_btn": "Riattiva le regole",
+"sm_retry": "L'ultimo avvio è terminato in modalità sicura ({w}). ASN Manager è ripartito normalmente e si sta verificando.",
+"sm_testing": "Autotest in corso…",
+"act_smoff": "Disattiva modalità sicura",
+"sm_confirm": "Riattivare le regole di ASN Manager? L'autotest sorveglia poi di nuovo il router.",
 "banner_pending": "La lista ASN è cambiata dall'ultima applicazione. Clicca su <b>Applica regole</b> per attivare le modifiche.",
 "banner_failed": "{n} ASN non sono stati caricati (0 sottoreti). Sono segnati in rosso qui sotto - usa <b>Riprova falliti</b>.",
 "traffic_title": "Traffico per ASN",

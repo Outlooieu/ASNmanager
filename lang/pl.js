@@ -2,6 +2,12 @@
 window.ASNM_LANGPACK = {"code": "pl", "locale": "pl-PL", "name": "Polski", "t": {
 "subtitle": "Kieruj całe systemy autonomiczne przez WAN, OpenVPN lub WireGuard.",
 "data_refreshed": "Dane odświeżone:",
+"sm_on": "Tryb awaryjny: ASN Manager o {t} wycofał wszystkie swoje reguły, ponieważ router nie działał z nimi poprawnie ({w}). Sam router miał dostęp do internetu. Listy i ustawienia zostają; po następnym restarcie ASN Manager ponownie się przetestuje.",
+"sm_off_btn": "Włącz reguły ponownie",
+"sm_retry": "Ostatni start zakończył się w trybie awaryjnym ({w}). ASN Manager uruchomił się ponownie normalnie i testuje się.",
+"sm_testing": "Trwa autotest…",
+"act_smoff": "Wyłącz tryb awaryjny",
+"sm_confirm": "Włączyć ponownie reguły ASN Managera? Autotest potem znów nadzoruje router.",
 "banner_pending": "Lista ASN zmieniła się od ostatniego zastosowania. Kliknij <b>Zastosuj reguły</b>, aby włączyć zmiany.",
 "banner_failed": "Nie udało się wczytać {n} ASN (0 podsieci). Są zaznaczone na czerwono poniżej - użyj <b>Ponów nieudane</b>.",
 "traffic_title": "Ruch według ASN",

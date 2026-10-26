@@ -2,6 +2,12 @@
 window.ASNM_LANGPACK = {"code": "da", "locale": "da-DK", "name": "Dansk", "t": {
 "subtitle": "Send hele autonome systemer gennem WAN, OpenVPN eller WireGuard.",
 "data_refreshed": "Data opdateret:",
+"sm_on": "Sikker tilstand: ASN Manager fjernede alle sine regler kl. {t}, fordi routeren ikke fungerede korrekt med dem ({w}). Routeren selv nåede internettet. Lister og indstillinger bevares; efter næste genstart tester ASN Manager sig selv igen.",
+"sm_off_btn": "Slå regler til igen",
+"sm_retry": "Sidste opstart endte i sikker tilstand ({w}). ASN Manager er startet normalt igen og tester sig selv.",
+"sm_testing": "Selvtest kører…",
+"act_smoff": "Sikker tilstand fra",
+"sm_confirm": "Slå ASN Managers regler til igen? Selvtesten overvåger routeren igen bagefter.",
 "banner_pending": "ASN-listen er ændret siden sidste anvendelse. Klik på <b>Anvend regler</b> for at aktivere ændringerne.",
 "banner_failed": "{n} ASN kunne ikke indlæses (0 undernet). De er markeret med rødt nedenfor - brug <b>Prøv mislykkede igen</b>.",
 "traffic_title": "Trafik pr. ASN",

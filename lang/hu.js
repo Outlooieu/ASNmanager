@@ -2,6 +2,12 @@
 window.ASNM_LANGPACK = {"code": "hu", "locale": "hu-HU", "name": "Magyar", "t": {
 "subtitle": "Teljes autonóm rendszerek irányítása WAN-on, OpenVPN-en vagy WireGuardon keresztül.",
 "data_refreshed": "Adatok frissítve:",
+"sm_on": "Csökkentett mód: az ASN Manager {t}-kor visszavonta az összes szabályát, mert a router nem működött velük megfelelően ({w}). Maga a router elérte az internetet. A listák és beállítások megmaradnak; a következő újraindítás után az ASN Manager újra teszteli magát.",
+"sm_off_btn": "Szabályok újra be",
+"sm_retry": "Az utolsó indítás csökkentett módban végződött ({w}). Az ASN Manager újra normálisan elindult, és teszteli magát.",
+"sm_testing": "Önteszt fut…",
+"act_smoff": "Csökkentett mód ki",
+"sm_confirm": "Bekapcsolja újra az ASN Manager szabályait? Az önteszt utána ismét figyeli a routert.",
 "banner_pending": "Az ASN-lista megváltozott a legutóbbi alkalmazás óta. A módosítások érvényesítéséhez kattints a <b>Szabályok alkalmazása</b> gombra.",
 "banner_failed": "{n} ASN nem tölthető le (0 alhálózat). Lent pirossal jelölve - használd az <b>Sikertelenek újrapróbálása</b> gombot.",
 "traffic_title": "Forgalom ASN szerint",

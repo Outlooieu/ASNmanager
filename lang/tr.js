@@ -2,6 +2,12 @@
 window.ASNM_LANGPACK = {"code": "tr", "locale": "tr-TR", "name": "Türkçe", "t": {
 "subtitle": "Otonom sistemlerin tamamını WAN, OpenVPN veya WireGuard üzerinden yönlendirin.",
 "data_refreshed": "Veriler yenilendi:",
+"sm_on": "Güvenli mod: ASN Manager, yönlendirici kurallarıyla düzgün çalışmadığı için ({w}) saat {t}'de tüm kurallarını geri aldı. Yönlendiricinin kendisi internete erişiyordu. Listeler ve ayarlar korunur; bir sonraki yeniden başlatmadan sonra ASN Manager kendini yeniden test eder.",
+"sm_off_btn": "Kuralları yeniden aç",
+"sm_retry": "Son açılış güvenli modda bitti ({w}). ASN Manager yeniden normal başladı ve kendini test ediyor.",
+"sm_testing": "Kendi kendine test sürüyor…",
+"act_smoff": "Güvenli modu kapat",
+"sm_confirm": "ASN Manager kuralları yeniden açılsın mı? Test ardından yönlendiriciyi yeniden izler.",
 "banner_pending": "ASN listesi son uygulamadan bu yana değişti. Değişikliklerin geçerli olması için <b>Kuralları uygula</b>'ya tıklayın.",
 "banner_failed": "{n} ASN indirilemedi (0 alt ağ). Aşağıda kırmızıyla işaretlendi - <b>Başarısızları yeniden dene</b>'yi kullanın.",
 "traffic_title": "ASN'ye göre trafik",

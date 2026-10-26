@@ -1,3 +1,8 @@
+## v3.9.29
+
+- **Safemode with self-test**: after a reboot, an Apply or a change of the DNS / failover settings ASN Manager watches the router for 2 minutes, counted from when it is fully up (WAN connected, time set, dnsmasq / AdGuard Home running, rules built). If the router itself reaches the internet over WAN but DNS gives no answers, dnsmasq is gone or the LAN is routed wrongly, all rules of ASN Manager are taken out (lists and settings stay). If it is still broken without them, the cause is elsewhere and the rules are put back. An outage of the internet line never counts; at most one rollback per boot
+- After a reboot ASN Manager starts normally once more and tests itself again; red banner on the page with "Turn rules on again", e-mail if e-mail notices are on, command `safemode status | on | off | test`
+
 ## v3.9.28
 
 - **Faster restore**: all settings are restored in one go with a single DNS sync at the end (before: one sync per setting - with "DNS per device" and no AdGuard Home login that meant one AdGuard Home restart for each, several minutes in all); the page data is written after the last step only. A restore after a reinstall took about 7 minutes, now about 1.5

@@ -2,6 +2,12 @@
 window.ASNM_LANGPACK = {"code": "nl", "locale": "nl-NL", "name": "Nederlands", "t": {
 "subtitle": "Leid complete autonome systemen via WAN, OpenVPN of WireGuard.",
 "data_refreshed": "Gegevens bijgewerkt:",
+"sm_on": "Veilige modus: ASN Manager heeft om {t} al zijn regels teruggedraaid omdat de router er niet goed mee werkte ({w}). De router zelf bereikte internet. Lijsten en instellingen blijven bewaard; na de volgende herstart test ASN Manager zichzelf opnieuw.",
+"sm_off_btn": "Regels weer inschakelen",
+"sm_retry": "De laatste start eindigde in de veilige modus ({w}). ASN Manager is opnieuw normaal gestart en test zichzelf.",
+"sm_testing": "Zelftest bezig…",
+"act_smoff": "Veilige modus uit",
+"sm_confirm": "De regels van ASN Manager weer inschakelen? De zelftest bewaakt de router daarna opnieuw.",
 "banner_pending": "De ASN-lijst is gewijzigd sinds de laatste toepassing. Klik op <b>Regels toepassen</b> om de wijzigingen te activeren.",
 "banner_failed": "{n} ASN('s) konden niet worden geladen (0 subnetten). Ze zijn hieronder rood gemarkeerd - gebruik <b>Mislukte opnieuw</b>.",
 "traffic_title": "Verkeer per ASN",

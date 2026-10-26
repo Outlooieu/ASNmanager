@@ -2,6 +2,12 @@
 window.ASNM_LANGPACK = {"code": "cz", "locale": "cs-CZ", "name": "Čeština", "t": {
 "subtitle": "Směrujte celé autonomní systémy přes WAN, OpenVPN nebo WireGuard.",
 "data_refreshed": "Data obnovena:",
+"sm_on": "Nouzový režim: ASN Manager v {t} odebral všechna svá pravidla, protože s nimi router nefungoval správně ({w}). Router sám se k internetu dostal. Seznamy a nastavení zůstávají; po dalším restartu se ASN Manager otestuje znovu.",
+"sm_off_btn": "Znovu zapnout pravidla",
+"sm_retry": "Poslední start skončil v nouzovém režimu ({w}). ASN Manager se znovu spustil normálně a právě se testuje.",
+"sm_testing": "Probíhá autotest…",
+"act_smoff": "Vypnout nouzový režim",
+"sm_confirm": "Znovu zapnout pravidla ASN Manageru? Autotest pak router opět hlídá.",
 "banner_pending": "Seznam ASN se od posledního použití změnil. Klikněte na <b>Použít pravidla</b> pro aktivaci změn.",
 "banner_failed": "{n} ASN se nepodařilo načíst (0 podsítí). Jsou níže označeny červeně - použijte <b>Zopakovat neúspěšné</b>.",
 "traffic_title": "Provoz podle ASN",

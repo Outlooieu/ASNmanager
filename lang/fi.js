@@ -2,6 +2,12 @@
 window.ASNM_LANGPACK = {"code": "fi", "locale": "fi-FI", "name": "Suomi", "t": {
 "subtitle": "Reititä kokonaisia autonomisia järjestelmiä WANin, OpenVPN:n tai WireGuardin kautta.",
 "data_refreshed": "Tiedot päivitetty:",
+"sm_on": "Vikasietotila: ASN Manager poisti kaikki sääntönsä klo {t}, koska reititin ei toiminut niiden kanssa oikein ({w}). Reititin itse pääsi internetiin. Luettelot ja asetukset säilyvät; seuraavan uudelleenkäynnistyksen jälkeen ASN Manager testaa itsensä uudelleen.",
+"sm_off_btn": "Ota säännöt taas käyttöön",
+"sm_retry": "Edellinen käynnistys päättyi vikasietotilaan ({w}). ASN Manager käynnistyi taas normaalisti ja testaa itseään.",
+"sm_testing": "Itsetesti käynnissä…",
+"act_smoff": "Vikasietotila pois",
+"sm_confirm": "Otetaanko ASN Managerin säännöt taas käyttöön? Itsetesti valvoo reititintä sen jälkeen uudelleen.",
 "banner_pending": "ASN-luettelo on muuttunut edellisen käyttöönoton jälkeen. Ota muutokset käyttöön valitsemalla <b>Ota säännöt käyttöön</b>.",
 "banner_failed": "{n} ASN:ää ei voitu ladata (0 aliverkkoa). Ne on merkitty alla punaisella - käytä <b>Yritä epäonnistuneita uudelleen</b>.",
 "traffic_title": "Liikenne ASN:n mukaan",

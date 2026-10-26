@@ -2,6 +2,12 @@
 window.ASNM_LANGPACK = {"code": "sv", "locale": "sv-SE", "name": "Svenska", "t": {
 "subtitle": "Dirigera hela autonoma system via WAN, OpenVPN eller WireGuard.",
 "data_refreshed": "Data uppdaterad:",
+"sm_on": "Felsäkert läge: ASN Manager tog bort alla sina regler kl. {t} eftersom routern inte fungerade korrekt med dem ({w}). Routern själv nådde internet. Listor och inställningar behålls; efter nästa omstart testar ASN Manager sig själv igen.",
+"sm_off_btn": "Slå på reglerna igen",
+"sm_retry": "Senaste starten slutade i felsäkert läge ({w}). ASN Manager startade normalt igen och testar sig själv.",
+"sm_testing": "Självtest pågår…",
+"act_smoff": "Felsäkert läge av",
+"sm_confirm": "Slå på ASN Managers regler igen? Självtestet övervakar routern igen efteråt.",
 "banner_pending": "ASN-listan har ändrats sedan senaste tillämpningen. Klicka på <b>Tillämpa regler</b> för att aktivera ändringarna.",
 "banner_failed": "{n} ASN kunde inte laddas ner (0 subnät). De är markerade i rött nedan - använd <b>Försök misslyckade igen</b>.",
 "traffic_title": "Trafik per ASN",

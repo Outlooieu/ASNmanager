@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.9.28 -->
+<!-- ASNmanager-WebUI v3.9.29 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -500,7 +500,7 @@ var ASNM_NS = 'asnmanager';
 // the settings of ALL add-ons: the firmware writes custom_settings.txt anew from what a page sends - so every command
 // sends them back along with its own (taken when the page loads, refreshed from the router after each job)
 var ASNM_CS = <% get_custom_settings(); %>;
-var ASNM_PAGE_VER = '3.9.28';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.9.29';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -508,6 +508,7 @@ var ASNM_I18N = {
   en: {
     subtitle: 'Route whole Autonomous Systems through WAN, OpenVPN or WireGuard.',
     data_refreshed: 'Data refreshed:',
+    sm_on: 'Safemode: ASN Manager took all of its rules out at {t} because the router did not work properly with them ({w}). The router itself reached the internet. Lists and settings are kept; after the next reboot ASN Manager tests itself again.', sm_off_btn: 'Turn rules on again', sm_retry: 'The last boot ended in safemode ({w}). ASN Manager started normally once more and is testing itself.', sm_testing: 'Self-test running…', act_smoff: 'Safemode off', sm_confirm: 'Turn the rules of ASN Manager on again? The self-test watches the router again afterwards.',
     banner_pending: 'The ASN list has changed since the last apply. Click <b>Apply rules</b> to activate the changes.',
     banner_failed: '{n} ASN(s) could not be loaded (0 subnets). They are marked red below - use <b>Retry failed</b>.',
     traffic_title: 'Traffic per ASN', tr_sub_on: 'Counting since {t}', tr_sub_off: 'Counting is off', tr_sub_none: 'Statistics module not installed',
@@ -661,6 +662,7 @@ var ASNM_I18N = {
   de: {
     subtitle: 'Leitet komplette Autonome Systeme über WAN, OpenVPN oder WireGuard.',
     data_refreshed: 'Daten aktualisiert:',
+    sm_on: 'Safemode: ASN Manager hat um {t} alle seine Regeln zurückgenommen, weil der Router damit nicht richtig lief ({w}). Der Router selbst kam ins Internet. Listen und Einstellungen bleiben erhalten; nach dem nächsten Neustart testet sich ASN Manager erneut.', sm_off_btn: 'Regeln wieder einschalten', sm_retry: 'Der letzte Start endete im Safemode ({w}). ASN Manager ist normal gestartet und testet sich gerade erneut.', sm_testing: 'Selbsttest läuft…', act_smoff: 'Safemode aus', sm_confirm: 'Regeln von ASN Manager wieder einschalten? Der Selbsttest überwacht den Router danach erneut.',
     banner_pending: 'Die ASN-Liste wurde seit dem letzten Anwenden geändert. Klicke auf <b>Regeln anwenden</b>, um die Änderungen zu aktivieren.',
     banner_failed: '{n} ASN(s) konnten nicht geladen werden (0 Subnetze). Sie sind unten rot markiert - nutze <b>Fehlgeschlagene wiederholen</b>.',
     traffic_title: 'Traffic pro ASN', tr_sub_on: 'Zählung seit {t}', tr_sub_off: 'Zählung ist aus', tr_sub_none: 'Statistik-Modul nicht installiert',
@@ -1007,6 +1009,28 @@ function asnmVersionFix(v) {
     asnmSend('refresh', []);
 }
 
+// safemode: red = rules are out (button turns them on again), blue = first start after a safemode boot, self-test running
+function asnmSmRender(sm) {
+    var ban = document.getElementById('asnm_banner_sm'), tx = document.getElementById('asnm_sm_text'), b = document.getElementById('asnm_sm_btn');
+    if (!sm || (!sm.on && !sm.flag)) { ban.style.display = 'none'; return; }
+    var why = sm.why || '?';
+    if (sm.on) {
+        ban.className = 'asnm-banner asnm-banner-bad';
+        tx.textContent = t('sm_on', { t: asnmFmtTime(sm.ts), w: why });
+        b.value = t('sm_off_btn'); b.style.display = '';
+    } else {
+        ban.className = 'asnm-banner asnm-banner-info';
+        tx.textContent = t('sm_retry', { w: why }) + (sm.testing ? ' ' + t('sm_testing') : '');
+        b.style.display = 'none';
+    }
+    ban.style.display = 'flex';
+}
+function asnmSmOff() {
+    if (ASNM.busy) return;
+    if (!confirm(t('sm_confirm'))) return;
+    asnmSend('smoff', []);
+}
+
 function asnmRender() {
     var d = ASNM.data;
     asnmVersionFix(d.version);
@@ -1014,6 +1038,7 @@ function asnmRender() {
     document.getElementById('asnm_last_apply').textContent = asnmFmtTime(d.last_apply);
     document.getElementById('asnm_generated').textContent = asnmFmtTime(d.generated);
     document.getElementById('asnm_banner').style.display = d.pending ? 'flex' : 'none';
+    asnmSmRender(d.safemode);
     var subs = 0, up = 0, used = 0;
     for (var si = 0; si < d.entries.length; si++) if (!d.entries[si].kind && d.entries[si].subnets > 0) subs += d.entries[si].subnets;
     for (var sj = 0; sj < d.ifaces.length; sj++) if (d.ifaces[sj].up) up++;
@@ -3793,6 +3818,7 @@ function initial() {
       <span class="asnm-chip" id="asnm_version">-</span>&nbsp; <span data-i18n="data_refreshed"></span> <span id="asnm_generated">-</span>
       <div class="asnm-upd-line"><span id="asnm_upd_state">-</span><span class="asnm-link" id="asnm_upd_btn" data-i18n="upd_check" onclick="asnmUpdCheck(true);"></span></div></div>
   </div>
+  <div id="asnm_banner_sm" class="asnm-banner asnm-banner-bad"><span id="asnm_sm_text"></span><span class="asnm-spacer"></span><input type="button" id="asnm_sm_btn" class="button_gen asnm-btn asnm-primary asnm-small-btn" onclick="asnmSmOff();"/></div>
   <div id="asnm_banner_update" class="asnm-banner asnm-banner-info"><span id="asnm_upd_text"></span><span class="asnm-spacer"></span>
     <a id="asnm_upd_notes" class="asnm-link" target="_blank" rel="noopener" data-i18n="upd_notes"></a>
     <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="upd_install" onclick="asnmUpdate();"/></div>

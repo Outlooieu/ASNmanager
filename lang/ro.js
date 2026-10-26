@@ -2,6 +2,12 @@
 window.ASNM_LANGPACK = {"code": "ro", "locale": "ro-RO", "name": "Română", "t": {
 "subtitle": "Rutează sisteme autonome întregi prin WAN, OpenVPN sau WireGuard.",
 "data_refreshed": "Date actualizate:",
+"sm_on": "Mod sigur: ASN Manager și-a retras toate regulile la {t} deoarece routerul nu funcționa corect cu ele ({w}). Routerul însuși ajungea la internet. Listele și setările se păstrează; după următoarea repornire ASN Manager se testează din nou.",
+"sm_off_btn": "Reactivează regulile",
+"sm_retry": "Ultima pornire s-a încheiat în mod sigur ({w}). ASN Manager a pornit din nou normal și se testează.",
+"sm_testing": "Autotest în curs…",
+"act_smoff": "Dezactivează modul sigur",
+"sm_confirm": "Reactivați regulile ASN Manager? Autotestul supraveghează apoi din nou routerul.",
 "banner_pending": "Lista ASN s-a schimbat de la ultima aplicare. Apasă <b>Aplică regulile</b> pentru a activa modificările.",
 "banner_failed": "{n} ASN nu au putut fi descărcate (0 subrețele). Sunt marcate cu roșu mai jos - folosește <b>Reîncearcă cele eșuate</b>.",
 "traffic_title": "Trafic pe ASN",

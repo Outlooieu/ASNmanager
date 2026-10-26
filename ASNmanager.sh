@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.9.28
+version=3.9.29
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -12,7 +12,7 @@ case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
 export PATH
 
-SCRIPT_VERSION="3.9.28"
+SCRIPT_VERSION="3.9.29"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -313,6 +313,7 @@ apply_schedule() {
     
     # Let the worker load from cache on every router boot in the background
     echo "$WORKER_SCRIPT boot >/dev/null 2>&1 &" >> "$SERVICES_START"
+    sm_hook_sync
 }
 
 configure_schedule() {
@@ -450,6 +451,7 @@ proc_kids() { for pk_d in /proc/[0-9]*; do [ "$(awk '{ print $4 }' "$pk_d/stat" 
 
 # the cron run of the routing check: not while the previous one still works, and never longer than 4 minutes
 rc_run_once() {
+    sm_on && return 0
     rr_d=/tmp/asnmanager-check.lock
     if ! mkdir "$rr_d" 2>/dev/null; then
         rr_o=$(cat "$rr_d/pid" 2>/dev/null)
@@ -782,6 +784,7 @@ cu_hook_sync() {
 # check runs) shared their work files - one saw half a list and took the addresses of many entries out of their sets
 CU_LOCK=/tmp/asnmanager-cu.lock
 cu_apply_dom() {
+    sm_on && return 0
     cl_i=0
     while ! mkdir "$CU_LOCK" 2>/dev/null; do
         if [ -n "$(find "$CU_LOCK" -maxdepth 0 -mmin +5 2>/dev/null)" ]; then rm -rf "$CU_LOCK"; continue; fi
@@ -965,6 +968,7 @@ cu_learned_js() {
 }
 
 cu_apply() {
+    sm_on && return 0
     : > "$CU_STATUS"
     cu_apply_ip
     cu_apply_dom
@@ -1650,6 +1654,10 @@ uninstall_menu() {
             rm -f "$ADDON_DIR/sg_domains"; sgd_write >/dev/null 2>&1; rm -f "$SGD_LOG"; rm -f "$DNSF_FLAG" "$DNSD_FLAG" "$DNSF_TLS_FLAG"; dnsf_sync >/dev/null 2>&1
             cu_purge >/dev/null 2>&1
             rm -f /tmp/asn_groups.txt
+            # safemode: self-test, flags, boot hook
+            sm_p=$(cat "$SM_PID" 2>/dev/null); [ -n "$sm_p" ] && kill "$sm_p" 2>/dev/null
+            rm -f "$SM_RT" "$SM_FLAG" "$SM_PID" "$SM_ROLLED" "$SM_NOTUS" "$SM_LAST"
+            [ -f "$SERVICES_START" ] && sed -i "/# ${SM_HOOK}\$/d" "$SERVICES_START"
 
             # Clean up kernel iptables rules, ipsets, and ip rules completely
             cleanup_rules
@@ -1955,6 +1963,8 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
+# safemode (self-test rolled the rules back): nothing until Apply / "safemode off" / the next reboot
+[ -f /tmp/asnmanager-safemode ] && exit 0
 # no ASNs: only the custom entries (IP/CIDR, domains) may be left
 [ ! -s "$ASN_FILE" ] && { [ -x /jffs/scripts/ASNmanager.sh ] && /jffs/scripts/ASNmanager.sh custom apply >/dev/null 2>&1; exit 0; }
 # domain sets and their marking rules first (also before the internet wait at boot): what dnsmasq learned stays
@@ -2961,7 +2971,14 @@ cli_clear() {
 #   cache:  rebuild every ASN rule from the saved subnets, download only ASNs that are not cached yet
 #   force:  download the subnets of every ASN again, then rebuild (the daily schedule does this anyway)
 APPLIED_ASNS="/tmp/asnmanager-applied.asns"
+# Apply turns safemode off; afterwards the self-test watches the router
 cli_apply() {
+    sm_on && { rm -f "$SM_RT" "$SM_FLAG"; sm_log "turned off by Apply"; echo "Safemode turned off - the rules are applied again."; sgd_write >/dev/null 2>&1; }
+    cli_apply_run "$@"; ca_rc=$?
+    sm_watch_start apply
+    return $ca_rc
+}
+cli_apply_run() {
     amode="${1:-smart}"
     case "$amode" in full|reload) amode=force ;; esac
     # (the marking rules must already be in the form of v3.4.0: after an update the first apply rebuilds them)
@@ -3132,6 +3149,7 @@ web_export() {
             "$SCRIPT_VERSION" "$(date +%s)" "$last_apply" "$pending" "$cron" "$worker"
         printf '"schedule":{"interval":%s,"time":"%s"},' "$INTERVAL" "$(json_esc "$TIME_VAL")"
         printf '"rules":"%s",' "$(rules_mode)"
+        sm_json
 
         printf '"entries":['
         awk -F':' '
@@ -3413,12 +3431,14 @@ web_job() {
         rsset)    rs_settings_batch "$a1" > "$OUT" 2>&1 ;;
         dnsfsrv)  dnsf_server_set "$a1" $(echo "$a2" | tr ',' ' ') > "$OUT" 2>&1 ;;
         mailtest) mail_test > "$OUT" 2>&1 ;;
+        smoff)    cli_safemode off > "$OUT" 2>&1 ;;
         aghlogin) rm -f "$AGH_AUTH.refused"; agh_login "$a1" > "$OUT" 2>&1 ;;
         failover) fbs=""; [ -n "$a2" ] && fbs="$a2"; [ -n "$a3" ] && fbs="${fbs:+$fbs,}$a3"
                   fo_set "$a1" "$fbs" > "$OUT" 2>&1 ;;
         *)        echo "Unknown action '$act'" > "$OUT"; false ;;
     esac
     rc=$?
+    case "$act" in setting|rsset|dnsfsrv|failover) sm_watch_start "$act" ;; esac
     esc=$(printf '\033')
     sed -i "s/${esc}\[[0-9;]*m//g" "$OUT"
     # after an update this process is still the OLD script (old version number in its data): the new script writes the data
@@ -4114,7 +4134,7 @@ sgd_file() { case "$(sgd_state)" in on) echo "$SGD_LOG" ;; ext) sgd_foreign ;; e
 sgd_write() {
     sgw_new=/tmp/asnmanager-dnslog.new
     : > "$sgw_new.l"
-    if sgd_on && [ -z "$(sgd_foreign)" ]; then printf 'log-queries=extra\nlog-facility=%s\n' "$SGD_LOG" > "$sgw_new.l"; fi
+    if ! sm_on && sgd_on && [ -z "$(sgd_foreign)" ]; then printf 'log-queries=extra\nlog-facility=%s\n' "$SGD_LOG" > "$sgw_new.l"; fi
     dm_block "$SGD_BEGIN" "$SGD_END" "$sgw_new.l" > "$sgw_new"; rm -f "$sgw_new.l"
     if [ -f "$DNSMASQ_ADD" ]; then sgw_cur="$DNSMASQ_ADD"; else sgw_cur=/dev/null; fi
     if cmp -s "$sgw_new" "$sgw_cur"; then rm -f "$sgw_new"; return 0; fi
@@ -4442,7 +4462,7 @@ dnsf_clear() {
 # our block in dnsmasq.conf.add: "servers-file=..." while on; dnsmasq restarts only when the block changed
 dnsf_conf_write() {
     dw_new=/tmp/asnmanager-dnsf.add
-    : > "$dw_new.l"; dnsf_on && [ -f "$DNSF_SERVERS" ] && printf 'servers-file=%s\n' "$DNSF_SERVERS" > "$dw_new.l"
+    : > "$dw_new.l"; ! sm_on && dnsf_on && [ -f "$DNSF_SERVERS" ] && printf 'servers-file=%s\n' "$DNSF_SERVERS" > "$dw_new.l"
     dm_block "$DNSF_BEGIN" "$DNSF_END" "$dw_new.l" > "$dw_new"; rm -f "$dw_new.l"
     if [ -f "$DNSMASQ_ADD" ]; then dw_cur="$DNSMASQ_ADD"; else dw_cur=/dev/null; fi
     if cmp -s "$dw_new" "$dw_cur"; then rm -f "$dw_new"; return 1; fi
@@ -4474,7 +4494,7 @@ dnsf_sync() {
     return $dsl_r
 }
 dnsf_sync_run() {
-    if ! dnsf_on && ! dnsd_on; then dnsf_clear; agh_present && grep -qE "^ +(- )?$DNSD_OURS" "$(agh_yaml)" 2>/dev/null && dnsd_apply "" ""; return 0; fi
+    if sm_on || { ! dnsf_on && ! dnsd_on; }; then dnsf_clear; agh_present && grep -qE "^ +(- )?$DNSD_OURS" "$(agh_yaml)" 2>/dev/null && dnsd_apply "" ""; return 0; fi
     set -- $(dnsf_base); ds_mode=$1; ds_base=$2
     ds_tmp=/tmp/asnmanager-dnsf.$$; mkdir -p "$ds_tmp"
     # 1) which set routes to which target: marking rules for all devices (no "-s")
@@ -5902,6 +5922,7 @@ cli_install() {
     chmod 755 "$SCRIPT_PATH" 2>/dev/null
     [ -f "$ASN_FILE" ] || : > "$ASN_FILE"
     webui_auto
+    sm_hook_sync
     echo "ASN Manager v${SCRIPT_VERSION} installed: $SCRIPT_PATH"
     if [ -t 0 ] && [ -t 1 ]; then sleep 1; exec "$SCRIPT_PATH"; fi
     echo "Open the menu with: $SCRIPT_PATH"
@@ -6074,6 +6095,7 @@ ep_list() {
 }
 
 ep_guard_sync() {
+    sm_on && return 0
     ep_want=$(ep_list | cut -d' ' -f1 | sort -u)
     ep_have=$(ip rule show 2>/dev/null | awk -v p="$EP_PRIO:" '$1 == p { for (i = 1; i <= NF; i++) if ($i == "to") print $(i + 1) }' | sed 's#/32$##' | sort -u)
     [ "$ep_want" = "$ep_have" ] && return 0
@@ -6152,6 +6174,7 @@ fo_vpnd_counts() {
     tr '<' '\n' < "$VPND_FILE" | awk -F'>' '$1 == "1" && ($3 != "" || $4 != "") { i = toupper($5); if (i == "WAN") i = "WAN1"; n[i]++ } END { for (i in n) print i, n[i] }'
 }
 fo_vpnd_sync() {
+    sm_on && return 0
     mkdir -p "$FO_RT"; fv_new="$FO_RT/vpnd.new"; : > "$fv_new"
     if [ -s "$FO_CONF" ] && fo_vpnd_on && [ -r "$VPND_FILE" ]; then
         fo_active_map | while read -r fv_t fv_a; do
@@ -6327,6 +6350,7 @@ fo_round_safe() { [ -s "$FO_CONF" ] || return 0; fo_lock || return 0; fo_round; 
 
 # one probe round over all chains
 fo_round() {
+    sm_on && return 0
     [ -s "$FO_CONF" ] || return 0
     rt_heal
     mkdir -p "$FO_RT"
@@ -7054,6 +7078,290 @@ webui_uninstall() {
     echo "WebUI removed."
 }
 
+# =====================================================================
+#  Safemode: after a boot, an Apply or a change of the DNS / failover settings a self-test watches the router for
+#  2 minutes - counted from the moment it is fully up (WAN connected, time set, dnsmasq / AdGuard Home running,
+#  rules built). If the router itself still reaches the internet over WAN but DNS answers no longer come, dnsmasq
+#  is gone or the LAN is routed wrongly, ASN Manager takes all of its own rules out again (the lists and settings
+#  stay). Then it checks again: still broken = not caused by ASN Manager, its rules are put back.
+#  An outage of the internet line itself never counts. At most one rollback per boot (Apply allows another one).
+#  SM_RT  (RAM)   = safemode is on: no rules until Apply / "safemode off" / the next reboot.
+#  SM_FLAG (jffs) = the last rollback; after a reboot ASN Manager starts normally once more with the self-test:
+#                   it passes -> the flag goes, it fails -> rolled back again until the next reboot.
+# =====================================================================
+SM_RT="/tmp/${WEBUI_NS}-safemode"
+SM_FLAG="$ADDON_DIR/safemode"
+SM_PID="/tmp/${WEBUI_NS}-smwatch.pid"
+SM_ROLLED="/tmp/${WEBUI_NS}-sm.rolled"         # a rollback was done this boot
+SM_NOTUS="/tmp/${WEBUI_NS}-sm.notus"           # the rollback did not help: the problem is elsewhere (this boot)
+SM_LAST="/tmp/${WEBUI_NS}-sm.last"             # last test result (time result reason)
+SM_HOOK="ASNmanager-Safemode"
+SM_READY_MAX=${SM_READY_MAX:-600}
+SM_WINDOW=${SM_WINDOW:-120}
+SM_STEP=${SM_STEP:-15}
+
+sm_on() { [ -f "$SM_RT" ]; }
+sm_log() { logger -t ASNmanager "Safemode: $1"; }
+
+# services-start: the self-test after every boot
+sm_hook_sync() {
+    [ -f "$SCRIPT_PATH" ] || return 0
+    # a worker of an older version knows nothing of safemode (its scheduled run would build the rules again)
+    if [ -f "$WORKER_SCRIPT" ] && [ -s "$ASN_FILE" ] && ! grep -q 'asnmanager-safemode' "$WORKER_SCRIPT"; then rebuild_worker >/dev/null 2>&1; fi
+    grep -q "# ${SM_HOOK}\$" "$SERVICES_START" 2>/dev/null && return 0
+    ensure_script "$SERVICES_START"
+    echo "$SCRIPT_PATH safemode boot </dev/null >/dev/null 2>&1 & # ${SM_HOOK}" >> "$SERVICES_START"
+}
+
+# the router is fully up: internet line connected, time set, dnsmasq (and AdGuard Home) running, no rule building
+sm_ready() {
+    [ "$(nvram get wan0_state_t 2>/dev/null)" = "2" ] || [ "$(nvram get wan1_state_t 2>/dev/null)" = "2" ] || return 1
+    [ "$(nvram get ntp_ready 2>/dev/null)" = "1" ] || return 1
+    pidof dnsmasq >/dev/null 2>&1 || return 1
+    if agh_present; then pidof AdGuardHome >/dev/null 2>&1 || return 1; fi
+    ps w 2>/dev/null | grep -v grep | grep -q 'asn-bypass-worker' && return 1
+    [ -d "$DNSF_LOCK" ] && return 1
+    [ -d "$CU_LOCK" ] && return 1
+    return 0
+}
+
+# the router reaches the internet through the WAN line itself (bound to the WAN interface: no rule of ASN Manager
+# is needed for that)
+sm_wan_ok() {
+    for sw_u in 0 1; do
+        [ "$(nvram get wan${sw_u}_state_t 2>/dev/null)" = "2" ] || continue
+        sw_if=$(nvram get wan${sw_u}_ifname 2>/dev/null); [ -n "$sw_if" ] || continue
+        for sw_ip in 1.1.1.1 9.9.9.9 8.8.8.8; do
+            ping -c 1 -W 3 -I "$sw_if" "$sw_ip" >/dev/null 2>&1 && return 0
+        done
+    done
+    return 1
+}
+
+sm_dns_ok() {
+    for sd_n in google.com cloudflare.com quad9.net; do
+        nsl "$sd_n" 127.0.0.1 2>/dev/null | awk '/^Name:/ { f = 1; next } f && /^Address/ && !/127\.0\.0\.1/ { ok = 1 } END { exit !ok }' && return 0
+    done
+    return 1
+}
+
+# LAN routing: a device that talks to the router must reach it ("local"), and the router must reach the devices
+# over the LAN interface. Only a clear wrong answer counts (an error of "ip route get" itself does not).
+sm_lan_bad() {
+    sl_ip=$(nvram get lan_ipaddr 2>/dev/null); sl_if=$(nvram get lan_ifname 2>/dev/null)
+    [ -n "$sl_ip" ] && [ -n "$sl_if" ] || return 1
+    sl_n=$(ip neigh show dev "$sl_if" 2>/dev/null | awk '/lladdr/ && $NF != "FAILED" && $1 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ { print $1 }' | head -n 3)
+    [ -n "$sl_n" ] || return 1
+    sl_bad=0; sl_good=0
+    for sl_d in $sl_n; do
+        sl_r=$(ip route get "$sl_d" 2>/dev/null | head -n 1)
+        case "$sl_r" in "") ;; *" dev $sl_if "*|*" dev $sl_if") sl_good=$((sl_good + 1)) ;; *) sl_bad=$((sl_bad + 1)); sl_why="$sl_d -> $sl_r" ;; esac
+        sl_r=$(ip route get "$sl_ip" from "$sl_d" iif "$sl_if" 2>/dev/null | head -n 1)
+        case "$sl_r" in "") ;; local*) sl_good=$((sl_good + 1)) ;; *) sl_bad=$((sl_bad + 1)); sl_why="$sl_d -> router: $sl_r" ;; esac
+    done
+    [ $sl_bad -gt 0 ] && [ $sl_good -eq 0 ] && { echo "LAN routing wrong ($sl_why)"; return 0; }
+    return 1
+}
+
+# prints the reason and returns 0 when something is broken
+sm_fail() {
+    pidof dnsmasq >/dev/null 2>&1 || { echo "dnsmasq is not running"; return 0; }
+    sm_dns_ok || { echo "no DNS answers from the router (127.0.0.1)"; return 0; }
+    sm_lan_bad && return 0
+    return 1
+}
+
+# one test right now (command line)
+sm_test() {
+    if sm_wan_ok; then echo "[OK]   the router reaches the internet over WAN"; else echo "[--]   the router does not reach the internet over WAN (no rollback in this state)"; fi
+    if pidof dnsmasq >/dev/null 2>&1; then echo "[OK]   dnsmasq is running"; else echo "[FAIL] dnsmasq is not running"; fi
+    if sm_dns_ok; then echo "[OK]   DNS answers from the router"; else echo "[FAIL] no DNS answers from the router (127.0.0.1)"; fi
+    if st_l=$(sm_lan_bad); then echo "[FAIL] $st_l"; else echo "[OK]   LAN routing"; fi
+    if sm_ready; then echo "[OK]   router is fully up"; else echo "[--]   router is not fully up yet (WAN / time / dnsmasq / AdGuard Home / rule building)"; fi
+}
+
+# start the self-test in the background (a running one is replaced: its time starts again)
+sm_watch_start() {
+    [ -n "$SM_NOWATCH" ] && return 0
+    sm_on && return 0
+    "$SCRIPT_PATH" safemode watch "${1:-change}" </dev/null >/dev/null 2>&1 &
+    return 0
+}
+
+sm_watch() {
+    sw_why=${1:-change}
+    sm_on && return 0
+    if [ -f "$SM_NOTUS" ]; then sm_log "self-test ($sw_why) skipped: a rollback this boot did not help, the problem is not ASN Manager"; return 0; fi
+    sw_old=$(cat "$SM_PID" 2>/dev/null)
+    [ -n "$sw_old" ] && [ "$sw_old" != "$$" ] && [ -d "/proc/$sw_old" ] && kill "$sw_old" 2>/dev/null
+    echo $$ > "$SM_PID"
+    [ "$sw_why" = "boot" ] && [ -f "$SM_FLAG" ] && sm_log "last boot ended in safemode ($(cut -d' ' -f2- "$SM_FLAG")) - starting normally once more, with the self-test"
+    sw_t=0
+    until sm_ready; do
+        [ "$(cat "$SM_PID" 2>/dev/null)" = "$$" ] || return 0
+        sw_t=$((sw_t + 10))
+        if [ $sw_t -ge "$SM_READY_MAX" ]; then
+            echo "$(date +%s) skip $sw_why: router not fully up after ${SM_READY_MAX}s" > "$SM_LAST"
+            sm_log "self-test ($sw_why) not done: router not fully up after ${SM_READY_MAX}s"; rm -f "$SM_PID"; return 0
+        fi
+        sleep 10
+    done
+    sw_end=$(( $(date +%s) + SM_WINDOW )); sw_fails=0; sw_pass=0; sw_res=""; sw_r=""
+    while :; do
+        [ "$(cat "$SM_PID" 2>/dev/null)" = "$$" ] || return 0        # replaced by a newer test
+        sm_on && { rm -f "$SM_PID"; return 0; }
+        if sm_wan_ok; then
+            if sw_r=$(sm_fail); then sw_fails=$((sw_fails + 1)); sw_pass=0; sw_last=$sw_r; else sw_pass=$((sw_pass + 1)); sw_fails=0; fi
+        fi
+        sw_now=$(date +%s)
+        if [ "$sw_now" -ge "$sw_end" ]; then
+            [ $sw_pass -ge 1 ] && { sw_res=ok; break; }
+            [ $sw_fails -ge 4 ] && { sw_res=fail; break; }
+            [ "$sw_now" -ge $((sw_end + SM_WINDOW)) ] && { sw_res=open; break; }   # internet line down meanwhile: no verdict
+        fi
+        sleep "$SM_STEP"
+    done
+    rm -f "$SM_PID"
+    case "$sw_res" in
+        ok)   echo "$(date +%s) ok $sw_why" > "$SM_LAST"
+              if [ -f "$SM_FLAG" ]; then rm -f "$SM_FLAG"; sm_log "self-test ($sw_why) passed - safemode over"; [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1; fi ;;
+        open) echo "$(date +%s) open $sw_why: internet line not working" > "$SM_LAST"
+              sm_log "self-test ($sw_why) without result: the internet line itself does not work (no rollback for that)" ;;
+        fail) echo "$(date +%s) fail $sw_why: $sw_last" > "$SM_LAST"
+              if [ -f "$SM_ROLLED" ] && [ "$sw_why" != "apply" ]; then
+                  sm_log "self-test ($sw_why) failed: $sw_last - no second rollback this boot"
+              else
+                  sm_rollback "$sw_last (after $sw_why)"
+              fi ;;
+    esac
+    return 0
+}
+
+sm_rollback() {
+    mkdir -p "$ADDON_DIR"
+    echo "$(date +%s) $1" > "$SM_RT"; echo "$(date +%s) $1" > "$SM_FLAG"; : > "$SM_ROLLED"
+    sm_log "$1 - all rules of ASN Manager taken out (lists and settings stay). Apply in the WebUI or \"ASNmanager.sh safemode off\" turns them on again"
+    sm_disable
+    # did that help? Still broken with a working internet line = not caused by ASN Manager: put the rules back
+    sleep 20; sr_bad=0; sr_n=0
+    while [ $sr_n -lt 4 ]; do
+        if sm_wan_ok; then if sm_fail >/dev/null; then sr_bad=$((sr_bad + 1)); else sr_bad=0; break; fi; fi
+        sr_n=$((sr_n + 1)); sleep "$SM_STEP"
+    done
+    if [ $sr_bad -ge 3 ]; then
+        : > "$SM_NOTUS"; rm -f "$SM_FLAG"
+        sm_log "still broken without the rules of ASN Manager - the problem is elsewhere; rules put back"
+        echo "$(date +%s) notus $1" > "$SM_LAST"
+        SM_NOWATCH=1; sm_restore >/dev/null 2>&1; SM_NOWATCH=""
+        return 0
+    fi
+    sm_mail "$1"
+    [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1
+    return 0
+}
+
+# takes every rule of ASN Manager out; the lists, settings and learned domain addresses stay
+sm_disable() {
+    cu_learned_save force >/dev/null 2>&1
+    # dnsmasq: all blocks of ASN Manager out of dnsmasq.conf.add, one restart
+    if [ -f "$DNSMASQ_ADD" ] && grep -q '^# ASNmanager ' "$DNSMASQ_ADD"; then
+        awk '/^# ASNmanager [a-z]* begin$/ { s = 1; next } s && /^# ASNmanager [a-z]* end$/ { s = 0; next } !s' "$DNSMASQ_ADD" > "$DNSMASQ_ADD.asnm"
+        if [ -s "$DNSMASQ_ADD.asnm" ]; then mv -f "$DNSMASQ_ADD.asnm" "$DNSMASQ_ADD"; else rm -f "$DNSMASQ_ADD.asnm" "$DNSMASQ_ADD"; fi
+        service restart_dnsmasq >/dev/null 2>&1
+    fi
+    # DNS per line / per device: rules, stand-in addresses, Unbound, AdGuard Home clients (sm_on: everything out)
+    dnsf_sync >/dev/null 2>&1
+    # failover, VPN Director copies, tunnel protection, speed test
+    for sd_p in "$FO_SELF_PRIO" "$FO_VPND_PRIO" $((FO_VPND_PRIO - 1)) "$EP_PRIO"; do
+        while ip rule del prio "$sd_p" 2>/dev/null; do :; done
+    done
+    st_cleanup >/dev/null 2>&1
+    # counting rules (they use the sets); the statistics put them back when the sets are there again
+    ts_remove_rules >/dev/null 2>&1
+    # domain sets and their rules
+    for sd_s in $(ipset list -n 2>/dev/null | grep -E '^ASN[CD]_'); do cu_rules_del "$sd_s"; ipset destroy "$sd_s" 2>/dev/null; done
+    # ASN sets, their rules and routing rules of every target
+    cleanup_rules
+    for sd_t in $VALID_DESTS; do
+        sd_m=$(get_target_info "$sd_t" | cut -d' ' -f2); [ -n "$sd_m" ] || continue
+        while ip rule del fwmark "$sd_m/$MARK_MASK" 2>/dev/null; do :; done
+        mark_old_rules_del "$sd_m"
+    done
+    agh_ipset_prune >/dev/null 2>&1
+    rm -f "$CU_GROUPS" "$CU_STATUS" /tmp/asnmanager-dnsmasq.lines "$APPLIED_ASNS" /tmp/asn_groups.txt
+    ip route flush cache 2>/dev/null
+    return 0
+}
+
+# safemode off: rules on again (Apply from cache), DNS / failover / suggestions as set
+sm_restore() {
+    rm -f "$SM_RT" "$SM_FLAG"
+    sm_log "turned off - rules of ASN Manager are applied again"
+    sgd_write >/dev/null 2>&1
+    cli_apply cache
+    fo_round_safe >/dev/null 2>&1
+    return 0
+}
+
+sm_mail() {
+    [ "$(mail_mode)" = "off" ] && return 0
+    mail_amtm_ok || return 0
+    sm_txt=/tmp/asnmanager-sm-mail.txt
+    {
+        echo "ASN Manager v$SCRIPT_VERSION on $(nvram get productid 2>/dev/null) has switched to safemode."
+        echo ""
+        echo "Reason: $1"
+        echo "Time:   $(date '+%Y-%m-%d %H:%M:%S')"
+        echo ""
+        echo "The router itself still reached the internet, but DNS, dnsmasq or the LAN routing did not work with the"
+        echo "rules of ASN Manager. All of its rules were taken out; your lists and settings are kept."
+        echo ""
+        echo "After the next reboot ASN Manager starts normally once more and tests itself again."
+        echo "To turn the rules on again now: Apply in the WebUI, or on the command line: /jffs/scripts/ASNmanager.sh safemode off"
+    } > "$sm_txt"
+    mail_send "ASN Manager: safemode - rules taken out" "$sm_txt" >/dev/null 2>&1
+    rm -f "$sm_txt"
+}
+
+# for data.js
+sm_json() {
+    sj_on=0; sm_on && sj_on=1
+    sj_f=0; [ -f "$SM_FLAG" ] && sj_f=1
+    sj_ts=0; sj_why=""
+    if [ -f "$SM_FLAG" ]; then read -r sj_ts sj_why < "$SM_FLAG"; elif [ -f "$SM_RT" ]; then read -r sj_ts sj_why < "$SM_RT"; fi
+    case "$sj_ts" in ''|*[!0-9]*) sj_ts=0 ;; esac
+    sj_run=0; sj_p=$(cat "$SM_PID" 2>/dev/null); [ -n "$sj_p" ] && [ -d "/proc/$sj_p" ] && sj_run=1
+    sj_last=$(cat "$SM_LAST" 2>/dev/null)
+    printf '"safemode":{"on":%s,"flag":%s,"ts":%s,"why":"%s","testing":%s,"last":"%s"},' \
+        "$sj_on" "$sj_f" "$sj_ts" "$(json_esc "$sj_why")" "$sj_run" "$(json_esc "$sj_last")"
+}
+
+sm_status() {
+    if sm_on; then echo "Safemode: ON since $(date -d "@$(cut -d' ' -f1 "$SM_RT")" '+%Y-%m-%d %H:%M' 2>/dev/null) - $(cut -d' ' -f2- "$SM_RT")"
+                   echo "All rules of ASN Manager are out. \"safemode off\" (or Apply) turns them on again."
+    elif [ -f "$SM_FLAG" ]; then echo "Safemode: off - the last boot ended in safemode ($(cut -d' ' -f2- "$SM_FLAG")); the self-test decides again"
+    else echo "Safemode: off"; fi
+    sl_p=$(cat "$SM_PID" 2>/dev/null); [ -n "$sl_p" ] && [ -d "/proc/$sl_p" ] && echo "Self-test: running"
+    [ -s "$SM_LAST" ] && { read -r sl_t sl_r < "$SM_LAST"; echo "Last self-test: $(date -d "@$sl_t" '+%Y-%m-%d %H:%M' 2>/dev/null) $sl_r"; }
+    return 0
+}
+
+cli_safemode() {
+    case "$1" in
+        status|"") sm_status ;;
+        on)        sm_on && { echo "Safemode is already on."; return 0; }
+                   mkdir -p "$ADDON_DIR"; echo "$(date +%s) turned on by hand" > "$SM_RT"; echo "$(date +%s) turned on by hand" > "$SM_FLAG"
+                   sm_log "turned on by hand"; sm_disable; echo "Safemode on: all rules of ASN Manager taken out (lists and settings kept)." ;;
+        off)       if sm_on || [ -f "$SM_FLAG" ]; then sm_restore; else echo "Safemode is off."; fi ;;
+        test)      sm_test ;;
+        watch)     sm_watch "$2" ;;
+        boot)      sm_hook_sync; rm -f "$SM_RT" "$SM_ROLLED" "$SM_NOTUS"; sm_watch boot ;;
+        *)         echo "Usage: safemode status | on | off | test"; return 1 ;;
+    esac
+    [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1
+    return 0
+}
+
 cli_usage() {
     cat << USAGE_EOF
 ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
@@ -7107,6 +7415,7 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   rescue                             stop stuck ASN Manager jobs, remove locks, restart failover and statistics
   amtmupdate [check]                 update for amtm (check: exit code 0 = amtm may update)
   mail off|daily|weekly|test|check|status  e-mail on new versions (amtm e-mail settings; a notice only)
+  safemode status | on | off | test  self-test with rollback: show / take all rules out / put them back / test the router now
   devices                            all active devices: normal way, open connections per line, DNS
   agh login <user> [password] | logout | status  login of AdGuard Home: "DNS per device" changes its clients without restarting it
   webui install [local] | enable | disable | update | uninstall | mount | unmount | export
@@ -7213,7 +7522,7 @@ cli_main() {
             esac ;;
         check)
             case "$1" in
-                run) proc_reap; cu_learned_save >/dev/null 2>&1; dns_export >/dev/null 2>&1; sgd_trim; rc_run_once
+                run) proc_reap; sm_hook_sync; cu_learned_save >/dev/null 2>&1; dns_export >/dev/null 2>&1; sgd_trim; rc_run_once
                      { dnsf_on || dnsd_on; } && dnsf_sync >/dev/null 2>&1
                      # new ASN names: write the page data again so they show up without a manual refresh
                      nm_before=$(md5sum "$NAMES_FILE" 2>/dev/null | cut -c1-32)
@@ -7247,10 +7556,12 @@ cli_main() {
             esac ;;
         service_event) service_event "$1" "$2"; return 0 ;;
         devices)  cli_devices ;;
+        safemode) cli_safemode "$@" ;;
         help|-h|--help) cli_usage ;;
         *)        cli_usage; false ;;
     esac
     rc=$?
+    case "$cmd" in dnstls|dnsdevice|dnsfollow|failover) case "$1" in on|off|set|clear|vpnd|server) sm_watch_start "$cmd" ;; esac ;; esac
     # Keep the WebUI view in sync after CLI changes
     case "$cmd" in add|preset|remove|del|clear|apply|reload|retry|edit|import|schedule|restore|custom)
         [ -f "$ADDON_DIR/webui_page" ] && web_export ;;

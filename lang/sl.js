@@ -2,6 +2,12 @@
 window.ASNM_LANGPACK = {"code": "sl", "locale": "sl-SI", "name": "Slovenščina", "t": {
 "subtitle": "Usmerjanje celotnih avtonomnih sistemov prek WAN, OpenVPN ali WireGuard.",
 "data_refreshed": "Podatki osveženi:",
+"sm_on": "Varni način: ASN Manager je ob {t} odstranil vsa svoja pravila, ker usmerjevalnik z njimi ni deloval pravilno ({w}). Usmerjevalnik sam je dosegel internet. Seznami in nastavitve ostanejo; po naslednjem zagonu se ASN Manager znova preizkusi.",
+"sm_off_btn": "Znova vklopi pravila",
+"sm_retry": "Zadnji zagon se je končal v varnem načinu ({w}). ASN Manager se je znova normalno zagnal in se preizkuša.",
+"sm_testing": "Samopreizkus poteka…",
+"act_smoff": "Izklopi varni način",
+"sm_confirm": "Znova vklopiti pravila ASN Managerja? Samopreizkus nato znova nadzoruje usmerjevalnik.",
 "banner_pending": "Seznam ASN se je spremenil od zadnje uveljavitve. Kliknite <b>Uveljavi pravila</b>, da spremembe začnejo veljati.",
 "banner_failed": "{n} ASN ni bilo mogoče prenesti (0 podomrežij). Spodaj so označeni rdeče - uporabite <b>Ponovi neuspele</b>.",
 "traffic_title": "Promet po ASN",
