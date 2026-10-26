@@ -1,3 +1,8 @@
+## v3.9.25
+
+- **Fix: the WebUI no longer wipes the settings of other add-ons** (issue #3, thanks KingGLEB): the firmware rewrites `/jffs/addons/custom_settings.txt` from what a page submits, and ASN Manager only sent its own command - every click removed the settings other add-ons keep there. The page now sends them back with every command (read with `get_custom_settings()`, refreshed from the router after each job). Settings of other add-ons that were lost need to be set again once
+- Uninstall also takes the lines of its domain sets out of the ipset file of AdGuard Home (it could refuse to start afterwards)
+
 ## v3.9.24
 
 - **Failover with DNS and VPN Director**: the DNS of a failed line follows its fallback (it never goes over WAN); new switch "VPN Director follows the failover" also moves the devices of the VPN Director and the router itself (e.g. Unbound) to the fallback - LAN, guest networks and the WAN network stay local. Old connections are closed on the switch and on the way back, so devices reconnect through the right line; switching a client off or on in the WebUI is noticed at once
