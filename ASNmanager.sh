@@ -3059,6 +3059,7 @@ json_esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\r\n\t'; }
 web_export() {
     [ -d "$(dirname "$WEB_DIR")" ] || return 0
     mkdir -p "$WEB_DIR" || return 1
+    cs_export
     lang_sync
     load_schedule
     sets_tmp="/tmp/asnm_sets.$$"
@@ -6751,12 +6752,24 @@ cli_update() {
     echo "Updated to v${u_rv}. The page reloads."
 }
 
+# the settings of all add-ons (custom_settings.txt) for the WebUI: the firmware writes the WHOLE file from what a page
+# sends (amng_custom) - the page has to send the settings of the other add-ons back with its own, so it needs them fresh
+cs_export() {
+    [ -d "$WEB_DIR" ] || return 0
+    awk -v ns="${WEBUI_NS}_cmd" 'BEGIN { printf "{" }
+        $1 == "" || $1 == ns { next }
+        { k = $1; v = substr($0, length($1) + 2)
+          gsub(/\\/, "\\\\", k); gsub(/"/, "\\\"", k); gsub(/\\/, "\\\\", v); gsub(/"/, "\\\"", v); gsub(/\t/, "\\t", v); gsub(/\r/, "", v)
+          printf "%s\"%s\":\"%s\"", (n++ ? "," : ""), k, v }
+        END { printf "}\n" }' "$SETTINGS_FILE" 2>/dev/null > "$WEB_DIR/cs.js.tmp" && mv -f "$WEB_DIR/cs.js.tmp" "$WEB_DIR/cs.js"
+}
 service_event() {
     [ "$1" = "start" ] || return 0
     case "$2" in
         "${WEBUI_NS}cmd")
             payload=$(sed -n "s/^${WEBUI_NS}_cmd //p" "$SETTINGS_FILE" 2>/dev/null | head -n 1)
             sed -i "/^${WEBUI_NS}_cmd /d" "$SETTINGS_FILE" 2>/dev/null
+            cs_export
             [ -n "$payload" ] && web_job "$payload"
             ;;
         "${WEBUI_NS}refresh") web_export ;;
