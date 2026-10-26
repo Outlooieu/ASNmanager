@@ -6078,8 +6078,13 @@ fo_fwtable() {
         *) return 1 ;;
     esac
     [ -n "$ff_t" ] || return 1
-    # only when the firmware has it filled (the line runs); otherwise no rule - the VPN Director decides as before
-    ip route show table "$ff_t" 2>/dev/null | grep -q '^default' || { ff_t=""; return 1; }
+    # only when the firmware has it filled (the line runs); otherwise no rule - the VPN Director decides as before.
+    # A VPN table must route through its tunnel (0.0.0.0/1 or default via its device) - its "default via WAN" alone is not enough
+    case "$ff_t" in
+        main) ip route show table main 2>/dev/null | grep -q '^default' || { ff_t=""; return 1; } ;;
+        *)    ff_d=$(get_ifname "$1"); [ -n "$ff_d" ] || { ff_t=""; return 1; }
+              ip route show table "$ff_t" 2>/dev/null | grep -qE "^(default|0\.0\.0\.0/1) .*dev $ff_d( |\$)" || { ff_t=""; return 1; } ;;
+    esac
     echo "$ff_t"; ff_t=""
 }
 FO_VPND_FLAG="$ADDON_DIR/fo_vpnd"                 # option: the VPN Director follows the failover (off by default)
