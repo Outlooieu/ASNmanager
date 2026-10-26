@@ -185,6 +185,10 @@ Normally the router looks up every name one way. A site that ASN Manager sends o
 
 The table "How it runs now" shows per line the DNS server, where it comes from, whether it is protected and what it is used for. Command line: `dnsfollow on|off|sync|status`, `dnsfollow server WGC3 10.2.0.1`, `dnsdevice on|off`, `dnstls on|off`. Turning a switch off removes everything it set up.
 
+- **The same provider DNS on several lines**: many VPN providers give every server the same DNS address (e.g. 10.2.0.1). Enter it for each line - every line gets a stand-in address (198.18.53.x) that is marked with its line and rewritten to the real one, so each line asks the server at the end of its own tunnel.
+- **AdGuard Home login** (optional, under "Every device"): with the login of its web interface, "DNS per device" changes the clients through AdGuard Home itself - no restart, DNS keeps running. Kept on the router only (root only, not in backups); command line `agh login <user> | logout | status`.
+- **Devices & DNS** (Diagnostics > router checks, `ASNmanager.sh devices`): every active device with its normal line, its open connections per line and its DNS - including the real resolver behind it (what leak tests show), with name and place.
+
 | Setup | Sites of ASN Manager | Every device | Encrypt over WAN |
 |---|---|---|---|
 | Unbound behind dnsmasq | yes | with AdGuard Home | yes (Unbound DoT) |
@@ -276,7 +280,11 @@ In the card "Target interfaces", section **Failover**, every target that has ASN
 - **Block** (kill switch, only as the last fallback) stops the traffic of your devices instead - nothing leaks through WAN while the VPNs are down. The router itself is not blocked (its own traffic for these ASNs uses WAN), so updates, subnet downloads and checks keep working.
 - If no member works, the rule stays on the target (if its VPN client is stopped, that can mean WAN - add "Block" to prevent it).
 - Every switch is written to the system log (`ASNmanager: Failover: WGC1 is down - traffic for its ASNs goes via WGC2`). The failover section shows the state (green / red per member, "down - via WGC2 since ..."), the ASN list marks the group ("↪ WGC2") and the routing check shows "↪ wgc2" instead of an error.
-- Rules of a target with a chain are created even while the target is offline (so the chain works after a reboot with the VPN still down). Existing connections of the failed target are not moved; apps reconnect through the new path.
+- Rules of a target with a chain are created even while the target is offline (so the chain works after a reboot with the VPN still down).
+- **VPN Director follows the failover** (switch in the failover section, off by default, `failover vpnd on|off`): the devices the VPN Director sends over a failed line - and the router itself, e.g. Unbound through a VPN - go over its fallback as well. ASN Manager copies their rules with the firmware table of the fallback (prio 10700, before the VPN Director and its kill switch; LAN, guest networks and the WAN network always stay local) and removes them when the line works again; the list of the VPN Director is not changed.
+- **DNS follows the failover**: names, domain entries and devices of a failed line are looked up through the DNS of the line in use; the DNS of the failed line stays blocked.
+- **Open connections** that still use the way of the outage are closed (`conntrack`) when the failover takes over and when the line works again - the devices reconnect through the right line at once.
+- Switching a WireGuard client off or on in the WebUI is noticed at once (service-event): a client switched off counts as down without a second check, a line that is back is used again within about 15 seconds.
 - Runs from cron every minute (two checks per minute); the chain is stored in `/jffs/addons/asnmanager/failover.conf`, the state in RAM.
 
 ## One rule for several devices

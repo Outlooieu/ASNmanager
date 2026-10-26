@@ -1,3 +1,10 @@
+## v3.9.24
+
+- **Failover with DNS and VPN Director**: the DNS of a failed line follows its fallback (it never goes over WAN); new switch "VPN Director follows the failover" also moves the devices of the VPN Director and the router itself (e.g. Unbound) to the fallback - LAN, guest networks and the WAN network stay local. Old connections are closed on the switch and on the way back, so devices reconnect through the right line; switching a client off or on in the WebUI is noticed at once
+- **AdGuard Home login** (optional): "DNS per device" changes its clients through AdGuard Home itself - no restart. **The same provider DNS on several VPN lines** (stand-in address per line, each line asks its own server)
+- **Devices & DNS** (Diagnostics, `devices`): line, open connections per line and the real DNS resolver of every active device; the routing check now lists its warnings and errors with the reason
+- Fixes: one dnsmasq restart per change instead of two (faster boot, shorter DNS gap); domain routing runs one at a time (after a WAN reconnect two runs took learned addresses away); addresses of removed domain entries no longer come back from the saved copy; the failover table of the WebUI appears at once
+
 ## v3.9.23
 
 - **E-mail on new versions** (Settings → "E-mail on new versions", off by default; suggested by AvalonOC): a notice with the installed version, the new version, the changes since your version (from the changelog) and the link to the full changelog - nothing is installed, updates stay manual. Uses the e-mail settings of amtm (`/jffs/addons/amtm/mail`). Checked once a day from 9:00 with the routing check; at most one e-mail per new version and per day or week, so several releases on one day come as one e-mail. "Send test e-mail" in the WebUI; command line `mail off|daily|weekly|test|check|status`; part of backups (`MAIL_NOTIFY`)
