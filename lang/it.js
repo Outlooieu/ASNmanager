@@ -413,7 +413,7 @@ window.ASNM_LANGPACK = {"code": "it", "locale": "it-IT", "name": "Italiano", "t"
 "lang_default": "Predefinita",
 "lang_en": "English",
 "theme_label": "Tema",
-"theme_dark": "Scuro",
+"theme_router": "Predefinita",
 "theme_light": "Chiaro",
 "theme_blue": "Blu",
 "stat_asns": "ASN",

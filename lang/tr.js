@@ -413,7 +413,7 @@ window.ASNM_LANGPACK = {"code": "tr", "locale": "tr-TR", "name": "Türkçe", "t"
 "lang_default": "Varsayılan",
 "lang_en": "English",
 "theme_label": "Tema",
-"theme_dark": "Koyu",
+"theme_router": "Varsayılan",
 "theme_light": "Açık",
 "theme_blue": "Mavi",
 "stat_asns": "ASN'ler",

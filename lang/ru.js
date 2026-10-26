@@ -413,7 +413,7 @@ window.ASNM_LANGPACK = {"code": "ru", "locale": "ru-RU", "name": "Русский
 "lang_default": "По умолчанию",
 "lang_en": "English",
 "theme_label": "Тема",
-"theme_dark": "Тёмная",
+"theme_router": "По умолчанию",
 "theme_light": "Светлая",
 "theme_blue": "Синяя",
 "stat_asns": "ASN",

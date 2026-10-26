@@ -4,6 +4,7 @@
 - After a reboot ASN Manager starts normally once more and tests itself again; red banner on the page with "Turn rules on again", e-mail if e-mail notices are on, command `safemode status | on | off | test`
 - Device check / device list: a device that gets its own DNS by DHCP - from its DHCP reservation (LAN > DHCP server) or its guest network (YazFi, Guest Network Pro), e.g. 8.8.8.8 - is shown with that DNS ("directly, not via the router", with YazFi Force DNS) and the real resolver behind it - before it wrongly showed the DNS of the router
 - Devices connected through the WireGuard server of the router show their user name (VPN server > WireGuard) instead of the bare address - in the device check, the device list and in AdGuard Home ("Vivo (ASNM WGC1)")
+- Themes: **Default** in the colours of the router pages (grey-green, yellow titles) replaces "Dark"; Light and Blue stay. Who had "Dark" gets Default
 
 ## v3.9.28
 

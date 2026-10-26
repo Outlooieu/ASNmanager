@@ -21,17 +21,19 @@
 #asnm, #asnm * { box-sizing: border-box; }
 
 /* ---------- themes ---------- */
-#asnm, #asnm[data-theme="dark"] {
-  --bg: #14181c; --card: #1d2328; --card2: #232a30; --line: #2e373e; --line2: #262e34;
-  --text: #e6ecf0; --text2: #c3ccd3; --muted: #8d9ba5; --placeholder: #5f6f7a;
-  --input: #11161a; --input-line: #36424b; --input-hover: #465661;
-  --btn: #2a333a; --btn-line: #3a4650; --btn-hover: #333e46; --btn-hover-line: #4a5863;
-  --group-hover: #29323a; --row-hover: rgba(255,255,255,.02);
-  --output: #0e1215; --output-text: #cfd8de;
-  --accent: #3b82f6; --accent-hover: #2f74e6; --accent2: #60a5fa; --accent-ring: rgba(59,130,246,.25);
-  --ok: #34d399; --warn: #fbbf24; --bad: #f87171;
-  --warn-text: #fde68a; --bad-text: #fecaca; --strong: #ffffff; --shadow: none;
+/* default: the colours of the router pages (Asuswrt-Merlin) - grey-green tables, dark headers, yellow titles */
+#asnm, #asnm[data-theme="router"] {
+  --bg: #4d595d; --card: #475a5f; --card2: #3a4a4f; --line: #2b383c; --line2: #3f5055;
+  --text: #ffffff; --text2: #e2e9eb; --muted: #b6c3c7; --placeholder: #8a9a9f;
+  --input: #576d73; --input-line: #929ea1; --input-hover: #b0bcbf;
+  --btn: #2f3a3e; --btn-line: #1f2a2e; --btn-hover: #3b484c; --btn-hover-line: #56676c;
+  --group-hover: #506469; --row-hover: rgba(255,255,255,.03);
+  --output: #2f3a3e; --output-text: #e8eef0;
+  --accent: #3a7cb8; --accent-hover: #336ea4; --accent2: #ffcc00; --accent-ring: rgba(255,204,0,.28);
+  --ok: #5eea9f; --warn: #ffcc00; --bad: #ff8a80;
+  --warn-text: #ffe58a; --bad-text: #ffd0cc; --strong: #ffffff; --shadow: 0 1px 2px rgba(0,0,0,.25);
 }
+#asnm[data-theme="router"] h3, #asnm:not([data-theme]) h3 { color: #ffcc00; }
 #asnm[data-theme="light"] {
   --bg: #eef2f6; --card: #ffffff; --card2: #f5f7fa; --line: #dde3ea; --line2: #eaeef3;
   --text: #1c2833; --text2: #3b4a57; --muted: #6b7a88; --placeholder: #9aa7b3;
@@ -594,7 +596,7 @@ var ASNM_I18N = {
     back_router: '← Network Map', add_entries: 'Entries', kind_ip: 'IP', kind_dom: 'Domain', st_learned: '{n} learned', lr_tip: 'Show the learned addresses', lr_head: 'Addresses learned for *.{d}', lr_more: '... and {n} more (all of them: ASNmanager.sh custom learned {id})', lr_none: 'No address learned yet.', lr_note: 'dnsmasq only stores the addresses, not which subdomain they belong to. An address is removed 7 days after its last lookup; the addresses are saved and put back after a router restart.',
     add_domnote: 'A domain also covers all its subdomains. It only works for devices that use the router as their DNS server (not with DoH or fixed DNS servers; IPv4 only). The router learns the addresses when a device looks the name up.',
     rc_nolearned: 'none learned', rc_tip_nolearned: 'No address has been learned for this domain yet. A device has to look the name up through the router\'s DNS server (dnsmasq). Not covered: devices with another DNS server or DoH, and names that an AdGuard Home in front answers without passing through dnsmasq.',
-    lang_label: 'Language', lang_default: 'Default', lang_en: 'English', theme_label: 'Theme', theme_dark: 'Dark', theme_light: 'Light', theme_blue: 'Blue',
+    lang_label: 'Language', lang_default: 'Default', lang_en: 'English', theme_label: 'Theme', theme_router: 'Default', theme_light: 'Light', theme_blue: 'Blue',
     stat_asns: 'ASNs', stat_more: '+ {i} IP · {d} domains',
     note_ph: 'Note, e.g. ZDF Mediathek', note_lbl: 'Note', add_note_lbl: 'Note (optional)', add_s1: 'Route', add_s2: 'via', add_s3: 'for', add_note_ph: 'optional, e.g. ZDF Mediathek', add_src_type: 'type IP addresses', add_src_hide: 'hide IP field', add_note_help: 'Shown under the entry - with several entries in one go, under each of them',
     c_clear_type: 'Remove ALL entries ({a} ASNs, {i} IP ranges, {d} domains) from the list?\nActive routing stays until you click "Apply rules".\n\nType {w} to confirm:', clear_word: 'DELETE', clear_wrong: 'Not removed - the word did not match.',
@@ -748,7 +750,7 @@ var ASNM_I18N = {
     back_router: '← Netzwerk\u00adübersicht', add_entries: 'Einträge', kind_ip: 'IP', kind_dom: 'Domain', st_learned: '{n} gelernt', lr_tip: 'Gelernte Adressen anzeigen', lr_head: 'Für *.{d} gelernte Adressen', lr_more: '... und {n} weitere (alle: ASNmanager.sh custom learned {id})', lr_none: 'Noch keine Adresse gelernt.', lr_note: 'dnsmasq speichert nur die Adressen, nicht zu welcher Subdomain sie gehören. Eine Adresse wird 7 Tage nach ihrer letzten Abfrage entfernt; die Adressen werden gesichert und nach einem Router-Neustart wiederhergestellt.',
     add_domnote: 'Eine Domain gilt auch für alle Subdomains. Sie wirkt nur für Geräte, die den Router als DNS-Server nutzen (nicht bei DoH oder fest eingestelltem DNS; nur IPv4). Der Router lernt die Adressen, wenn ein Gerät den Namen auflöst.',
     rc_nolearned: 'nichts gelernt', rc_tip_nolearned: 'Für diese Domain wurde noch keine Adresse gelernt. Ein Gerät muss den Namen über den DNS-Server des Routers (dnsmasq) auflösen. Nicht erfasst werden Geräte mit anderem DNS-Server oder DoH und Namen, die ein davorgeschalteter AdGuard Home beantwortet, ohne dass sie über dnsmasq laufen.',
-    lang_label: 'Sprache', lang_default: 'Standard', lang_en: 'English', theme_label: 'Design', theme_dark: 'Dunkel', theme_light: 'Hell', theme_blue: 'Blau',
+    lang_label: 'Sprache', lang_default: 'Standard', lang_en: 'English', theme_label: 'Design', theme_router: 'Standard', theme_light: 'Hell', theme_blue: 'Blau',
     stat_asns: 'ASNs', stat_more: '+ {i} IP · {d} Domains',
     note_ph: 'Notiz, z. B. ZDF Mediathek', note_lbl: 'Notiz', add_note_lbl: 'Notiz (optional)', add_s1: 'Leite', add_s2: 'über', add_s3: 'für', add_note_ph: 'optional, z. B. ZDF Mediathek', add_src_type: 'IP-Adressen eintippen', add_src_hide: 'IP-Feld ausblenden', add_note_help: 'Steht unter dem Eintrag - bei mehreren Einträgen auf einmal unter jedem davon',
     c_clear_type: 'ALLE Einträge ({a} ASNs, {i} IP-Bereiche, {d} Domains) aus der Liste entfernen?\nDas aktive Routing bleibt bestehen, bis du "Regeln anwenden" klickst.\n\nZum Bestätigen {w} eintippen:', clear_word: 'LÖSCHEN', clear_wrong: 'Nicht entfernt - das Wort stimmte nicht.',
@@ -2386,10 +2388,10 @@ function asnmSetLangMode(mode) {
     window.location.reload();
 }
 
-var ASNM_THEMES = { dark: '#1d2328', light: '#ffffff', blue: '#14528a' };
+var ASNM_THEMES = { router: '#4d595d', light: '#ffffff', blue: '#14528a' };
 
 function asnmSetTheme(name, noSave) {
-    if (!ASNM_THEMES[name]) name = 'dark';
+    if (!ASNM_THEMES[name]) name = 'router';                  // also the former dark theme
     document.getElementById('asnm').setAttribute('data-theme', name);
     var seg = document.getElementById('asnm_theme'), html = '';
     for (var k in ASNM_THEMES) html += '<span class="' + (k === name ? 'asnm-on' : '') + '" onclick="asnmSetTheme(\'' + k + '\')">' +
@@ -2399,8 +2401,8 @@ function asnmSetTheme(name, noSave) {
 }
 
 function asnmLoadTheme() {
-    var n = 'dark';
-    try { n = localStorage.getItem('asnm_theme') || 'dark'; } catch (e) {}
+    var n = 'router';
+    try { n = localStorage.getItem('asnm_theme') || 'router'; } catch (e) {}
     asnmSetTheme(n, true);
 }
 

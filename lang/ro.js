@@ -413,7 +413,7 @@ window.ASNM_LANGPACK = {"code": "ro", "locale": "ro-RO", "name": "Română", "t"
 "lang_default": "Implicită",
 "lang_en": "English",
 "theme_label": "Temă",
-"theme_dark": "Întunecată",
+"theme_router": "Implicită",
 "theme_light": "Luminoasă",
 "theme_blue": "Albastră",
 "stat_asns": "ASN-uri",

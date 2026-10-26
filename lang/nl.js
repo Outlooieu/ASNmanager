@@ -413,7 +413,7 @@ window.ASNM_LANGPACK = {"code": "nl", "locale": "nl-NL", "name": "Nederlands", "
 "lang_default": "Standaard",
 "lang_en": "English",
 "theme_label": "Thema",
-"theme_dark": "Donker",
+"theme_router": "Standaard",
 "theme_light": "Licht",
 "theme_blue": "Blauw",
 "stat_asns": "ASN's",

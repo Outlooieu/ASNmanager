@@ -413,7 +413,7 @@ window.ASNM_LANGPACK = {"code": "sl", "locale": "sl-SI", "name": "Slovenščina"
 "lang_default": "Privzeto",
 "lang_en": "English",
 "theme_label": "Tema",
-"theme_dark": "Temna",
+"theme_router": "Privzeto",
 "theme_light": "Svetla",
 "theme_blue": "Modra",
 "stat_asns": "ASN",

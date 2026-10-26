@@ -413,7 +413,7 @@ window.ASNM_LANGPACK = {"code": "fi", "locale": "fi-FI", "name": "Suomi", "t": {
 "lang_default": "Oletus",
 "lang_en": "English",
 "theme_label": "Teema",
-"theme_dark": "Tumma",
+"theme_router": "Oletus",
 "theme_light": "Vaalea",
 "theme_blue": "Sininen",
 "stat_asns": "ASN:t",

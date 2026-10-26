@@ -413,7 +413,7 @@ window.ASNM_LANGPACK = {"code": "cz", "locale": "cs-CZ", "name": "Čeština", "t
 "lang_default": "Výchozí",
 "lang_en": "English",
 "theme_label": "Motiv",
-"theme_dark": "Tmavý",
+"theme_router": "Výchozí",
 "theme_light": "Světlý",
 "theme_blue": "Modrý",
 "stat_asns": "ASN",

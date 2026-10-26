@@ -413,7 +413,7 @@ window.ASNM_LANGPACK = {"code": "uk", "locale": "uk-UA", "name": "Українс
 "lang_default": "За замовчуванням",
 "lang_en": "English",
 "theme_label": "Тема",
-"theme_dark": "Темна",
+"theme_router": "За замовчуванням",
 "theme_light": "Світла",
 "theme_blue": "Синя",
 "stat_asns": "ASN",

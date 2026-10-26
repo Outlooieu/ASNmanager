@@ -413,7 +413,7 @@ window.ASNM_LANGPACK = {"code": "sv", "locale": "sv-SE", "name": "Svenska", "t":
 "lang_default": "Standard",
 "lang_en": "English",
 "theme_label": "Tema",
-"theme_dark": "Mörkt",
+"theme_router": "Standard",
 "theme_light": "Ljust",
 "theme_blue": "Blått",
 "stat_asns": "ASN",

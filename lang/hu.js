@@ -413,7 +413,7 @@ window.ASNM_LANGPACK = {"code": "hu", "locale": "hu-HU", "name": "Magyar", "t": 
 "lang_default": "Alapértelmezett",
 "lang_en": "English",
 "theme_label": "Téma",
-"theme_dark": "Sötét",
+"theme_router": "Alapértelmezett",
 "theme_light": "Világos",
 "theme_blue": "Kék",
 "stat_asns": "ASN-ek",
