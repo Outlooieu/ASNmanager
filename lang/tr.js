@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "tr", "locale": "tr-TR", "name": "Türkçe", "t"
 "fo_vd_c_on": "VPN Director yedeklemeyi izlesin mi? Bir hat düştüğünde cihazları burada ayarladığınız yedek hatta geçer (\"Engelle\" ile: engellenir).",
 "btn_devices": "Cihazlar ve DNS",
 "act_devices": "Cihazlar ve DNS",
+"agh_add": "Girişi gir",
 "footer": "Asuswrt-Merlin için ASN Manager"
 }};

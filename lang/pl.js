@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "pl", "locale": "pl-PL", "name": "Polski", "t": 
 "fo_vd_c_on": "Czy VPN Director ma podążać za failoverem? Gdy łącze ulegnie awarii, jego urządzenia przejdą na ustawione tu łącze zapasowe (przy \"Blokuj\": zostaną zablokowane).",
 "btn_devices": "Urządzenia i DNS",
 "act_devices": "Urządzenia i DNS",
+"agh_add": "Wpisz login",
 "footer": "ASN Manager dla Asuswrt-Merlin"
 }};

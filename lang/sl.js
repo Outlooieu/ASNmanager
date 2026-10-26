@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "sl", "locale": "sl-SI", "name": "Slovenščina"
 "fo_vd_c_on": "Naj VPN Director sledi failoverju? Ko linija izpade, gredo njene naprave prek tukaj nastavljene rezervne linije (pri »Blokiraj«: so blokirane).",
 "btn_devices": "Naprave in DNS",
 "act_devices": "Naprave in DNS",
+"agh_add": "Vnesi prijavo",
 "footer": "ASN Manager za Asuswrt-Merlin"
 }};

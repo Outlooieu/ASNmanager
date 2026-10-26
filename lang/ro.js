@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "ro", "locale": "ro-RO", "name": "Română", "t"
 "fo_vd_c_on": "Lași VPN Director să urmeze failover-ul? Dacă o linie cade, dispozitivele ei trec pe linia de rezervă setată aici (cu \"Blochează\": sunt blocate).",
 "btn_devices": "Dispozitive și DNS",
 "act_devices": "Dispozitive și DNS",
+"agh_add": "Introdu autentificarea",
 "footer": "ASN Manager pentru Asuswrt-Merlin"
 }};

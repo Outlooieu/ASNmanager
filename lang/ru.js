@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "ru", "locale": "ru-RU", "name": "Русский
 "fo_vd_c_on": "Пусть VPN Director следует резервированию? Если линия упадёт, её устройства пойдут через заданную здесь резервную линию (при «Блокировать» - будут заблокированы).",
 "btn_devices": "Устройства и DNS",
 "act_devices": "Устройства и DNS",
+"agh_add": "Ввести данные входа",
 "footer": "ASN Manager для Asuswrt-Merlin"
 }};

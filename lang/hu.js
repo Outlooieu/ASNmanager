@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "hu", "locale": "hu-HU", "name": "Magyar", "t": 
 "fo_vd_c_on": "Kövesse a VPN Director a failovert? Ha egy vonal kiesik, az eszközei az itt megadott tartalékvonalra kerülnek (\"Tiltás\" esetén letiltódnak).",
 "btn_devices": "Eszközök és DNS",
 "act_devices": "Eszközök és DNS",
+"agh_add": "Bejelentkezés megadása",
 "footer": "ASN Manager Asuswrt-Merlinhez"
 }};

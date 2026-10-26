@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "it", "locale": "it-IT", "name": "Italiano", "t"
 "fo_vd_c_on": "Far seguire il failover al VPN Director? Se una linea cade, i suoi dispositivi passano per la linea di riserva impostata qui (con \"Blocca\": vengono bloccati).",
 "btn_devices": "Dispositivi & DNS",
 "act_devices": "Dispositivi & DNS",
+"agh_add": "Inserisci login",
 "footer": "ASN Manager per Asuswrt-Merlin"
 }};

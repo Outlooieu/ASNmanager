@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "sv", "locale": "sv-SE", "name": "Svenska", "t":
 "fo_vd_c_on": "Ska VPN Director följa failover? Om en linje faller bort går dess enheter över reservlinjen du anger här (med \"Blockera\": de blockeras).",
 "btn_devices": "Enheter och DNS",
 "act_devices": "Enheter och DNS",
+"agh_add": "Ange inloggning",
 "footer": "ASN Manager för Asuswrt-Merlin"
 }};

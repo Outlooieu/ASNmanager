@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "cz", "locale": "cs-CZ", "name": "Čeština", "t
 "fo_vd_c_on": "Má VPN Director následovat failover? Když linka vypadne, její zařízení půjdou přes záložní linku nastavenou zde (s \"Blokovat\": budou zablokována).",
 "btn_devices": "Zařízení a DNS",
 "act_devices": "Zařízení a DNS",
+"agh_add": "Zadat přihlášení",
 "footer": "ASN Manager pro Asuswrt-Merlin"
 }};

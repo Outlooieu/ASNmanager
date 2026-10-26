@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "es", "locale": "es-ES", "name": "Español", "t"
 "fo_vd_c_on": "¿Hacer que el VPN Director siga la conmutación? Si una línea falla, sus dispositivos pasan por la línea de reserva que configures aquí (con \"Bloquear\": quedan bloqueados).",
 "btn_devices": "Dispositivos y DNS",
 "act_devices": "Dispositivos y DNS",
+"agh_add": "Introducir inicio de sesión",
 "footer": "ASN Manager para Asuswrt-Merlin"
 }};

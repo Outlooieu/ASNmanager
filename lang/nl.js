@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "nl", "locale": "nl-NL", "name": "Nederlands", "
 "fo_vd_c_on": "De VPN Director de failover laten volgen? Valt een lijn uit, dan gaan de apparaten via de hier ingestelde uitwijklijn (bij \"Blokkeren\": geblokkeerd).",
 "btn_devices": "Apparaten & DNS",
 "act_devices": "Apparaten & DNS",
+"agh_add": "Login invoeren",
 "footer": "ASN Manager voor Asuswrt-Merlin"
 }};

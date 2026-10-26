@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "fr", "locale": "fr-FR", "name": "Français", "t
 "fo_vd_c_on": "Laisser le VPN Director suivre le basculement ? Si une ligne tombe en panne, ses appareils passent par la ligne de secours définie ici (avec « Bloquer » : ils sont bloqués).",
 "btn_devices": "Appareils & DNS",
 "act_devices": "Appareils & DNS",
+"agh_add": "Saisir l'identifiant",
 "footer": "ASN Manager pour Asuswrt-Merlin"
 }};

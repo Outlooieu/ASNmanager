@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "fi", "locale": "fi-FI", "name": "Suomi", "t": {
 "fo_vd_c_on": "Annetaanko VPN Directorin seurata vikasietoa? Kun linja katkeaa, sen laitteet käyttävät tässä asetettua varalinjaa (\"Estä\": ne estetään).",
 "btn_devices": "Laitteet & DNS",
 "act_devices": "Laitteet & DNS",
+"agh_add": "Anna tunnukset",
 "footer": "ASN Manager Asuswrt-Merlinille"
 }};
