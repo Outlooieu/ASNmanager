@@ -632,5 +632,7 @@ window.ASNM_LANGPACK = {"code": "ru", "locale": "ru-RU", "name": "Русский
 "btn_devices": "Устройства и DNS",
 "act_devices": "Устройства и DNS",
 "agh_add": "Ввести данные входа",
+"rc_more": "показать ещё {n}",
+"rc_less": "свернуть",
 "footer": "ASN Manager для Asuswrt-Merlin"
 }};

@@ -632,5 +632,7 @@ window.ASNM_LANGPACK = {"code": "sl", "locale": "sl-SI", "name": "Slovenščina"
 "btn_devices": "Naprave in DNS",
 "act_devices": "Naprave in DNS",
 "agh_add": "Vnesi prijavo",
+"rc_more": "prikaži še {n}",
+"rc_less": "prikaži manj",
 "footer": "ASN Manager za Asuswrt-Merlin"
 }};

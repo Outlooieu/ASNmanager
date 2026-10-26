@@ -1037,9 +1037,10 @@ cu_check_rows() {          # $1 = rc_out file, $2 = number of rows already writt
             sample=$(cu_learned_ips "$cid" 1)
             [ -z "$sample" ] && [ -n "$cc_set" ] && sample=$(ipset list "$cc_set" 2>/dev/null | awk '/^Members:/ { f = 1; next } f && NF { print $1; exit }')
             if [ -z "$cc_set" ] || ! echo "$rc_rules" | grep -q -- "--match-set $cc_set dst"; then code=norule
-            elif [ -z "$sample" ]; then code=nolearned; fi
+            elif [ -z "$sample" ]; then code=nolearned; sample=9.9.9.9; fi     # nothing learned yet: the way is checked anyway
         fi
-        if [ "$code" = "ok" ]; then
+        if [ "$code" = "ok" ] || [ "$code" = "nolearned" ]; then
+            cc_nl=$code; code=ok
             if [ "$exp" != "BLOCK" ] && ! check_iface_up "$exp"; then code=down
             elif [ "$exp" = "BLOCK" ]; then code=blocked
             else
@@ -1048,10 +1049,11 @@ cu_check_rows() {          # $1 = rc_out file, $2 = number of rows already writt
                 elif [ "$got" != "$xdev" ]; then code=wrongdev
                 elif [ "$exp" != "$d" ]; then code=failover; fi
             fi
+            [ "$code" = "ok" ] && [ "$cc_nl" = "nolearned" ] && code=oknl         # the way is right, no address learned yet
         fi
         # nothing learned yet (no device has looked the name up since it was added / since a reinstall) is no fault:
         # shown as a note, not as a warning - the same as for a domain whose target already has other addresses
-        case "$code" in ok|nolearned) state=ok ;; skipped|norule|failover|blocked) state=warn ;; *) state=fail ;; esac
+        case "$code" in ok|oknl|nolearned) state=ok ;; skipped|norule|failover|blocked) state=warn ;; *) state=fail ;; esac
         [ "$code" = "skipped" ] && code=ok
         dev=$(get_ifname "$d")
         [ $ccr_n -gt 0 ] && printf ',' >> "$1"
@@ -6569,6 +6571,7 @@ rc_print() {
             blocked)   echo "[WARN] ${lbl} -> ${d}: ${d} is down - traffic blocked (failover)" ;;
             nosubnets) echo "[WARN] ${lbl} -> ${d}: no subnets loaded" ;;
             nolearned) echo "[INFO] ${lbl} -> ${d}: no addresses learned yet - they are learned when a device looks the name up through the router" ;;
+            oknl)      echo "[OK]   ${lbl} -> ${d}: goes via ${got} (no address learned yet - learned when a device looks the name up)" ;;
         esac
     done
     [ -s "$EP_CACHE" ] && while read -r ep_ip ep_who; do echo "[INFO] VPN server $ep_ip ($ep_who) always goes via WAN"; done < "$EP_CACHE"

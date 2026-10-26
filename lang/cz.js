@@ -632,5 +632,7 @@ window.ASNM_LANGPACK = {"code": "cz", "locale": "cs-CZ", "name": "Čeština", "t
 "btn_devices": "Zařízení a DNS",
 "act_devices": "Zařízení a DNS",
 "agh_add": "Zadat přihlášení",
+"rc_more": "zobrazit dalších {n}",
+"rc_less": "zobrazit méně",
 "footer": "ASN Manager pro Asuswrt-Merlin"
 }};

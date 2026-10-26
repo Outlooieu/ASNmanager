@@ -526,7 +526,7 @@ var ASNM_I18N = {
     upd_available: 'v{r} available', upd_error: 'GitHub not reachable', upd_install: 'Update now', upd_notes: 'What is new?', upd_running: 'Updating - please wait, the page reloads afterwards...',
     banner_update: 'A new version is available: ASN Manager v{r} (installed: v{l}).',
     upd_confirm: 'Install ASN Manager v{r} now?\nThe page reloads afterwards. ASN list, schedule and statistics are kept.',
-    rc_title: 'Routing check', rc_now: 'Check now', rc_checking: 'Checking...', rc_summary: '{ok} OK · {warn} warnings · {fail} errors', rc_checked: 'checked {t}',
+    rc_title: 'Routing check', rc_more: 'show {n} more', rc_less: 'show less', rc_now: 'Check now', rc_checking: 'Checking...', rc_summary: '{ok} OK · {warn} warnings · {fail} errors', rc_checked: 'checked {t}',
     rc_none: 'no ASNs', rc_th: 'Routing', rc_down: 'offline', rc_noroute: 'no route', rc_norule: 'not active', rc_nosub: 'no subnets',
     rc_tip_ok: 'Sample address {ip} goes via {dev} as intended.', rc_tip_wrong: 'Sample address {ip} goes via {got} instead of {dev}!',
     rc_tip_down: 'Target interface {dev} is offline.', rc_tip_noroute: 'No route found for {ip}.', rc_tip_norule: 'The rule is not active - click "Apply rules".',
@@ -679,7 +679,7 @@ var ASNM_I18N = {
     upd_available: 'v{r} verfügbar', upd_error: 'GitHub nicht erreichbar', upd_install: 'Jetzt aktualisieren', upd_notes: 'Was ist neu?', upd_running: 'Update läuft - bitte warten, danach lädt die Seite neu...',
     banner_update: 'Neue Version verfügbar: ASN Manager v{r} (installiert: v{l}).',
     upd_confirm: 'ASN Manager v{r} jetzt installieren?\nDanach lädt die Seite neu. ASN-Liste, Zeitplan und Statistik bleiben erhalten.',
-    rc_title: 'Routing-Prüfung', rc_now: 'Jetzt prüfen', rc_checking: 'Wird geprüft...', rc_summary: '{ok} OK · {warn} Warnungen · {fail} Fehler', rc_checked: 'geprüft {t}',
+    rc_title: 'Routing-Prüfung', rc_more: '{n} weitere anzeigen', rc_less: 'weniger anzeigen', rc_now: 'Jetzt prüfen', rc_checking: 'Wird geprüft...', rc_summary: '{ok} OK · {warn} Warnungen · {fail} Fehler', rc_checked: 'geprüft {t}',
     rc_none: 'keine ASNs', rc_th: 'Routing', rc_down: 'offline', rc_noroute: 'keine Route', rc_norule: 'nicht aktiv', rc_nosub: 'keine Subnetze',
     rc_tip_ok: 'Beispiel-Adresse {ip} geht wie geplant über {dev}.', rc_tip_wrong: 'Beispiel-Adresse {ip} geht über {got} statt über {dev}!',
     rc_tip_down: 'Ziel-Interface {dev} ist offline.', rc_tip_noroute: 'Für {ip} wurde keine Route gefunden.', rc_tip_norule: 'Die Regel ist nicht aktiv - "Regeln anwenden" klicken.',
@@ -3362,6 +3362,7 @@ function asnmRcInfo(r) {
         case 'blocked':  cls = 'asnm-warn'; txt = '⛔ ' + t('rc_blocked'); tip = t('rc_tip_blocked', { d: r.dest }); break;
         case 'pending':  cls = '';          txt = '… ' + t('rc_checking'); tip = t('rc_checking'); break;
         case 'nolearned': cls = '';          txt = '… ' + t('rc_nolearned'); tip = t('rc_tip_nolearned'); break;
+        case 'oknl':     cls = 'asnm-ok';   txt = '✓ ' + r.got;           tip = t('rc_tip_nolearned'); break;
         default:         cls = 'asnm-warn'; txt = '! ' + t('rc_nosub');   tip = t('rc_tip_nosub');
     }
     if (r.recent >= 0) tip += '\n' + t('rc_tip_seen', { dev: r.dev, b: asnmFmtBytes(r.recent) });
@@ -3454,8 +3455,10 @@ function asnmRcRender() {
         if (show) { var stx = document.getElementById('asnm_rc_err_txt'); stx.textContent = st.textContent; stx.className = st.className; }
     }
     // which entries: listed below the summary (status card and diagnostics)
-    var iss = (d && !ASNM_RC.checking) ? asnmRcIssues() : [], ih = '';
-    for (i = 0; i < iss.length; i++) ih += '<div style="margin:4px 0 0 0;">' + iss[i].html + '</div>';
+    var iss = (d && !ASNM_RC.checking) ? asnmRcIssues() : [], ih = '', lim = ASNM_RC.showAll ? iss.length : 5;
+    for (i = 0; i < iss.length && i < lim; i++) ih += '<div style="margin:4px 0 0 0;">' + iss[i].html + '</div>';
+    if (iss.length > 5) ih += '<div style="margin-top:4px;"><span class="asnm-link" onclick="ASNM_RC.showAll=!ASNM_RC.showAll;asnmRcRender();">' +
+        asnmEsc(ASNM_RC.showAll ? t('rc_less') : t('rc_more', { n: iss.length - 5 })) + '</span></div>';
     ['asnm_rc_err_list', 'asnm_rc_state_list'].forEach(function (id) { var el = document.getElementById(id); if (el) { el.innerHTML = ih; el.style.display = ih ? '' : 'none'; } });
     if (fail) {
         var fl = asnmRcFailedEntries(), names = [];
@@ -3789,8 +3792,7 @@ function initial() {
     </div>
     <div class="asnm-kv" id="asnm_sched_err" style="display:none;"><span data-i18n="auto_refresh"></span>: <b class="asnm-rc-warn" data-i18n="sched_err"></b></div>
     <div class="asnm-kv" id="asnm_rc_err" style="display:none;"><span data-i18n="rc_title"></span>: <b id="asnm_rc_err_txt"></b>
-      <span class="asnm-link" style="margin-left: 8px;" data-i18n="rc_now" onclick="asnmRcCheck();"></span>
-      <div id="asnm_rc_err_list" class="asnm-help" style="display:none;"></div></div>
+      <span class="asnm-link" style="margin-left: 8px;" data-i18n="rc_now" onclick="asnmRcCheck();"></span></div>
     <div class="asnm-row">
       <input type="button" class="button_gen asnm-btn asnm-primary" data-i18n-value="btn_apply" onclick="asnmApply();"/>
       <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_full" data-i18n-title="btn_full_tip" onclick="asnmApplyFull();"/>
@@ -3798,6 +3800,7 @@ function initial() {
       <span class="asnm-spacer"></span>
       <input type="button" class="button_gen asnm-btn asnm-ghost" data-i18n-value="btn_reload" onclick="asnmSend('refresh', []);"/>
     </div>
+    <div id="asnm_rc_err_list" class="asnm-help" style="display:none;margin-top:8px;"></div>
     <span id="asnm_status" class="asnm-status"></span>
     <div id="asnm_progress" class="asnm-progress">
       <div class="asnm-progress-track"><div id="asnm_progress_bar" class="asnm-progress-bar"></div></div>

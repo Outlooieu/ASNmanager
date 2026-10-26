@@ -632,5 +632,7 @@ window.ASNM_LANGPACK = {"code": "tr", "locale": "tr-TR", "name": "Türkçe", "t"
 "btn_devices": "Cihazlar ve DNS",
 "act_devices": "Cihazlar ve DNS",
 "agh_add": "Girişi gir",
+"rc_more": "{n} tane daha göster",
+"rc_less": "daha az göster",
 "footer": "Asuswrt-Merlin için ASN Manager"
 }};
