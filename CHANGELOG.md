@@ -1,3 +1,8 @@
+## v3.9.28
+
+- **Faster restore**: all settings are restored in one go with a single DNS sync at the end (before: one sync per setting - with "DNS per device" and no AdGuard Home login that meant one AdGuard Home restart for each, several minutes in all); the page data is written after the last step only. A restore after a reinstall took about 7 minutes, now about 1.5
+- Restore and other multi-step jobs show a progress bar ("Step 3 of 6: Domains & IPs · 42 s") and the time it took at the end
+
 ## v3.9.27
 
 - **Backup holds more**: the DNS of the VPN provider per line, the switch "VPN Director follows the failover" and the own presets (also those on a USB device) - restored over SSH and in the WebUI
