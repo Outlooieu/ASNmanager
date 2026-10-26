@@ -1360,8 +1360,9 @@ backup_text() {
     echo "FO_VPND=$(fo_vpnd_on && echo on || echo off)"
     # DNS of the VPN provider per line ("DNS fitting the line")
     [ -s "$DNSF_CONF" ] && awk -F= '$1 ~ /^(OVPN|WGC)[1-5]$/ && $2 != "" { v = $2; gsub(/ +/, ",", v); print "DNS_SERVER_" $1 "=" v }' "$DNSF_CONF"
-    # own presets kept on the router (a presets.txt on a USB device stays where it is)
-    if [ -s "$PRESET_OWN" ]; then echo "[PRESETS]"; grep -E '^[a-z]+\|[^|]+\|[^|]+\|(wide)?$' "$PRESET_OWN"; fi
+    # own presets - from the router and from a USB device (restored to the router)
+    bt_p=$(cat /jffs/addons/asnmanager/presets.txt /tmp/mnt/*/ASNmanager/presets.txt 2>/dev/null | tr -d '\r' | grep -E '^[a-z]+\|[^|]+\|[^|]+\|(wide)?$' | awk '!s[$0]++')
+    if [ -n "$bt_p" ]; then echo "[PRESETS]"; echo "$bt_p"; fi
     return 0
 }
 
