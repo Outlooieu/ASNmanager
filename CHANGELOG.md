@@ -2,6 +2,7 @@
 
 - **Safemode with self-test**: after a reboot, an Apply or a change of the DNS / failover settings ASN Manager watches the router for 2 minutes, counted from when it is fully up (WAN connected, time set, dnsmasq / AdGuard Home running, rules built). If the router itself reaches the internet over WAN but DNS gives no answers, dnsmasq is gone or the LAN is routed wrongly, all rules of ASN Manager are taken out (lists and settings stay). If it is still broken without them, the cause is elsewhere and the rules are put back. An outage of the internet line never counts; at most one rollback per boot
 - After a reboot ASN Manager starts normally once more and tests itself again; red banner on the page with "Turn rules on again", e-mail if e-mail notices are on, command `safemode status | on | off | test`
+- Device check / device list: a device in a guest network (YazFi, Guest Network Pro) whose network hands out its own DNS by DHCP (e.g. 8.8.8.8) is shown with that DNS ("directly, not via the router", with YazFi Force DNS) and the real resolver behind it - before it wrongly showed the DNS of the router
 
 ## v3.9.28
 
