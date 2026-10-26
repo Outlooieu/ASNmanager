@@ -2471,9 +2471,10 @@ dg_agh_clients() {
             else if (s == "u") { if (v !~ /^\[/) u = u (u == "" ? "" : " ") v; else if (v !~ /:553$/ && v !~ /^\[\/[a-z.]*lan\/\]/ && v !~ /^\[\/\/\]/) sp++ } }
         END { if (p) out() }' "$dac_y"
 }
-# DNS the network of a device hands out by DHCP when it is not the router (YazFi / guest networks: e.g. 8.8.8.8 -
-# the device asks it directly, dnsmasq / AdGuard Home / Unbound never see its lookups).
-# Prints "servers<TAB>interface<TAB>force(0|1)<TAB>yazfi(0|1)" or nothing (= the device asks the router).
+# DNS a device gets by DHCP when it is not the router - the device then asks it directly, dnsmasq / AdGuard Home /
+# Unbound never see its lookups. Order: YazFi "Force DNS" (rewrites every lookup of the network), the DNS of the
+# device's own DHCP reservation (LAN > DHCP server, manual assignment), the DNS of its network (YazFi / guest networks).
+# Prints "servers<TAB>interface<TAB>force(0|1)<TAB>source(yazfi|host|net)" or nothing (= the device asks the router).
 dg_dhcp_dns() {
     dh_conf=${DG_DMCONF:-/etc/dnsmasq.conf}
     [ -r "$dh_conf" ] || return 0
@@ -2483,25 +2484,38 @@ dg_dhcp_dns() {
     [ -n "$dh_x" ] || return 0
     dh_if=${dh_x%% *}; dh_gw=${dh_x#* }
     dh_tag=$dh_if; [ "$dh_if" = "$(nvram get lan_ifname 2>/dev/null)" ] && dh_tag=lan
-    dh_s=$(awk -F, -v t="$dh_tag" -v t2="$dh_if" '
-        { a = $1; if (sub(/^dhcp-option=/, "", a) == 0) next; sub(/^tag:/, "", a)
-          if ((a != t && a != t2) || ($2 != "6" && $2 != "option:dns-server")) next
-          for (i = 3; i <= NF; i++) { v = $i; gsub(/[" ]/, "", v); if (v != "" && !(v in s)) { s[v] = 1; o = o (o == "" ? "" : " ") v } } }
-        END { print o }' "$dh_conf")
-    [ -n "$dh_s" ] || return 0                                   # no DNS option: dnsmasq hands out the router itself
-    for dh_v in $dh_s; do case "$dh_v" in "$dh_gw"|0.0.0.0) return 0 ;; esac; done
-    dh_k=$(echo "$dh_if" | tr -d '.'); dh_y=0; dh_f=0
+    dh_mac=$(awk -v i="$1" '$1 == i { print tolower($4); exit }' "${DG_ARP:-/proc/net/arp}" 2>/dev/null)
+    dh_k=$(echo "$dh_if" | tr -d '.'); dh_y=0; dh_f=0; dh_src=net
     if grep -q "^${dh_k}_IPADDR=" /jffs/addons/YazFi.d/config 2>/dev/null; then
         dh_y=1; grep -q "^${dh_k}_FORCEDNS=true" /jffs/addons/YazFi.d/config 2>/dev/null && dh_f=1
     fi
-    printf '%s\t%s\t%s\t%s\n' "$dh_s" "$dh_if" "$dh_f" "$dh_y"
+    dh_opt() {     # DNS servers of the dhcp-option lines for tag $1 / $2
+        awk -F, -v t="$1" -v t2="$2" '
+            { a = $1; if (sub(/^dhcp-option=/, "", a) == 0) next; sub(/^tag:/, "", a); a = tolower(a)
+              if ((a != t && a != t2) || ($2 != "6" && $2 != "option:dns-server")) next
+              for (i = 3; i <= NF; i++) { v = $i; gsub(/[" ]/, "", v); if (v != "" && !(v in s)) { s[v] = 1; o = o (o == "" ? "" : " ") v } } }
+            END { print o }' "$dh_conf"
+    }
+    dh_s=""
+    # the device's own DHCP reservation with a DNS server (not when YazFi rewrites every lookup anyway)
+    if [ $dh_f -eq 0 ] && [ -n "$dh_mac" ]; then
+        dh_s=$(dh_opt "$dh_mac" "$dh_mac")
+        [ -n "$dh_s" ] || dh_s=$({ cat /jffs/nvram/dhcp_staticlist 2>/dev/null || nvram get dhcp_staticlist 2>/dev/null; } | tr '<' '\n' |
+            awk -F'>' -v m="$dh_mac" 'tolower($1) == m && $3 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ { print $3; exit }')
+        [ -n "$dh_s" ] && dh_src=host
+    fi
+    [ -n "$dh_s" ] || { dh_s=$(dh_opt "$dh_tag" "$dh_if"); dh_src=net; [ $dh_y -eq 1 ] && dh_src=yazfi; }
+    [ -n "$dh_s" ] || return 0                                   # no DNS option: dnsmasq hands out the router itself
+    for dh_v in $dh_s; do case "$dh_v" in "$dh_gw"|0.0.0.0) return 0 ;; esac; done
+    printf '%s\t%s\t%s\t%s\n' "$dh_s" "$dh_if" "$dh_f" "$dh_src"
 }
 # one line: which DNS the device asks ($1 = device ip, $2 = file of dg_agh_clients)
 dg_dns_label() {
     dd_h=$(dg_dhcp_dns "$1")
     if [ -n "$dd_h" ]; then
         echo "$dd_h" | awk -F'\t' '{ gsub(/ /, ", ", $1)
-            printf "%s directly - handed out by DHCP of %s%s%s; not via the router (no dnsmasq / AdGuard Home / Unbound)\n", $1, $2, ($4 == "1" ? " (YazFi)" : ""), ($3 == "1" ? ", Force DNS on: every lookup of the device goes there" : "") }'
+            w = ($4 == "host") ? "the DHCP reservation of this device" : ("DHCP of " $2 ($4 == "yazfi" ? " (YazFi)" : ""))
+            printf "%s directly - handed out by %s%s; not via the router (no dnsmasq / AdGuard Home / Unbound)\n", $1, w, ($3 == "1" ? ", Force DNS on: every lookup of the device goes there" : "") }'
         return 0
     fi
     dd_norm="normal DNS: $(dnsf_base | awk '{ print $1 " via " $2 }')"
