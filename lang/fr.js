@@ -206,8 +206,8 @@ window.ASNM_LANGPACK = {"code": "fr", "locale": "fr-FR", "name": "Français", "t
 "dw_base_unknown": "votre DNS normal",
 "dw_f_title": "Sites d'ASN Manager",
 "dw_f_desc": "Les domaines et ASN de votre liste sont résolus via leur cible - un site sur le WAN interroge un serveur DNS via le WAN, un site sur WGC3 un serveur via WGC3.",
-"dw_d_title": "Chaque appareil selon le VPN Director",
-"dw_d_desc": "Tous les autres sites : chaque appareil les résout via la ligne que le VPN Director lui attribue. Nécessite AdGuard Home (redémarré quand le VPN Director ou vos domaines changent).",
+"dw_d_title": "DNS de chaque appareil via sa ligne",
+"dw_d_desc": "Le trafic d'un appareil passe par la ligne que lui donne le VPN Director, ses requêtes DNS suivent le chemin du routeur - sauf si un DNS est saisi dans le client VPN du routeur : le routeur les redirige alors directement vers lui, en contournant AdGuard Home et ses filtres. Avec ce réglage, chaque appareil interroge le DNS de sa ligne via AdGuard Home, avec ses filtres. Nécessite AdGuard Home ; sans l'identifiant AdGuard Home, il est brièvement redémarré lors des modifications.",
 "dw_t_title": "Chiffrer les requêtes via le WAN",
 "dw_t_desc": "Ce qui est résolu via le WAN sort en DNS over TLS - votre fournisseur d'accès ne voit plus les noms. Les requêtes via un VPN sont de toute façon protégées par le tunnel.",
 "dw_now": "Fonctionnement actuel",
@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "fr", "locale": "fr-FR", "name": "Français", "t
 "fo_vd_c_on": "Laisser le VPN Director suivre le basculement ? Si une ligne tombe en panne, ses appareils passent par la ligne de secours définie ici (avec « Bloquer » : ils sont bloqués).",
 "btn_devices": "Appareils & DNS",
 "act_devices": "Appareils & DNS",
+"agh_add": "Saisir l'identifiant",
 "footer": "ASN Manager pour Asuswrt-Merlin"
 }};

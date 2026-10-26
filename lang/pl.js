@@ -206,8 +206,8 @@ window.ASNM_LANGPACK = {"code": "pl", "locale": "pl-PL", "name": "Polski", "t": 
 "dw_base_unknown": "Twój zwykły DNS",
 "dw_f_title": "Strony z ASN Manager",
 "dw_f_desc": "Domeny i ASN z Twojej listy są rozwiązywane przez ich cel - strona na WAN pyta serwer DNS przez WAN, strona na WGC3 serwer przez WGC3.",
-"dw_d_title": "Każde urządzenie według VPN Director",
-"dw_d_desc": "Wszystkie pozostałe strony: każde urządzenie rozwiązuje je przez łącze, które przydziela mu VPN Director. Wymaga AdGuard Home (restartowany, gdy zmienia się VPN Director lub Twoje domeny).",
+"dw_d_title": "DNS każdego urządzenia przez jego łącze",
+"dw_d_desc": "Ruch urządzenia idzie łączem, które przydziela mu VPN Director, jego zapytania DNS drogą routera - chyba że w kliencie VPN routera wpisano DNS: wtedy router przekierowuje je prosto tam, z pominięciem AdGuard Home i jego filtrów. Dzięki temu przełącznikowi każde urządzenie pyta DNS swojego łącza przez AdGuard Home, z filtrami. Wymaga AdGuard Home; bez loginu AdGuard Home jest on krótko restartowany przy zmianach.",
 "dw_t_title": "Szyfruj zapytania przez WAN",
 "dw_t_desc": "To, co jest rozwiązywane przez WAN, wychodzi jako DNS over TLS - Twój dostawca internetu nie widzi już nazw. Zapytania przez VPN i tak chroni tunel.",
 "dw_now": "Jak to teraz działa",
@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "pl", "locale": "pl-PL", "name": "Polski", "t": 
 "fo_vd_c_on": "Czy VPN Director ma podążać za failoverem? Gdy łącze ulegnie awarii, jego urządzenia przejdą na ustawione tu łącze zapasowe (przy \"Blokuj\": zostaną zablokowane).",
 "btn_devices": "Urządzenia i DNS",
 "act_devices": "Urządzenia i DNS",
+"agh_add": "Wpisz login",
 "footer": "ASN Manager dla Asuswrt-Merlin"
 }};

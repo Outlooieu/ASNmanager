@@ -206,8 +206,8 @@ window.ASNM_LANGPACK = {"code": "da", "locale": "da-DK", "name": "Dansk", "t": {
 "dw_base_unknown": "din normale DNS",
 "dw_f_title": "Websteder fra ASN Manager",
 "dw_f_desc": "Domæner og ASN på din liste slås op gennem deres mål - et websted på WAN spørger en DNS-server via WAN, et websted på WGC3 en gennem WGC3.",
-"dw_d_title": "Hver enhed efter VPN Director",
-"dw_d_desc": "Alle andre websteder: hver enhed slår dem op via den linje, VPN Director giver den. Kræver AdGuard Home (genstartes, når VPN Director eller dine domæner ændres).",
+"dw_d_title": "DNS for hver enhed over dens linje",
+"dw_d_desc": "En enheds trafik går over den linje, VPN Director giver den, dens DNS-opslag routerens vej - medmindre der er angivet en DNS i routerens VPN-klient: så omdirigerer routeren dem direkte dertil, uden om AdGuard Home og dens filtre. Med denne kontakt spørger hver enhed sin linjes DNS via AdGuard Home, med filtre. Kræver AdGuard Home; uden AdGuard Home-login genstartes det kortvarigt ved ændringer.",
 "dw_t_title": "Krypter forespørgsler via WAN",
 "dw_t_desc": "Det, der slås op via WAN, sendes som DNS over TLS - din udbyder ser ikke længere navnene. Forespørgsler gennem et VPN beskyttes alligevel af tunnelen.",
 "dw_now": "Sådan kører det nu",
@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "da", "locale": "da-DK", "name": "Dansk", "t": {
 "fo_vd_c_on": "Skal VPN Director følge failover? Falder en linje ud, går dens enheder over den reservelinje, du angiver her (med \"Bloker\": de blokeres).",
 "btn_devices": "Enheder & DNS",
 "act_devices": "Enheder & DNS",
+"agh_add": "Indtast login",
 "footer": "ASN Manager til Asuswrt-Merlin"
 }};

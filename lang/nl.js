@@ -206,8 +206,8 @@ window.ASNM_LANGPACK = {"code": "nl", "locale": "nl-NL", "name": "Nederlands", "
 "dw_base_unknown": "je normale DNS",
 "dw_f_title": "Sites van ASN Manager",
 "dw_f_desc": "Domeinen en ASN's op je lijst worden via hun doel opgezocht - een site op WAN vraagt een DNS-server via WAN, een site op WGC3 een server via WGC3.",
-"dw_d_title": "Elk apparaat volgens de VPN Director",
-"dw_d_desc": "Alle andere sites: elk apparaat zoekt ze op via de lijn die de VPN Director het geeft. Vereist AdGuard Home (wordt herstart als de VPN Director of je domeinen veranderen).",
+"dw_d_title": "DNS van elk apparaat via zijn lijn",
+"dw_d_desc": "Het verkeer van een apparaat gaat via de lijn die de VPN Director het geeft, zijn DNS-opzoekingen via de weg van de router - tenzij in de VPN-client van de router een DNS is ingevuld: dan stuurt de router ze rechtstreeks daarheen, langs AdGuard Home en zijn filters. Hiermee vraagt elk apparaat de DNS van zijn lijn via AdGuard Home, met filters. Vereist AdGuard Home; zonder AdGuard Home-login wordt het bij wijzigingen kort herstart.",
 "dw_t_title": "Queries via WAN versleutelen",
 "dw_t_desc": "Wat via WAN wordt opgezocht, gaat als DNS over TLS naar buiten - je provider ziet de namen niet meer. Queries via een VPN worden sowieso door de tunnel beschermd.",
 "dw_now": "Zo werkt het nu",
@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "nl", "locale": "nl-NL", "name": "Nederlands", "
 "fo_vd_c_on": "De VPN Director de failover laten volgen? Valt een lijn uit, dan gaan de apparaten via de hier ingestelde uitwijklijn (bij \"Blokkeren\": geblokkeerd).",
 "btn_devices": "Apparaten & DNS",
 "act_devices": "Apparaten & DNS",
+"agh_add": "Login invoeren",
 "footer": "ASN Manager voor Asuswrt-Merlin"
 }};

@@ -206,8 +206,8 @@ window.ASNM_LANGPACK = {"code": "sl", "locale": "sl-SI", "name": "Slovenščina"
 "dw_base_unknown": "vaš običajni DNS",
 "dw_f_title": "Strani iz ASN Manager",
 "dw_f_desc": "Domene in ASN z vašega seznama se razrešijo prek svojega cilja - stran na WAN vpraša strežnik DNS prek WAN, stran na WGC3 enega skozi WGC3.",
-"dw_d_title": "Vsaka naprava po VPN Director",
-"dw_d_desc": "Vse druge strani: vsaka naprava jih razreši po liniji, ki ji jo dodeli VPN Director. Potrebuje AdGuard Home (znova se zažene, ko se spremenijo VPN Director ali vaše domene).",
+"dw_d_title": "DNS vsake naprave prek njene linije",
+"dw_d_desc": "Promet naprave gre po liniji, ki ji jo da VPN Director, njene poizvedbe DNS po poti usmerjevalnika - razen če je v VPN-odjemalcu usmerjevalnika vnesen DNS: takrat jih usmerjevalnik preusmeri naravnost tja, mimo AdGuard Home in njegovih filtrov. S tem stikalom vsaka naprava vpraša DNS svoje linije prek AdGuard Home, s filtri. Potrebuje AdGuard Home; brez prijave v AdGuard Home se ob spremembah na kratko ponovno zažene.",
 "dw_t_title": "Šifriraj poizvedbe prek WAN",
 "dw_t_desc": "Kar se razreši prek WAN, gre ven kot DNS over TLS - vaš ponudnik imen ne vidi več. Poizvedbe skozi VPN tako ali tako ščiti tunel.",
 "dw_now": "Kako deluje zdaj",
@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "sl", "locale": "sl-SI", "name": "Slovenščina"
 "fo_vd_c_on": "Naj VPN Director sledi failoverju? Ko linija izpade, gredo njene naprave prek tukaj nastavljene rezervne linije (pri »Blokiraj«: so blokirane).",
 "btn_devices": "Naprave in DNS",
 "act_devices": "Naprave in DNS",
+"agh_add": "Vnesi prijavo",
 "footer": "ASN Manager za Asuswrt-Merlin"
 }};

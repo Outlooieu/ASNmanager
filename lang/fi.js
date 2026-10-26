@@ -206,8 +206,8 @@ window.ASNM_LANGPACK = {"code": "fi", "locale": "fi-FI", "name": "Suomi", "t": {
 "dw_base_unknown": "tavallinen DNS-palvelusi",
 "dw_f_title": "ASN Managerin sivustot",
 "dw_f_desc": "Luettelosi verkkotunnukset ja ASN:t selvitetään niiden kohteen kautta - WANissa oleva sivusto kysyy DNS-palvelimelta WANin kautta, WGC3:ssa oleva sivusto WGC3:n kautta.",
-"dw_d_title": "Jokainen laite VPN Directorin mukaan",
-"dw_d_desc": "Kaikki muut sivustot: jokainen laite selvittää ne VPN Directorin sille antaman yhteyden kautta. Edellyttää AdGuard Homea (käynnistetään uudelleen, kun VPN Director tai verkkotunnuksesi muuttuvat).",
+"dw_d_title": "Jokaisen laitteen DNS sen linjan kautta",
+"dw_d_desc": "Laitteen liikenne kulkee VPN Directorin antamaa linjaa, sen DNS-haut reitittimen reittiä - ellei reitittimen VPN-asiakkaaseen ole annettu DNS:ää: silloin reititin ohjaa ne suoraan sinne, AdGuard Homen ja sen suodattimien ohi. Tällä kytkimellä jokainen laite kysyy linjansa DNS:ää AdGuard Homen kautta, suodattimin. Vaatii AdGuard Homen; ilman AdGuard Home -tunnuksia se käynnistetään muutoksissa hetkeksi uudelleen.",
 "dw_t_title": "Salaa kyselyt WANin kautta",
 "dw_t_desc": "WANin kautta selvitettävät nimet lähtevät DNS over TLS -muodossa - palveluntarjoajasi ei enää näe nimiä. VPN:n kautta kulkevat kyselyt suojaa joka tapauksessa tunneli.",
 "dw_now": "Näin se toimii nyt",
@@ -631,5 +631,6 @@ window.ASNM_LANGPACK = {"code": "fi", "locale": "fi-FI", "name": "Suomi", "t": {
 "fo_vd_c_on": "Annetaanko VPN Directorin seurata vikasietoa? Kun linja katkeaa, sen laitteet käyttävät tässä asetettua varalinjaa (\"Estä\": ne estetään).",
 "btn_devices": "Laitteet & DNS",
 "act_devices": "Laitteet & DNS",
+"agh_add": "Anna tunnukset",
 "footer": "ASN Manager Asuswrt-Merlinille"
 }};
