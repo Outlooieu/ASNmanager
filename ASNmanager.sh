@@ -1358,6 +1358,10 @@ backup_text() {
     echo "DNS_TLS=$(dnsf_tls_on && echo on || echo off)"
     echo "MAIL_NOTIFY=$(mail_mode)"
     echo "FO_VPND=$(fo_vpnd_on && echo on || echo off)"
+    # DNS of the VPN provider per line ("DNS fitting the line")
+    [ -s "$DNSF_CONF" ] && awk -F= '$1 ~ /^(OVPN|WGC)[1-5]$/ && $2 != "" { v = $2; gsub(/ +/, ",", v); print "DNS_SERVER_" $1 "=" v }' "$DNSF_CONF"
+    # own presets kept on the router (a presets.txt on a USB device stays where it is)
+    if [ -s "$PRESET_OWN" ]; then echo "[PRESETS]"; grep -E '^[a-z]+\|[^|]+\|[^|]+\|(wide)?$' "$PRESET_OWN"; fi
     return 0
 }
 
@@ -1392,6 +1396,7 @@ rs_scan() {
             /^\[SCHEDULE\]/ { f = d "/sched.txt"; next }
             /^\[FAILOVER\]/ { f = d "/fo.txt"; next }
             /^\[SETTINGS\]/ { f = d "/set.txt"; next }
+            /^\[PRESETS\]/ { f = d "/presets.txt"; next }
             /^\[/ { f = ""; next }
             /^#/ || /^[ \t]*$/ { next }
             f != "" { print > f }' "$RS_DIR/raw.txt"
@@ -1431,6 +1436,8 @@ rs_setting() {
         DNS_TLS:on|DNS_TLS:off)        dnsf_tls_set "$2" ;;
         MAIL_NOTIFY:off|MAIL_NOTIFY:daily|MAIL_NOTIFY:weekly)  mail_set "$2" ;;
         FO_VPND:on|FO_VPND:off)        fo_vpnd_set "$2" ;;
+        DNS_SERVER_OVPN[1-5]:*|DNS_SERVER_WGC[1-5]:*)
+                                       dnsf_server_set "${1#DNS_SERVER_}" $(echo "$2" | tr ',' ' '); return $? ;;
         FO_VPND:*|STATS:*|STATS_SAVING:*|STATS_MODE:*|RULES_MODE:*|WEBUI_LOCATION:*|SG_DOMAINS:*|DNS_FOLLOW:*|DNS_DEVICE:*|DNS_TLS:*|MAIL_NOTIFY:*)   echo "Invalid value '$2' for $1 skipped."; return 0 ;;
         *)                echo "Unknown setting '$1' skipped."; return 0 ;;
     esac
@@ -1470,7 +1477,10 @@ rs_apply() {
         while IFS='=' read -r ra_t ra_c; do [ -n "$ra_t" ] && fo_set "$ra_t" "$ra_c"; done < "$RS_DIR/fo.txt" ;;
     esac
     case "$ra_cats" in *,settings,*)
-        while IFS='=' read -r ra_k ra_v; do [ -n "$ra_k" ] && rs_setting "$ra_k" "$ra_v"; done < "$RS_DIR/set.txt" ;;
+        while IFS='=' read -r ra_k ra_v; do [ -n "$ra_k" ] && rs_setting "$ra_k" "$ra_v"; done < "$RS_DIR/set.txt"
+        if [ -s "$RS_DIR/presets.txt" ]; then
+            cli_pimport "$ra_mode" "$(awk '{ printf "%s%s", (NR > 1 ? ";" : ""), $0 }' "$RS_DIR/presets.txt" | sed 's/%/%25/g; s/ /%20/g')"
+        fi ;;
     esac
     [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1
     return 0

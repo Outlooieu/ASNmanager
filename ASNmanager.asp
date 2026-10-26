@@ -2156,11 +2156,11 @@ function asnmExportDone(txt, note) {
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.parentNode.removeChild(a); }, 1000);
 }
-var ASNM_SET_OK = { MAIL_NOTIFY: /^(off|daily|weekly)$/, STATS: /^(enabled|disabled)$/, STATS_SAVING: /^(on|off)$/, STATS_MODE: /^(asn|iface)$/, RULES_MODE: /^(combined|single)$/, WEBUI_LOCATION: /^(vpn|addons)$/, SG_DOMAINS: /^(on|off)$/, DNS_FOLLOW: /^(on|off)$/, DNS_DEVICE: /^(on|off)$/, DNS_TLS: /^(on|off)$/ };
+var ASNM_SET_OK = { MAIL_NOTIFY: /^(off|daily|weekly)$/, STATS: /^(enabled|disabled)$/, STATS_SAVING: /^(on|off)$/, STATS_MODE: /^(asn|iface)$/, RULES_MODE: /^(combined|single)$/, WEBUI_LOCATION: /^(vpn|addons)$/, SG_DOMAINS: /^(on|off)$/, DNS_FOLLOW: /^(on|off)$/, DNS_DEVICE: /^(on|off)$/, DNS_TLS: /^(on|off)$/, FO_VPND: /^(on|off)$/ };
 
 function asnmParseBackup(txt) {
     var lines = txt.replace(/\r/g, '').split('\n'), section = null, hasSections = /^\[(ASN_LIST|CUSTOM)\]/m.test(txt);
-    var res = { notes: [], entries: [], custom: [], bad: 0, interval: null, time: null, hasAsn: false, failover: [], hasFo: false, settings: {}, nset: 0, version: '' };
+    var res = { notes: [], entries: [], custom: [], bad: 0, interval: null, time: null, hasAsn: false, failover: [], hasFo: false, settings: {}, dnssrv: [], presets: [], nset: 0, version: '' };
     var tg = '(?:WAN1|WAN2|OVPN[1-5]|WGC[1-5])', reFo = new RegExp('^(WAN|' + tg + ')=(' + tg + '|BLOCK)(?:,(' + tg + '|BLOCK))?$');
     for (var i = 0; i < lines.length; i++) {
         var l = lines[i].trim();
@@ -2180,6 +2180,12 @@ function asnmParseBackup(txt) {
         if (section === '[SETTINGS]') {
             var sm = /^([A-Z_]+)=([a-z]+)$/.exec(l);
             if (sm && ASNM_SET_OK[sm[1]] && ASNM_SET_OK[sm[1]].test(sm[2])) { res.settings[sm[1]] = sm[2]; res.nset++; }
+            var dm = /^DNS_SERVER_((?:OVPN|WGC)[1-5])=(\d{1,3}(?:\.\d{1,3}){3}(?:,\d{1,3}(?:\.\d{1,3}){3})?)$/.exec(l);
+            if (dm) { res.dnssrv.push([dm[1], dm[2]]); res.nset++; }
+            continue;
+        }
+        if (section === '[PRESETS]') {
+            if (/^[a-z]+\|[^|]+\|[^|]+\|(wide)?$/.test(l)) res.presets.push(l);
             continue;
         }
         if (section === '[NOTES]') {
@@ -2295,8 +2301,18 @@ function asnmImportRun() {
         for (i = 0; i < r.failover.length; i++) { var p = r.failover[i][1].split(','); jobs.push(['failover', [r.failover[i][0], p[0] || '', p[1] || '']]); }
     }
     if (chk('asnm_rs_set')) {
-        var order = ['STATS_SAVING', 'STATS_MODE', 'RULES_MODE', 'WEBUI_LOCATION', 'SG_DOMAINS', 'DNS_FOLLOW', 'DNS_DEVICE', 'DNS_TLS', 'MAIL_NOTIFY', 'STATS'];
+        var order = ['STATS_SAVING', 'STATS_MODE', 'RULES_MODE', 'WEBUI_LOCATION', 'SG_DOMAINS', 'DNS_FOLLOW', 'DNS_DEVICE', 'DNS_TLS', 'MAIL_NOTIFY', 'FO_VPND', 'STATS'];
         for (i = 0; i < order.length; i++) if (r.settings[order[i]]) jobs.push(['setting', [order[i], r.settings[order[i]]]]);
+        for (i = 0; i < r.dnssrv.length; i++) jobs.push(['dnsfsrv', [r.dnssrv[i][0], r.dnssrv[i][1]]]);              // DNS of the VPN provider per line
+        if (r.presets.length) {                                                                                        // own presets of the router
+            var pchunk = [], plen = 0;
+            for (i = 0; i < r.presets.length; i++) {
+                var pe = encodeURIComponent(r.presets[i]);
+                if (plen + pe.length + 1 > ASNM.chunkChars && pchunk.length) { jobs.push(['pimport', ['merge', pchunk.join(';')]]); pchunk = []; plen = 0; }
+                pchunk.push(pe); plen += pe.length + 1;
+            }
+            if (pchunk.length) jobs.push(['pimport', ['merge', pchunk.join(';')]]);
+        }
     }
     if (!jobs.length) { alert(t('rs_nosel')); return; }
     asnmImportCancel();
