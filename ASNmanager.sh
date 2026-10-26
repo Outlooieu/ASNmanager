@@ -6,6 +6,12 @@ version=3.9.23
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
+# cron, service-event and the WebUI start the script with a short PATH: the tools in /usr/sbin and /opt (conntrack,
+# ip, ...) must be found there as well
+case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH" ;; esac
+case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
+export PATH
+
 SCRIPT_VERSION="3.9.23"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
@@ -6172,7 +6178,8 @@ fo_ct_pending() {
 # again, moved = $1 is down and its devices go over the fallback now - those that went over WAN meanwhile, e.g. after a
 # reboot before the failover took over, are closed and open again through the fallback)
 fo_ct_close() {
-    command -v conntrack >/dev/null 2>&1 && [ -r "$VPND_FILE" ] || return 0
+    [ -r "$VPND_FILE" ] || return 0
+    command -v conntrack >/dev/null 2>&1 || { logger -t ASNmanager "Failover: conntrack not found (PATH=$PATH) - old connections of $1 are not closed"; return 0; }
     fr_l=$2
     case "$fr_l" in
         BLOCK|"") return 0 ;;
