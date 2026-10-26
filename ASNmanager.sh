@@ -6124,6 +6124,30 @@ fo_vpnd_sync() {
     return 0
 }
 
+# a line works again: open connections of its VPN Director devices that went another way meanwhile would stay on it
+# until they end (the router keeps a connection on its way, hardware acceleration as well) - they are closed, the
+# devices open them again through their own line. Meanwhile = the fallback (VPN Director follows) or WAN (the firmware
+# sends them there without kill switch). $1 = line that works again, $2 = line it used meanwhile
+fo_ct_reset() {
+    command -v conntrack >/dev/null 2>&1 && [ -r "$VPND_FILE" ] || return 0
+    if fo_vpnd_on; then fr_l=$2; else fr_l=WAN1; fi
+    case "$fr_l" in
+        BLOCK|"") return 0 ;;
+        WAN|WAN1) fr_ip=$(nvram get wan0_ipaddr) ;;
+        WAN2) fr_ip=$(nvram get wan1_ipaddr) ;;
+        *) fr_ip=$(ip -4 addr show "$(get_ifname "$fr_l")" 2>/dev/null | awk '/inet / { split($2, a, "/"); print a[1]; exit }') ;;
+    esac
+    case "$fr_ip" in ''|0.0.0.0) return 0 ;; esac
+    fr_n=0
+    for fr_s in $(tr '<' '\n' < "$VPND_FILE" | awk -F'>' -v t="$1" '$1 == "1" && $4 == "" { i = toupper($5); if (i == "WAN") i = "WAN1"
+            if (i == t && $3 ~ /^[0-9.]+(\/32)?$/) { sub(/\/32$/, "", $3); print $3 } }'); do
+        fr_c=$(conntrack -D -s "$fr_s" -q "$fr_ip" 2>&1 | sed -n 's/.* \([0-9][0-9]*\) flow entries have been deleted.*/\1/p')
+        fr_n=$((fr_n + ${fr_c:-0}))
+    done
+    [ $fr_n -gt 0 ] && logger -t ASNmanager "Failover: $1 works again - $fr_n open connection(s) of its devices still went via $fr_l: closed, they reconnect through $1"
+    return 0
+}
+
 # targets that are down and moved to another one right now: "target active" (active may be BLOCK)
 fo_active_map() {
     [ -s "$FO_CONF" ] || return 0
@@ -6201,7 +6225,7 @@ fo_round() {
     [ -s "$FO_CONF" ] || return 0
     rt_heal
     mkdir -p "$FO_RT"
-    fo_now=$(date +%s); fo_changed=0
+    fo_now=$(date +%s); fo_changed=0; fo_ct_old=""
     for fo_i in $(sed 's/=/,/' "$FO_CONF" | tr ',' '\n' | grep -v '^$' | sort -u); do echo "$fo_i $(fo_health "$fo_i")"; done > "$FO_RT/health.txt"
     while IFS='=' read -r fo_t fo_ch; do
         [ -n "$(fo_info "$fo_t")" ] || continue
@@ -6213,7 +6237,7 @@ fo_round() {
         fo_old=$(cat "$FO_RT/active_$fo_t" 2>/dev/null)
         if [ "$fo_act" != "$fo_old" ]; then
             echo "$fo_act" > "$FO_RT/active_$fo_t"; echo "$fo_now" > "$FO_RT/since_$fo_t"; fo_changed=1
-            if [ "$fo_act" = "$fo_t" ]; then [ -n "$fo_old" ] && logger -t ASNmanager "Failover: $fo_t works again - traffic via $fo_t"
+            if [ "$fo_act" = "$fo_t" ]; then [ -n "$fo_old" ] && { logger -t ASNmanager "Failover: $fo_t works again - traffic via $fo_t"; fo_ct_old="$fo_ct_old $fo_t:$fo_old"; }
             elif [ "$fo_act" = "BLOCK" ]; then logger -t ASNmanager "Failover: $fo_t is down - traffic for its ASNs is blocked"
             else logger -t ASNmanager "Failover: $fo_t is down - traffic for its ASNs goes via $fo_act"; fi
         fi
@@ -6221,6 +6245,8 @@ fo_round() {
         fo_self_rule "$fo_t" "$fo_act"
     done < "$FO_CONF"
     fo_vpnd_sync
+    # after the rules are back: close the connections that still use the way of the outage
+    for fo_x in $fo_ct_old; do fo_ct_reset "${fo_x%%:*}" "${fo_x#*:}"; done; fo_ct_old=""
     fo_export
     [ $fo_changed -eq 1 ] && rc_check >/dev/null 2>&1
     # DNS follows: the names of the target that is down are looked up through the line in use (in the background:
