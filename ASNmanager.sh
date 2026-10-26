@@ -6160,9 +6160,10 @@ fo_ct_pending() {
     for fcp_f in "$FO_RT"/ctback_*; do
         [ -f "$fcp_f" ] || continue
         fcp_t=${fcp_f##*/ctback_}; read -r fcp_l fcp_ip fcp_n < "$fcp_f"
-        case "$fcp_ip" in [0-9]*) ;; *) fcp_n=${fcp_ip:-1}; fcp_ip="" ;; esac
-        [ "$(cat "$FO_RT/active_$fcp_t" 2>/dev/null)" = "$fcp_t" ] && fo_ct_close "$fcp_t" "$fcp_l" back $fcp_ip
-        fcp_n=$((${fcp_n:-1} - 1))
+        case "$fcp_ip" in *.*) ;; *) fcp_n=$fcp_ip; fcp_ip="" ;; esac      # "line count" when no address was known
+        case "$fcp_n" in ''|*[!0-9]*) fcp_n=1 ;; esac
+        if [ "$(cat "$FO_RT/active_$fcp_t" 2>/dev/null)" = "$fcp_t" ]; then fo_ct_close "$fcp_t" "$fcp_l" back $fcp_ip; fcp_n=$((fcp_n - 1))
+        else fcp_n=0; fi
         if [ $fcp_n -le 0 ]; then rm -f "$fcp_f" "$FO_RT/ctip_$fcp_t"; else echo "$fcp_l $fcp_ip $fcp_n" > "$fcp_f"; fi
     done
     return 0
@@ -6182,14 +6183,16 @@ fo_ct_close() {
         WAN2) fr_ip=$(nvram get wan1_ipaddr) ;;
         *) fr_ip=$(ip -4 addr show "$(get_ifname "$fr_l")" 2>/dev/null | awk '/inet / { split($2, a, "/"); print a[1]; exit }') ;;
     esac
-    case "$fr_ip" in ''|0.0.0.0) return 0 ;; esac
+    case "$fr_ip" in ''|0.0.0.0) [ "$3" = "back" ] && logger -t ASNmanager "Failover: $1 - address of $fr_l unknown right now, old connections checked again in the next round"; return 1 ;; esac
     fr_n=0
     for fr_s in $(tr '<' '\n' < "$VPND_FILE" | awk -F'>' -v t="$1" '$1 == "1" && $4 == "" { i = toupper($5); if (i == "WAN") i = "WAN1"
             if (i == t && $3 ~ /^[0-9.]+(\/32)?$/) { sub(/\/32$/, "", $3); print $3 } }'); do
         fr_c=$(conntrack -D -s "$fr_s" -q "$fr_ip" 2>&1 | sed -n 's/.* \([0-9][0-9]*\) flow entries have been deleted.*/\1/p')
         fr_n=$((fr_n + ${fr_c:-0}))
     done
-    if [ $fr_n -gt 0 ]; then
+    if [ $fr_n -eq 0 ]; then
+        logger -t ASNmanager "Failover: $1 - no open connection(s) of its devices via $fr_l ($fr_ip) left"
+    else
         if [ "$3" = "moved" ]; then logger -t ASNmanager "Failover: $1 is down - $fr_n open connection(s) of its devices went via $fr_l: closed, they reconnect through the fallback"
         else logger -t ASNmanager "Failover: $1 works again - $fr_n open connection(s) of its devices still went via $fr_l: closed, they reconnect through $1"; fi
     fi
@@ -6293,6 +6296,9 @@ fo_round() {
         fi
         fo_set_rule "$fo_t" "$fo_act"
         fo_self_rule "$fo_t" "$fo_act"
+        if [ "$fo_act" != "$fo_t" ] && [ ! -s "$FO_RT/ctip_$fo_t" ]; then
+            case "$fo_act" in WAN*|BLOCK) ;; *) ip -4 addr show "$(get_ifname "$fo_act")" 2>/dev/null | awk '/inet / { split($2, a, "/"); print a[1]; exit }' > "$FO_RT/ctip_$fo_t" ;; esac
+        fi
     done < "$FO_CONF"
     fo_vpnd_sync
     # after the rules are back: close the connections that still use the way of the outage
