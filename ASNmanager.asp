@@ -3361,7 +3361,7 @@ function asnmRcInfo(r) {
         case 'failover': cls = 'asnm-warn'; txt = '↪ ' + r.got;           tip = t('rc_tip_fo', { dev: r.dev, ip: r.sample, got: r.got }); break;
         case 'blocked':  cls = 'asnm-warn'; txt = '⛔ ' + t('rc_blocked'); tip = t('rc_tip_blocked', { d: r.dest }); break;
         case 'pending':  cls = '';          txt = '… ' + t('rc_checking'); tip = t('rc_checking'); break;
-        case 'nolearned': cls = 'asnm-warn'; txt = '! ' + t('rc_nolearned'); tip = t('rc_tip_nolearned'); break;
+        case 'nolearned': cls = '';          txt = '… ' + t('rc_nolearned'); tip = t('rc_tip_nolearned'); break;
         default:         cls = 'asnm-warn'; txt = '! ' + t('rc_nosub');   tip = t('rc_tip_nosub');
     }
     if (r.recent >= 0) tip += '\n' + t('rc_tip_seen', { dev: r.dev, b: asnmFmtBytes(r.recent) });

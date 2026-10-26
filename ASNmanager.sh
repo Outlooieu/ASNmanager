@@ -1049,7 +1049,9 @@ cu_check_rows() {          # $1 = rc_out file, $2 = number of rows already writt
                 elif [ "$exp" != "$d" ]; then code=failover; fi
             fi
         fi
-        case "$code" in ok) state=ok ;; skipped|nolearned|norule|failover|blocked) state=warn ;; *) state=fail ;; esac
+        # nothing learned yet (no device has looked the name up since it was added / since a reinstall) is no fault:
+        # shown as a note, not as a warning - the same as for a domain whose target already has other addresses
+        case "$code" in ok|nolearned) state=ok ;; skipped|norule|failover|blocked) state=warn ;; *) state=fail ;; esac
         [ "$code" = "skipped" ] && code=ok
         dev=$(get_ifname "$d")
         [ $ccr_n -gt 0 ] && printf ',' >> "$1"
@@ -6566,7 +6568,7 @@ rc_print() {
             failover)  echo "[WARN] ${lbl} -> ${d}: ${d} is down - failover via ${got}" ;;
             blocked)   echo "[WARN] ${lbl} -> ${d}: ${d} is down - traffic blocked (failover)" ;;
             nosubnets) echo "[WARN] ${lbl} -> ${d}: no subnets loaded" ;;
-            nolearned) echo "[WARN] ${lbl} -> ${d}: no addresses learned yet (the devices must use the router as DNS server)" ;;
+            nolearned) echo "[INFO] ${lbl} -> ${d}: no addresses learned yet - they are learned when a device looks the name up through the router" ;;
         esac
     done
     [ -s "$EP_CACHE" ] && while read -r ep_ip ep_who; do echo "[INFO] VPN server $ep_ip ($ep_who) always goes via WAN"; done < "$EP_CACHE"
