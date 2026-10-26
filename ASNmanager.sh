@@ -6148,7 +6148,24 @@ fo_vpnd_sync() {
 # devices open them again through their own line. Meanwhile = the fallback (VPN Director follows) or WAN (the firmware
 # sends them there without kill switch). $1 = line that works again, $2 = line it used meanwhile
 fo_ct_reset() {
-    if fo_vpnd_on; then fo_ct_close "$1" "$2" back; else fo_ct_close "$1" WAN1 back; fi
+    if fo_vpnd_on; then fcr_l=$2; else fcr_l=WAN1; fi
+    # the address the fallback had (the firmware restarts all WireGuard clients when one comes back - the fallback may
+    # be down for a moment right now): remembered when the failover started
+    fcr_ip=$(cat "$FO_RT/ctip_$1" 2>/dev/null)
+    case "$fcr_l" in WAN*) fcr_ip="" ;; esac
+    # this round and the next two (connections may still be on their way back)
+    echo "$fcr_l $fcr_ip 3" > "$FO_RT/ctback_$1"
+}
+fo_ct_pending() {
+    for fcp_f in "$FO_RT"/ctback_*; do
+        [ -f "$fcp_f" ] || continue
+        fcp_t=${fcp_f##*/ctback_}; read -r fcp_l fcp_ip fcp_n < "$fcp_f"
+        case "$fcp_ip" in [0-9]*) ;; *) fcp_n=${fcp_ip:-1}; fcp_ip="" ;; esac
+        [ "$(cat "$FO_RT/active_$fcp_t" 2>/dev/null)" = "$fcp_t" ] && fo_ct_close "$fcp_t" "$fcp_l" back $fcp_ip
+        fcp_n=$((${fcp_n:-1} - 1))
+        if [ $fcp_n -le 0 ]; then rm -f "$fcp_f" "$FO_RT/ctip_$fcp_t"; else echo "$fcp_l $fcp_ip $fcp_n" > "$fcp_f"; fi
+    done
+    return 0
 }
 # closes the connections of the VPN Director devices of line $1 that leave through line $2 ($3: back = $1 works
 # again, moved = $1 is down and its devices go over the fallback now - those that went over WAN meanwhile, e.g. after a
@@ -6158,6 +6175,9 @@ fo_ct_close() {
     fr_l=$2
     case "$fr_l" in
         BLOCK|"") return 0 ;;
+        *) [ -n "$4" ] && fr_ip=$4 ;;
+    esac
+    [ -n "$4" ] || case "$fr_l" in
         WAN|WAN1) fr_ip=$(nvram get wan0_ipaddr) ;;
         WAN2) fr_ip=$(nvram get wan1_ipaddr) ;;
         *) fr_ip=$(ip -4 addr show "$(get_ifname "$fr_l")" 2>/dev/null | awk '/inet / { split($2, a, "/"); print a[1]; exit }') ;;
@@ -6268,7 +6288,8 @@ fo_round() {
             if [ "$fo_act" = "$fo_t" ]; then [ -n "$fo_old" ] && { logger -t ASNmanager "Failover: $fo_t works again - traffic via $fo_t"; fo_ct_old="$fo_ct_old $fo_t:$fo_old"; }
             elif [ "$fo_act" = "BLOCK" ]; then logger -t ASNmanager "Failover: $fo_t is down - traffic for its ASNs is blocked"
             else logger -t ASNmanager "Failover: $fo_t is down - traffic for its ASNs goes via $fo_act"
-                 case "$fo_act" in WAN*) ;; *) fo_ct_mv="$fo_ct_mv $fo_t" ;; esac; fi
+                 case "$fo_act" in WAN*) ;; *) fo_ct_mv="$fo_ct_mv $fo_t"
+                     ip -4 addr show "$(get_ifname "$fo_act")" 2>/dev/null | awk '/inet / { split($2, a, "/"); print a[1]; exit }' > "$FO_RT/ctip_$fo_t" ;; esac; fi
         fi
         fo_set_rule "$fo_t" "$fo_act"
         fo_self_rule "$fo_t" "$fo_act"
@@ -6276,6 +6297,7 @@ fo_round() {
     fo_vpnd_sync
     # after the rules are back: close the connections that still use the way of the outage
     for fo_x in $fo_ct_old; do fo_ct_reset "${fo_x%%:*}" "${fo_x#*:}"; done; fo_ct_old=""
+    fo_ct_pending
     if fo_vpnd_on; then for fo_x in $fo_ct_mv; do fo_ct_close "$fo_x" WAN1 moved; done; fi; fo_ct_mv=""
     fo_export
     [ $fo_changed -eq 1 ] && rc_check >/dev/null 2>&1
