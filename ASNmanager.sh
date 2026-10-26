@@ -803,6 +803,7 @@ cu_apply_dom() {
     cu_learned_restore $cad_fresh
     cu_seed_known /tmp/asnmanager-seed.ent
     cu_group_cleanup /tmp/asnmanager-seed.ent
+    cu_group_prune /tmp/asnmanager-seed.ent
     cp -f /tmp/asnmanager-seed.ent "$CU_IDMAP" 2>/dev/null; rm -f /tmp/asnmanager-seed.ent
     cu_dnsmasq_write /tmp/asnmanager-dnsmasq.lines "$cad_new"
     rm -f /tmp/asnmanager-dnsmasq.lines
@@ -869,6 +870,23 @@ agh_ipset_prune() {
     logger -t ASNmanager "AdGuard Home: lines of removed domain sets taken out of $aip_f (it would not start with them)"
 }
 
+# a group set may only hold addresses that one of its entries learned (each entry fills its own ASNC_<id> as well):
+# addresses of a removed or moved domain - also those put back from the saved copy - are taken out
+cu_group_prune() {
+    [ -s "$1" ] || return 0
+    for cgp_s in $(cut -f2 "$1" | sort -u); do
+        ipset list -n 2>/dev/null | grep -qx "$cgp_s" || continue
+        for cgp_id in $(awk -F'\t' -v s="$cgp_s" '$2 == s { print $1 }' "$1"); do
+            ipset list "ASNC_$cgp_id" 2>/dev/null | awk '/^Members:/ { f = 1; next } f && $1 ~ /^[0-9.]+$/ { print $1 }'
+        done > /tmp/asnmanager-gp.ok
+        ipset list "$cgp_s" 2>/dev/null | awk '/^Members:/ { f = 1; next } f && $1 ~ /^[0-9.]+$/ { print $1 }' > /tmp/asnmanager-gp.all
+        awk 'FILENAME == ARGV[1] { ok[$1] = 1; next } !($1 in ok)' /tmp/asnmanager-gp.ok /tmp/asnmanager-gp.all > /tmp/asnmanager-gp.del
+        while read -r cgp_ip; do ipset -q del "$cgp_s" "$cgp_ip"; done < /tmp/asnmanager-gp.del
+        [ -s /tmp/asnmanager-gp.del ] && logger -t ASNmanager "Domain routing: $(wc -l < /tmp/asnmanager-gp.del) address(es) in $cgp_s belonged to no domain entry any more - removed"
+    done
+    rm -f /tmp/asnmanager-gp.ok /tmp/asnmanager-gp.all /tmp/asnmanager-gp.del
+    return 0
+}
 cu_cset_cleanup() {
     for ccc_s in $(ipset list -n 2>/dev/null | grep '^ASNC_'); do
         cu_has "${ccc_s#ASNC_}" || { cu_rules_del "$ccc_s"; ipset destroy "$ccc_s" 2>/dev/null; }
