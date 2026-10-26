@@ -1037,9 +1037,10 @@ cu_check_rows() {          # $1 = rc_out file, $2 = number of rows already writt
             sample=$(cu_learned_ips "$cid" 1)
             [ -z "$sample" ] && [ -n "$cc_set" ] && sample=$(ipset list "$cc_set" 2>/dev/null | awk '/^Members:/ { f = 1; next } f && NF { print $1; exit }')
             if [ -z "$cc_set" ] || ! echo "$rc_rules" | grep -q -- "--match-set $cc_set dst"; then code=norule
-            elif [ -z "$sample" ]; then code=nolearned; fi
+            elif [ -z "$sample" ]; then code=nolearned; sample=9.9.9.9; fi     # nothing learned yet: the way is checked anyway
         fi
-        if [ "$code" = "ok" ]; then
+        if [ "$code" = "ok" ] || [ "$code" = "nolearned" ]; then
+            cc_nl=$code; code=ok
             if [ "$exp" != "BLOCK" ] && ! check_iface_up "$exp"; then code=down
             elif [ "$exp" = "BLOCK" ]; then code=blocked
             else
@@ -1048,8 +1049,11 @@ cu_check_rows() {          # $1 = rc_out file, $2 = number of rows already writt
                 elif [ "$got" != "$xdev" ]; then code=wrongdev
                 elif [ "$exp" != "$d" ]; then code=failover; fi
             fi
+            [ "$code" = "ok" ] && [ "$cc_nl" = "nolearned" ] && code=oknl         # the way is right, no address learned yet
         fi
-        case "$code" in ok) state=ok ;; skipped|nolearned|norule|failover|blocked) state=warn ;; *) state=fail ;; esac
+        # nothing learned yet (no device has looked the name up since it was added / since a reinstall) is no fault:
+        # shown as a note, not as a warning - the same as for a domain whose target already has other addresses
+        case "$code" in ok|oknl|nolearned) state=ok ;; skipped|norule|failover|blocked) state=warn ;; *) state=fail ;; esac
         [ "$code" = "skipped" ] && code=ok
         dev=$(get_ifname "$d")
         [ $ccr_n -gt 0 ] && printf ',' >> "$1"
@@ -1358,6 +1362,11 @@ backup_text() {
     echo "DNS_TLS=$(dnsf_tls_on && echo on || echo off)"
     echo "MAIL_NOTIFY=$(mail_mode)"
     echo "FO_VPND=$(fo_vpnd_on && echo on || echo off)"
+    # DNS of the VPN provider per line ("DNS fitting the line")
+    [ -s "$DNSF_CONF" ] && awk -F= '$1 ~ /^(OVPN|WGC)[1-5]$/ && $2 != "" { v = $2; gsub(/ +/, ",", v); print "DNS_SERVER_" $1 "=" v }' "$DNSF_CONF"
+    # own presets - from the router and from a USB device (restored to the router)
+    bt_p=$(cat /jffs/addons/asnmanager/presets.txt /tmp/mnt/*/ASNmanager/presets.txt 2>/dev/null | tr -d '\r' | grep -E '^[a-z]+\|[^|]+\|[^|]+\|(wide)?$' | awk '!s[$0]++')
+    if [ -n "$bt_p" ]; then echo "[PRESETS]"; echo "$bt_p"; fi
     return 0
 }
 
@@ -1392,6 +1401,7 @@ rs_scan() {
             /^\[SCHEDULE\]/ { f = d "/sched.txt"; next }
             /^\[FAILOVER\]/ { f = d "/fo.txt"; next }
             /^\[SETTINGS\]/ { f = d "/set.txt"; next }
+            /^\[PRESETS\]/ { f = d "/presets.txt"; next }
             /^\[/ { f = ""; next }
             /^#/ || /^[ \t]*$/ { next }
             f != "" { print > f }' "$RS_DIR/raw.txt"
@@ -1431,6 +1441,8 @@ rs_setting() {
         DNS_TLS:on|DNS_TLS:off)        dnsf_tls_set "$2" ;;
         MAIL_NOTIFY:off|MAIL_NOTIFY:daily|MAIL_NOTIFY:weekly)  mail_set "$2" ;;
         FO_VPND:on|FO_VPND:off)        fo_vpnd_set "$2" ;;
+        DNS_SERVER_OVPN[1-5]:*|DNS_SERVER_WGC[1-5]:*)
+                                       dnsf_server_set "${1#DNS_SERVER_}" $(echo "$2" | tr ',' ' '); return $? ;;
         FO_VPND:*|STATS:*|STATS_SAVING:*|STATS_MODE:*|RULES_MODE:*|WEBUI_LOCATION:*|SG_DOMAINS:*|DNS_FOLLOW:*|DNS_DEVICE:*|DNS_TLS:*|MAIL_NOTIFY:*)   echo "Invalid value '$2' for $1 skipped."; return 0 ;;
         *)                echo "Unknown setting '$1' skipped."; return 0 ;;
     esac
@@ -1470,7 +1482,10 @@ rs_apply() {
         while IFS='=' read -r ra_t ra_c; do [ -n "$ra_t" ] && fo_set "$ra_t" "$ra_c"; done < "$RS_DIR/fo.txt" ;;
     esac
     case "$ra_cats" in *,settings,*)
-        while IFS='=' read -r ra_k ra_v; do [ -n "$ra_k" ] && rs_setting "$ra_k" "$ra_v"; done < "$RS_DIR/set.txt" ;;
+        while IFS='=' read -r ra_k ra_v; do [ -n "$ra_k" ] && rs_setting "$ra_k" "$ra_v"; done < "$RS_DIR/set.txt"
+        if [ -s "$RS_DIR/presets.txt" ]; then
+            cli_pimport "$ra_mode" "$(awk '{ printf "%s%s", (NR > 1 ? ";" : ""), $0 }' "$RS_DIR/presets.txt" | sed 's/%/%25/g; s/ /%20/g')"
+        fi ;;
     esac
     [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1
     return 0
@@ -6555,7 +6570,8 @@ rc_print() {
             failover)  echo "[WARN] ${lbl} -> ${d}: ${d} is down - failover via ${got}" ;;
             blocked)   echo "[WARN] ${lbl} -> ${d}: ${d} is down - traffic blocked (failover)" ;;
             nosubnets) echo "[WARN] ${lbl} -> ${d}: no subnets loaded" ;;
-            nolearned) echo "[WARN] ${lbl} -> ${d}: no addresses learned yet (the devices must use the router as DNS server)" ;;
+            nolearned) echo "[INFO] ${lbl} -> ${d}: no addresses learned yet - they are learned when a device looks the name up through the router" ;;
+            oknl)      echo "[OK]   ${lbl} -> ${d}: goes via ${got} (no address learned yet - learned when a device looks the name up)" ;;
         esac
     done
     [ -s "$EP_CACHE" ] && while read -r ep_ip ep_who; do echo "[INFO] VPN server $ep_ip ($ep_who) always goes via WAN"; done < "$EP_CACHE"

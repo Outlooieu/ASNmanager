@@ -632,5 +632,7 @@ window.ASNM_LANGPACK = {"code": "br", "locale": "pt-BR", "name": "Português (Br
 "btn_devices": "Dispositivos e DNS",
 "act_devices": "Dispositivos e DNS",
 "agh_add": "Informar login",
+"rc_more": "mostrar mais {n}",
+"rc_less": "mostrar menos",
 "footer": "ASN Manager para Asuswrt-Merlin"
 }};
