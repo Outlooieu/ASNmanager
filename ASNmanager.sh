@@ -985,6 +985,8 @@ cu_purge() {
     cu_hook_sync ""
     rm -f "$(cu_save_jffs)" "$(cu_save_usb)" 2>/dev/null
     cu_dnsmasq_write /dev/null
+    # AdGuard Home (ipset copy of the Merlin installer) would not start with lines of sets that no longer exist
+    agh_ipset_prune >/dev/null 2>&1
     rm -f "$CU_GROUPS" "$CU_STATUS" /tmp/asnmanager-dnsmasq.lines
 }
 
