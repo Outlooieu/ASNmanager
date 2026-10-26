@@ -1,3 +1,9 @@
+## v3.9.27
+
+- **Backup holds more**: the DNS of the VPN provider per line, the switch "VPN Director follows the failover" and the own presets (also those on a USB device) - restored over SSH and in the WebUI
+- Routing check: a domain entry without learned addresses (e.g. after a reinstall) shows its line ("✓ wgc3", the way is checked with a test address) instead of a warning; the list of warnings and errors is shown below the apply buttons, 5 at first and the rest on demand
+- Failover: the switch "VPN Director follows the failover" sits below the chains in a box of its own (the chains work without it); "address(es) learned"
+
 ## v3.9.26
 
 - DNS card tidier: the AdGuard Home login is a short line under the device switch (the form opens on demand); a VPN line with its provider DNS shows a short "Edit" link; the device switch is renamed "Each device's DNS over its line" and explains what it adds (the traffic already follows the VPN Director - the switch sends the DNS of each device over its line through AdGuard Home and its filters, unlike a DNS set in the VPN client of the router)
