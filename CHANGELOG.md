@@ -1,3 +1,7 @@
+## v3.9.26
+
+- DNS card tidier: the AdGuard Home login is a short line under the device switch (the form opens on demand); a VPN line with its provider DNS shows a short "Edit" link; the device switch is renamed "Each device's DNS over its line" and explains what it adds (the traffic already follows the VPN Director - the switch sends the DNS of each device over its line through AdGuard Home and its filters, unlike a DNS set in the VPN client of the router)
+
 ## v3.9.25
 
 - **Fix: the WebUI no longer wipes the settings of other add-ons** (issue #3, thanks KingGLEB): the firmware rewrites `/jffs/addons/custom_settings.txt` from what a page submits, and ASN Manager only sent its own command - every click removed the settings other add-ons keep there. The page now sends them back with every command (read with `get_custom_settings()`, refreshed from the router after each job). Settings of other add-ons that were lost need to be set again once
