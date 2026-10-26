@@ -6359,9 +6359,10 @@ fo_cron_sync() {
         cru a ASN_Failover "* * * * * $SCRIPT_PATH failover run" 2>/dev/null
         ensure_script "$SERVICES_START"
         grep -q "# ${FO_HOOK}\$" "$SERVICES_START" 2>/dev/null || echo "$SCRIPT_PATH failover cron >/dev/null 2>&1 # ${FO_HOOK}" >> "$SERVICES_START"
-        # a VPN client is started / stopped (also by hand in the WebUI): check at once instead of at the next minute
+        # a VPN client is started / stopped (also by hand in the WebUI): check at once instead of at the next minute -
+        # three rounds 5 s apart, so a line that works again has its two good rounds within about 15 s
         ensure_script "$SERVICE_EVENT"
-        grep -q "# ${FO_HOOK}\$" "$SERVICE_EVENT" 2>/dev/null || echo 'case "$2" in wgc*|vpnclient*|wireguard*) (sleep 6; '"$SCRIPT_PATH"' failover once) </dev/null >/dev/null 2>&1 & ;; esac # '"${FO_HOOK}" >> "$SERVICE_EVENT"
+        grep -q "# ${FO_HOOK}\$" "$SERVICE_EVENT" 2>/dev/null || echo 'case "$2" in wgc*|vpnclient*|wireguard*) (sleep 6; '"$SCRIPT_PATH"' failover once; sleep 5; '"$SCRIPT_PATH"' failover once; sleep 5; '"$SCRIPT_PATH"' failover once) </dev/null >/dev/null 2>&1 & ;; esac # '"${FO_HOOK}" >> "$SERVICE_EVENT"
     else
         cru d ASN_Failover 2>/dev/null
         [ -f "$SERVICES_START" ] && sed -i "/# ${FO_HOOK}\$/d" "$SERVICES_START"
