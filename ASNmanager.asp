@@ -3314,6 +3314,10 @@ function asnmRcMap() {
 function asnmRcBadge(e, map) {
     var r = (map || asnmRcMap())[asnmNormDest(e.dest) + '|' + e.asn];
     if (!r) return '<span class="asnm-muted">-</span>';
+    var x = asnmRcInfo(r);
+    return '<span class="asnm-badge ' + x.cls + '" title="' + asnmEsc(x.tip) + '">' + asnmEsc(x.txt) + '</span>';
+}
+function asnmRcInfo(r) {
     var cls, txt, tip;
     switch (r.code) {
         case 'ok':       cls = 'asnm-ok';   txt = '✓ ' + r.got;           tip = t('rc_tip_ok', { ip: r.sample, dev: r.got }); break;
@@ -3328,7 +3332,25 @@ function asnmRcBadge(e, map) {
         default:         cls = 'asnm-warn'; txt = '! ' + t('rc_nosub');   tip = t('rc_tip_nosub');
     }
     if (r.recent >= 0) tip += '\n' + t('rc_tip_seen', { dev: r.dev, b: asnmFmtBytes(r.recent) });
-    return '<span class="asnm-badge ' + cls + '" title="' + asnmEsc(tip) + '">' + asnmEsc(txt) + '</span>';
+    return { cls: cls, txt: txt, tip: tip };
+}
+// the entries with a warning or an error, as "label - reason" lines (shown below the summary)
+function asnmRcIssues() {
+    var d = ASNM_RC.data, out = [], i, k, e, lab;
+    if (!d || !d.results) return out;
+    for (i = 0; i < d.results.length; i++) {
+        var r = d.results[i];
+        if (r.state === 'ok' || r.state === 'pending') continue;
+        lab = 'AS' + r.asn;
+        if (ASNM.data && ASNM.data.entries) for (k = 0; k < ASNM.data.entries.length; k++) {
+            e = ASNM.data.entries[k];
+            if (String(e.asn) === String(r.asn) && asnmNormDest(e.dest) === r.dest) { lab = asnmRcLabel(e); break; }
+        }
+        var x = asnmRcInfo(r);
+        out.push({ bad: r.state !== 'warn', html: '<span class="asnm-badge ' + x.cls + '">' + asnmEsc(x.txt) + '</span> <b>' + asnmEsc(lab) + '</b> → ' + asnmEsc(r.dest) +
+            '<div class="asnm-dev">' + asnmEsc(x.tip).replace(/\n/g, '<br>') + '</div>' });
+    }
+    return out;
 }
 
 function asnmRcFailed(r) { return r && r.state !== 'ok' && r.state !== 'warn' && r.state !== 'pending'; }
@@ -3394,6 +3416,10 @@ function asnmRcRender() {
         se.style.display = show ? '' : 'none';
         if (show) { var stx = document.getElementById('asnm_rc_err_txt'); stx.textContent = st.textContent; stx.className = st.className; }
     }
+    // which entries: listed below the summary (status card and diagnostics)
+    var iss = (d && !ASNM_RC.checking) ? asnmRcIssues() : [], ih = '';
+    for (i = 0; i < iss.length; i++) ih += '<div style="margin:4px 0 0 0;">' + iss[i].html + '</div>';
+    ['asnm_rc_err_list', 'asnm_rc_state_list'].forEach(function (id) { var el = document.getElementById(id); if (el) { el.innerHTML = ih; el.style.display = ih ? '' : 'none'; } });
     if (fail) {
         var fl = asnmRcFailedEntries(), names = [];
         for (i = 0; i < fl.length && i < 3; i++) names.push(asnmRcLabel(fl[i]));
@@ -3724,7 +3750,8 @@ function initial() {
     </div>
     <div class="asnm-kv" id="asnm_sched_err" style="display:none;"><span data-i18n="auto_refresh"></span>: <b class="asnm-rc-warn" data-i18n="sched_err"></b></div>
     <div class="asnm-kv" id="asnm_rc_err" style="display:none;"><span data-i18n="rc_title"></span>: <b id="asnm_rc_err_txt"></b>
-      <span class="asnm-link" style="margin-left: 8px;" data-i18n="rc_now" onclick="asnmRcCheck();"></span></div>
+      <span class="asnm-link" style="margin-left: 8px;" data-i18n="rc_now" onclick="asnmRcCheck();"></span>
+      <div id="asnm_rc_err_list" class="asnm-help" style="display:none;"></div></div>
     <div class="asnm-row">
       <input type="button" class="button_gen asnm-btn asnm-primary" data-i18n-value="btn_apply" onclick="asnmApply();"/>
       <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_full" data-i18n-title="btn_full_tip" onclick="asnmApplyFull();"/>
@@ -3852,7 +3879,8 @@ function initial() {
       <div class="asnm-kv"><span data-i18n="dns_lbl"></span>: <b id="asnm_dns_state">-</b></div>
       <div class="asnm-kv"><span data-i18n="auto_refresh"></span>: <b id="asnm_schedule_info">-</b></div>
       <div class="asnm-kv"><span data-i18n="rc_title"></span>: <b id="asnm_rc_state">-</b>
-        <span class="asnm-link" style="margin-left: 8px;" data-i18n="rc_now" onclick="asnmRcCheck();"></span></div>
+        <span class="asnm-link" style="margin-left: 8px;" data-i18n="rc_now" onclick="asnmRcCheck();"></span>
+        <div id="asnm_rc_state_list" class="asnm-help" style="display:none;"></div></div>
     </div>
     <div class="asnm-form">
       <div class="asnm-field asnm-full"><span class="asnm-label" data-i18n="domain_ip"></span>
