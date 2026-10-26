@@ -3342,7 +3342,11 @@ function asnmRcIssues() {
         var r = d.results[i];
         if (r.state === 'ok' || r.state === 'pending') continue;
         lab = 'AS' + r.asn;
-        if (ASNM.data && ASNM.data.entries) for (k = 0; k < ASNM.data.entries.length; k++) {
+        if (/^C\d+$/.test(r.asn)) {                         // own entry (domain / IP): its id
+            lab = r.asn;
+            var cl = (ASNM.data && ASNM.data.custom) || [];
+            for (k = 0; k < cl.length; k++) if (cl[k].id === r.asn) { lab = (cl[k].kind === 'dom' ? '*.' : '') + cl[k].value; break; }
+        } else if (ASNM.data && ASNM.data.entries) for (k = 0; k < ASNM.data.entries.length; k++) {
             e = ASNM.data.entries[k];
             if (String(e.asn) === String(r.asn) && asnmNormDest(e.dest) === r.dest) { lab = asnmRcLabel(e); break; }
         }
