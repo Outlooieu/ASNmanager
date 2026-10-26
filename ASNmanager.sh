@@ -6179,7 +6179,9 @@ fo_ct_pending() {
 # reboot before the failover took over, are closed and open again through the fallback)
 fo_ct_close() {
     [ -r "$VPND_FILE" ] || return 0
-    command -v conntrack >/dev/null 2>&1 || { logger -t ASNmanager "Failover: conntrack not found (PATH=$PATH) - old connections of $1 are not closed"; return 0; }
+    # by its path: "command -v" did not find it when cron started the script
+    fr_ct=""; for fr_x in /usr/sbin/conntrack /sbin/conntrack /usr/bin/conntrack /opt/sbin/conntrack; do [ -x "$fr_x" ] && { fr_ct=$fr_x; break; }; done
+    [ -n "$fr_ct" ] || { logger -t ASNmanager "Failover: conntrack not found - old connections of $1 are not closed"; return 0; }
     fr_l=$2
     case "$fr_l" in
         BLOCK|"") return 0 ;;
@@ -6194,7 +6196,7 @@ fo_ct_close() {
     fr_n=0
     for fr_s in $(tr '<' '\n' < "$VPND_FILE" | awk -F'>' -v t="$1" '$1 == "1" && $4 == "" { i = toupper($5); if (i == "WAN") i = "WAN1"
             if (i == t && $3 ~ /^[0-9.]+(\/32)?$/) { sub(/\/32$/, "", $3); print $3 } }'); do
-        fr_c=$(conntrack -D -s "$fr_s" -q "$fr_ip" 2>&1 | sed -n 's/.* \([0-9][0-9]*\) flow entries have been deleted.*/\1/p')
+        fr_c=$("$fr_ct" -D -s "$fr_s" -q "$fr_ip" 2>&1 | sed -n 's/.* \([0-9][0-9]*\) flow entries have been deleted.*/\1/p')
         fr_n=$((fr_n + ${fr_c:-0}))
     done
     if [ $fr_n -eq 0 ]; then
