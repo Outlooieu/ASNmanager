@@ -1357,6 +1357,7 @@ function asnmRenderIfaces() {
         if (i === ASNM.data.ifaces.length - 1) setTimeout(asnmFoRender, 0);
     }
     document.getElementById('asnm_ifaces').innerHTML = html + '</table>';
+    if (typeof ASNM_FO !== 'undefined' && ASNM_FO.data && !document.getElementById('asnm_fo').innerHTML) asnmFoRender();   // failover data came first
 }
 
 function asnmCountryName(cc, fallback) {
@@ -3610,6 +3611,8 @@ function asnmTab(id) {
     asnmTabBadges();
     if (id === 'settings') asnmPerfMark();
     if (id === 'diag') asnmDiagDevFill();
+    // targets: draw the failover table at once (its data may have come before the page data), fetch it fresh if missing
+    if (id === 'targets' && typeof ASNM_FO !== 'undefined') { if (ASNM_FO.data) asnmFoRender(); else asnmFoLoad(); }
     // inside its own tab the traffic card does not need to be opened first
     if (id === 'traffic' && typeof ASNM_TR !== 'undefined' && !ASNM_TR.open) asnmTrToggle();
 }
