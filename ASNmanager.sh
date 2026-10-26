@@ -2379,10 +2379,23 @@ dg_route_dev() {     # IP DEVICE-IP [MARK]
 dg_lan_probe() {     # an address in the LAN that no device uses (for "any device")
     echo "$(nvram get lan_ipaddr 2>/dev/null | cut -d. -f1-3).250"
 }
-dg_devname() {       # name of a device (DHCP list, then custom client list)
+dg_devname() {       # name of a device (DHCP list, then custom client list, then user name at the WireGuard server)
     dn_n=$(awk -v ip="$1" '$3 == ip && $4 != "*" { print $4; exit }' /var/lib/misc/dnsmasq.leases 2>/dev/null)
     [ -n "$dn_n" ] || dn_n=$(nvram get custom_clientlist 2>/dev/null | tr '<' '\n' | awk -F'>' -v ip="$1" '$4 == ip { print $1; exit }')
+    [ -n "$dn_n" ] || dn_n=$(wgs_name "$1")
     echo "$dn_n"
+}
+# user name of a client of the WireGuard server of the router (VPN > VPN server > WireGuard: "wgs1_c3_name" with
+# "wgs1_c3_addr=10.6.0.4/32"); the list is read from nvram at most every 5 minutes
+wgs_name() {
+    wn_c=/tmp/asnmanager-wgs.names
+    if [ ! -f "$wn_c" ] || [ $(( $(date +%s) - $(date -r "$wn_c" +%s 2>/dev/null || echo 0) )) -gt 300 ]; then
+        nvram show 2>/dev/null | awk -F= '
+            /^wgs[0-9]+_c[0-9]+_(addr|name)=/ { k = $1; v = substr($0, length($1) + 2); p = k; sub(/_(addr|name)$/, "", p)
+                if (k ~ /_addr$/) { sub(/\/.*/, "", v); a[p] = v } else n[p] = v }
+            END { for (p in a) if (a[p] != "" && n[p] != "") print a[p] "\t" n[p] }' > "$wn_c.new" 2>/dev/null && mv -f "$wn_c.new" "$wn_c"
+    fi
+    awk -F'\t' -v i="$1" '$1 == i { print $2; exit }' "$wn_c" 2>/dev/null
 }
 
 # explain <domain|IP> [device IP]: which entry catches it, which way it takes, what DNS answered
@@ -5053,6 +5066,7 @@ dnsd_name() {
         [ -n "$dn_mac" ] && dn_n=$(nvram get custom_clientlist 2>/dev/null | tr '<' '\n' | awk -F'>' -v m="$dn_mac" 'toupper($2) == m { print $1; exit }' | dnsd_clean)
         [ -n "$dn_n" ] || dn_n=$(awk -v i="$dn_ip" '$1 == i { print $2; exit }' /etc/hosts.dnsmasq /jffs/addons/YazDHCP.d/.hostnames 2>/dev/null | dnsd_clean)
         [ -n "$dn_n" ] || dn_n=$(awk -v i="$dn_ip" '$3 == i && $4 != "*" { print $4; exit }' /var/lib/misc/dnsmasq.leases 2>/dev/null | dnsd_clean)
+        [ -n "$dn_n" ] || dn_n=$(wgs_name "$dn_ip" | dnsd_clean)
     esac
     if [ -n "$dn_n" ]; then
         if [ "$(awk -F'\t' -v i="$dn_ip" '$1 == i { print $2; exit }' "$DNSD_NAMES" 2>/dev/null)" != "$dn_n" ]; then
