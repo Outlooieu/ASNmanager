@@ -6233,8 +6233,10 @@ fo_health() {
     hf="$FO_RT/h_$1"; hs=""; hok=0; hfl=0
     [ -f "$hf" ] && read -r hs hok hfl < "$hf"
     if fo_probe "$1"; then hok=$((hok + 1)); hfl=0; else hfl=$((hfl + 1)); hok=0; fi
-    # a VPN client that is switched off (its interface is gone) is down at once - no second ping round
-    case "$1" in OVPN*|WGC*) [ $hfl -gt 0 ] && ! check_iface_up "$1" >/dev/null 2>&1 && hfl=2 ;; esac
+    # a WireGuard client that is switched off in the WebUI is down at once - no second ping round. Only "switched off"
+    # (wgcN_enable=0): when one client is switched on or off the firmware restarts all of them ("restart wgc"), their
+    # interfaces are gone for a moment - that is no outage
+    case "$1" in WGC[1-5]) [ $hfl -gt 0 ] && [ "$(nvram get "wgc${1#WGC}_enable" 2>/dev/null)" = "0" ] && hfl=2 ;; esac
     if [ -z "$hs" ]; then if [ $hok -gt 0 ]; then hs=up; else hs=down; fi
     elif [ "$hs" = "up" ] && [ $hfl -ge 2 ]; then hs=down
     elif [ "$hs" = "down" ] && [ $hok -ge 2 ]; then hs=up; fi
@@ -6359,7 +6361,7 @@ fo_cron_sync() {
         grep -q "# ${FO_HOOK}\$" "$SERVICES_START" 2>/dev/null || echo "$SCRIPT_PATH failover cron >/dev/null 2>&1 # ${FO_HOOK}" >> "$SERVICES_START"
         # a VPN client is started / stopped (also by hand in the WebUI): check at once instead of at the next minute
         ensure_script "$SERVICE_EVENT"
-        grep -q "# ${FO_HOOK}\$" "$SERVICE_EVENT" 2>/dev/null || echo 'case "$2" in wgc*|vpnclient*|wireguard*) (sleep 2; '"$SCRIPT_PATH"' failover once) </dev/null >/dev/null 2>&1 & ;; esac # '"${FO_HOOK}" >> "$SERVICE_EVENT"
+        grep -q "# ${FO_HOOK}\$" "$SERVICE_EVENT" 2>/dev/null || echo 'case "$2" in wgc*|vpnclient*|wireguard*) (sleep 6; '"$SCRIPT_PATH"' failover once) </dev/null >/dev/null 2>&1 & ;; esac # '"${FO_HOOK}" >> "$SERVICE_EVENT"
     else
         cru d ASN_Failover 2>/dev/null
         [ -f "$SERVICES_START" ] && sed -i "/# ${FO_HOOK}\$/d" "$SERVICES_START"
