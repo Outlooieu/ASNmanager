@@ -207,7 +207,7 @@ window.ASNM_LANGPACK = {"code": "da", "locale": "da-DK", "name": "Dansk", "t": {
 "dw_f_title": "Websteder fra ASN Manager",
 "dw_f_desc": "Domæner og ASN på din liste slås op gennem deres mål - et websted på WAN spørger en DNS-server via WAN, et websted på WGC3 en gennem WGC3.",
 "dw_d_title": "DNS for hver enhed over dens linje",
-"dw_d_desc": "En enheds trafik går allerede over den linje, VPN Director giver den, men dens DNS-opslag går routerens vej. Med denne kontakt spørger hver enhed også sin linjes DNS. Kræver AdGuard Home (kun der har hver enhed sin egen DNS); uden AdGuard Home-login genstartes det kortvarigt ved ændringer.",
+"dw_d_desc": "En enheds trafik går over den linje, VPN Director giver den, dens DNS-opslag routerens vej - medmindre der er angivet en DNS i routerens VPN-klient: så omdirigerer routeren dem direkte dertil, uden om AdGuard Home og dens filtre. Med denne kontakt spørger hver enhed sin linjes DNS via AdGuard Home, med filtre. Kræver AdGuard Home; uden AdGuard Home-login genstartes det kortvarigt ved ændringer.",
 "dw_t_title": "Krypter forespørgsler via WAN",
 "dw_t_desc": "Det, der slås op via WAN, sendes som DNS over TLS - din udbyder ser ikke længere navnene. Forespørgsler gennem et VPN beskyttes alligevel af tunnelen.",
 "dw_now": "Sådan kører det nu",

@@ -207,7 +207,7 @@ window.ASNM_LANGPACK = {"code": "cz", "locale": "cs-CZ", "name": "Čeština", "t
 "dw_f_title": "Stránky z ASN Manageru",
 "dw_f_desc": "Domény a ASN z vašeho seznamu se překládají přes svůj cíl - stránka na WAN se ptá serveru DNS přes WAN, stránka na WGC3 serveru přes WGC3.",
 "dw_d_title": "DNS každého zařízení přes jeho linku",
-"dw_d_desc": "Provoz zařízení už jde linkou, kterou mu přidělí VPN Director, jeho DNS dotazy ale cestou routeru. S tímto přepínačem se každé zařízení ptá i DNS své linky. Vyžaduje AdGuard Home (jen tam má každé zařízení vlastní DNS); bez přihlášení AdGuard Home se při změnách krátce restartuje.",
+"dw_d_desc": "Provoz zařízení jde linkou, kterou mu přidělí VPN Director, jeho DNS dotazy cestou routeru - pokud ve VPN klientovi routeru není zadané DNS: pak je router přesměruje rovnou tam, mimo AdGuard Home a jeho filtry. S tímto přepínačem se každé zařízení ptá DNS své linky přes AdGuard Home, s filtry. Vyžaduje AdGuard Home; bez přihlášení AdGuard Home se při změnách krátce restartuje.",
 "dw_t_title": "Šifrovat dotazy přes WAN",
 "dw_t_desc": "Co se překládá přes WAN, odchází jako DNS over TLS - váš poskytovatel už názvy nevidí. Dotazy přes VPN chrání tunel tak jako tak.",
 "dw_now": "Jak to teď běží",

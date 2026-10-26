@@ -207,7 +207,7 @@ window.ASNM_LANGPACK = {"code": "ro", "locale": "ro-RO", "name": "Română", "t"
 "dw_f_title": "Site-urile din ASN Manager",
 "dw_f_desc": "Domeniile și ASN-urile din lista ta sunt rezolvate prin ținta lor - un site pe WAN întreabă un server DNS prin WAN, un site pe WGC3 unul prin WGC3.",
 "dw_d_title": "DNS-ul fiecărui dispozitiv prin linia sa",
-"dw_d_desc": "Traficul unui dispozitiv merge deja pe linia dată de VPN Director, dar interogările DNS urmează calea routerului. Cu acest comutator fiecare dispozitiv întreabă și DNS-ul liniei sale. Necesită AdGuard Home (doar acolo fiecare dispozitiv are DNS propriu); fără autentificarea AdGuard Home este repornit scurt la modificări.",
+"dw_d_desc": "Traficul unui dispozitiv merge pe linia dată de VPN Director, interogările DNS pe calea routerului - cu excepția cazului în care în clientul VPN al routerului este introdus un DNS: atunci routerul le redirecționează direct acolo, ocolind AdGuard Home și filtrele sale. Cu acest comutator fiecare dispozitiv întreabă DNS-ul liniei sale prin AdGuard Home, cu filtre. Necesită AdGuard Home; fără autentificarea AdGuard Home este repornit scurt la modificări.",
 "dw_t_title": "Criptează interogările prin WAN",
 "dw_t_desc": "Ce se rezolvă prin WAN pleacă ca DNS over TLS - furnizorul tău nu mai vede numele. Interogările printr-un VPN sunt oricum protejate de tunel.",
 "dw_now": "Cum funcționează acum",

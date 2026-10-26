@@ -207,7 +207,7 @@ window.ASNM_LANGPACK = {"code": "es", "locale": "es-ES", "name": "Español", "t"
 "dw_f_title": "Sitios de ASN Manager",
 "dw_f_desc": "Los dominios y ASN de tu lista se resuelven a través de su destino - un sitio en la WAN consulta un servidor DNS por la WAN, un sitio en WGC3 uno a través de WGC3.",
 "dw_d_title": "DNS de cada dispositivo por su línea",
-"dw_d_desc": "El tráfico de un dispositivo ya va por la línea que le da el VPN Director, pero sus consultas DNS siguen el camino del router. Con este interruptor cada dispositivo consulta también el DNS de su línea. Necesita AdGuard Home (solo allí cada dispositivo tiene su propio DNS); sin el inicio de sesión de AdGuard Home se reinicia brevemente con los cambios.",
+"dw_d_desc": "El tráfico de un dispositivo va por la línea que le da el VPN Director, sus consultas DNS por el camino del router - salvo que haya un DNS en el cliente VPN del router: entonces el router las redirige directamente allí, saltándose AdGuard Home y sus filtros. Con este interruptor cada dispositivo consulta el DNS de su línea a través de AdGuard Home, con sus filtros. Necesita AdGuard Home; sin el inicio de sesión de AdGuard Home se reinicia brevemente con los cambios.",
 "dw_t_title": "Cifrar las consultas por la WAN",
 "dw_t_desc": "Lo que se resuelve por la WAN sale como DNS over TLS - tu proveedor ya no ve los nombres. Las consultas a través de una VPN ya están protegidas por el túnel.",
 "dw_now": "Cómo funciona ahora",

@@ -207,7 +207,7 @@ window.ASNM_LANGPACK = {"code": "nl", "locale": "nl-NL", "name": "Nederlands", "
 "dw_f_title": "Sites van ASN Manager",
 "dw_f_desc": "Domeinen en ASN's op je lijst worden via hun doel opgezocht - een site op WAN vraagt een DNS-server via WAN, een site op WGC3 een server via WGC3.",
 "dw_d_title": "DNS van elk apparaat via zijn lijn",
-"dw_d_desc": "Het verkeer van een apparaat gaat al via de lijn die de VPN Director het geeft, maar zijn DNS-opzoekingen via de weg van de router. Hiermee vraagt elk apparaat ook de DNS van zijn lijn. Vereist AdGuard Home (alleen daar heeft elk apparaat een eigen DNS); zonder AdGuard Home-login wordt het bij wijzigingen kort herstart.",
+"dw_d_desc": "Het verkeer van een apparaat gaat via de lijn die de VPN Director het geeft, zijn DNS-opzoekingen via de weg van de router - tenzij in de VPN-client van de router een DNS is ingevuld: dan stuurt de router ze rechtstreeks daarheen, langs AdGuard Home en zijn filters. Hiermee vraagt elk apparaat de DNS van zijn lijn via AdGuard Home, met filters. Vereist AdGuard Home; zonder AdGuard Home-login wordt het bij wijzigingen kort herstart.",
 "dw_t_title": "Queries via WAN versleutelen",
 "dw_t_desc": "Wat via WAN wordt opgezocht, gaat als DNS over TLS naar buiten - je provider ziet de namen niet meer. Queries via een VPN worden sowieso door de tunnel beschermd.",
 "dw_now": "Zo werkt het nu",

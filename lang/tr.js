@@ -207,7 +207,7 @@ window.ASNM_LANGPACK = {"code": "tr", "locale": "tr-TR", "name": "Türkçe", "t"
 "dw_f_title": "ASN Manager'daki siteler",
 "dw_f_desc": "Listenizdeki alan adları ve ASN'ler kendi hedefleri üzerinden çözülür - WAN'daki bir site WAN üzerinden bir DNS sunucusuna, WGC3'teki bir site WGC3 üzerinden birine sorar.",
 "dw_d_title": "Her cihazın DNS'i kendi hattı üzerinden",
-"dw_d_desc": "Bir cihazın trafiği zaten VPN Director'ün verdiği hattan gider, DNS sorguları ise yönlendiricinin yolundan. Bu anahtarla her cihaz kendi hattının DNS'ine de sorar. AdGuard Home gerekir (yalnızca orada her cihazın kendi DNS'i olur); AdGuard Home girişi olmadan değişikliklerde kısa süre yeniden başlatılır.",
+"dw_d_desc": "Bir cihazın trafiği VPN Director'ün verdiği hattan gider, DNS sorguları yönlendiricinin yolundan - yönlendiricinin VPN istemcisine bir DNS girilmişse hariç: o zaman yönlendirici onları AdGuard Home'u ve filtrelerini atlayarak doğrudan oraya yönlendirir. Bu anahtarla her cihaz kendi hattının DNS'ine AdGuard Home üzerinden, filtrelerle sorar. AdGuard Home gerekir; AdGuard Home girişi olmadan değişikliklerde kısa süre yeniden başlatılır.",
 "dw_t_title": "WAN üzerinden sorguları şifrele",
 "dw_t_desc": "WAN üzerinden çözülenler DNS over TLS olarak gider - sağlayıcınız adları artık görmez. VPN üzerinden giden sorguları zaten tünel korur.",
 "dw_now": "Şu an nasıl çalışıyor",

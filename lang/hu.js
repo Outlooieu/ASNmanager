@@ -207,7 +207,7 @@ window.ASNM_LANGPACK = {"code": "hu", "locale": "hu-HU", "name": "Magyar", "t": 
 "dw_f_title": "Az ASN Manager oldalai",
 "dw_f_desc": "A listád domainjei és ASN-jei a céljukon át oldódnak fel - egy WAN-on lévő oldal WAN-on keresztül kérdez DNS-szervert, egy WGC3-on lévő WGC3-on át.",
 "dw_d_title": "Minden eszköz DNS-e a saját vonalán",
-"dw_d_desc": "Egy eszköz forgalma már a VPN Director által adott vonalon megy, DNS-lekérdezései viszont a router útján. Ezzel minden eszköz a saját vonala DNS-ét is kérdezi. AdGuard Home kell hozzá (csak ott van minden eszköznek saját DNS-e); AdGuard Home bejelentkezés nélkül változáskor röviden újraindul.",
+"dw_d_desc": "Egy eszköz forgalma a VPN Director által adott vonalon megy, DNS-lekérdezései a router útján - kivéve, ha a router VPN-kliensében meg van adva egy DNS: ekkor a router közvetlenül oda irányítja őket, az AdGuard Home-ot és szűrőit megkerülve. Ezzel minden eszköz a saját vonala DNS-ét kérdezi az AdGuard Home-on át, szűrőkkel. AdGuard Home kell hozzá; AdGuard Home bejelentkezés nélkül változáskor röviden újraindul.",
 "dw_t_title": "WAN-on menő lekérdezések titkosítása",
 "dw_t_desc": "A WAN-on feloldott nevek DNS over TLS-ként mennek ki - a szolgáltatód nem látja többé a neveket. A VPN-en menő lekérdezéseket amúgy is védi az alagút.",
 "dw_now": "Így működik most",

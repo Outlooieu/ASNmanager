@@ -207,7 +207,7 @@ window.ASNM_LANGPACK = {"code": "sl", "locale": "sl-SI", "name": "Slovenščina"
 "dw_f_title": "Strani iz ASN Manager",
 "dw_f_desc": "Domene in ASN z vašega seznama se razrešijo prek svojega cilja - stran na WAN vpraša strežnik DNS prek WAN, stran na WGC3 enega skozi WGC3.",
 "dw_d_title": "DNS vsake naprave prek njene linije",
-"dw_d_desc": "Promet naprave že gre po liniji, ki ji jo da VPN Director, njene poizvedbe DNS pa po poti usmerjevalnika. S tem stikalom vsaka naprava vpraša tudi DNS svoje linije. Potrebuje AdGuard Home (le tam ima vsaka naprava svoj DNS); brez prijave v AdGuard Home se ob spremembah na kratko ponovno zažene.",
+"dw_d_desc": "Promet naprave gre po liniji, ki ji jo da VPN Director, njene poizvedbe DNS po poti usmerjevalnika - razen če je v VPN-odjemalcu usmerjevalnika vnesen DNS: takrat jih usmerjevalnik preusmeri naravnost tja, mimo AdGuard Home in njegovih filtrov. S tem stikalom vsaka naprava vpraša DNS svoje linije prek AdGuard Home, s filtri. Potrebuje AdGuard Home; brez prijave v AdGuard Home se ob spremembah na kratko ponovno zažene.",
 "dw_t_title": "Šifriraj poizvedbe prek WAN",
 "dw_t_desc": "Kar se razreši prek WAN, gre ven kot DNS over TLS - vaš ponudnik imen ne vidi več. Poizvedbe skozi VPN tako ali tako ščiti tunel.",
 "dw_now": "Kako deluje zdaj",
