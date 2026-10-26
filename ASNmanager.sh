@@ -2466,7 +2466,7 @@ cli_devices() {
     echo "Devices active right now (seen by the router in the last minutes):"
     printf '%-15s %-20s %-7s %-34s %s\n' "IP" "NAME" "WAY" "CONNECTIONS NOW (per line)" "DNS"
     dvs_k=/tmp/asnmanager-dvs.keys; : > "$dvs_k"
-    awk '$3 == "0x2" && $6 ~ /^br/ { print $1 }' /proc/net/arp 2>/dev/null | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | while read -r dvs_ip; do
+    awk '$3 == "0x2" && $6 ~ /^br/ && $1 !~ /^169\.254\./ { print $1 }' /proc/net/arp 2>/dev/null | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | while read -r dvs_ip; do
         dvs_w=$(dg_target_of_dev "$(dg_route_dev 1.1.1.1 "$dvs_ip")")
         dvs_l=$(awk -v ip="$dvs_ip" -v nf="$dvs_n" 'BEGIN { while ((getline l < nf) > 0) { split(l, a, " "); w[a[1]] = a[2] } }
             { k = 0; s = ""; for (i = 1; i <= NF; i++) { if ($i ~ /^src=/ && s == "") s = substr($i, 5); if ($i ~ /^dst=/) { k++; if (k == 2) d = substr($i, 5) } }
@@ -5037,9 +5037,10 @@ dnsd_apply() {
         dnsd_foreign_ids "$da_y" | sort -u > "$da_tmp/foreign"
         : > "$da_tmp/names"
         for da_t in $( { cut -d' ' -f1 "$da_tmp/groups"; echo WAN1; } | sort -u); do
-            # failover (with "VPN Director follows the failover"): the devices of a target that is down look up through
-            # the line their traffic uses now (the client keeps its name)
-            da_e=$da_t; da_a=""; fo_vpnd_on && da_a=$(awk -v t="$da_t" '$1 == t && $2 != "BLOCK" { print $2 }' "$4" 2>/dev/null)
+            # failover: the devices of a target that is down look up through the DNS of the line in use - also when the
+            # VPN Director does not follow (its devices then go over WAN or are blocked by the firmware; their DNS
+            # still never goes over WAN and does not stay on the dead line). The client keeps its name.
+            da_e=$da_t; da_a=$(awk -v t="$da_t" '$1 == t && $2 != "BLOCK" { print $2 }' "$4" 2>/dev/null)
             [ -n "$da_a" ] && { [ "$da_a" = "$2" ] || grep -q "^$da_a " "$1"; } && da_e=$da_a
             da_same=0; [ "$da_e" = "$2" ] && [ "$(echo "$2" | cut -c1-3)" = "WAN" ] && da_same=1   # normal DNS goes over WAN
             da_srv=""; [ "$da_e" != "$2" ] && da_srv=$(awk -v t="$da_e" '$1 == t { $1 = ""; print }' "$1")
