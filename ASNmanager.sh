@@ -6,6 +6,12 @@ version=3.9.23
 # (only if a terminal exists - without one, e.g. in an automated install, a failing "exec <" would end the shell)
 [ $# -eq 0 ] && ! [ -t 0 ] && ( exec < /dev/tty ) 2>/dev/null && exec < /dev/tty
 
+# cron, service-event and the WebUI start the script with a short PATH: the tools in /usr/sbin and /opt (conntrack,
+# ip, ...) must be found there as well
+case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH" ;; esac
+case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
+export PATH
+
 SCRIPT_VERSION="3.9.23"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
@@ -654,6 +660,20 @@ cu_apply_ip() {
 # dnsmasq keeps a DNS cache?  (cache-size=0 = off, e.g. when AdGuard Home answers in front of it)
 cu_dnsmasq_cache_on() { ! grep -qE '^cache-size=0[[:space:]]*$' /etc/dnsmasq.conf 2>/dev/null; }
 
+# dnsmasq.conf.add with one of our blocks put in (at its old place, so the other blocks do not move - a moved block
+# looked like a change to the next writer and restarted dnsmasq a second time) or taken out ($3 empty / no file)
+# dm_block <begin> <end> <file with the lines> : prints the new dnsmasq.conf.add
+dm_block() {
+    awk -v b="$1" -v e="$2" -v f="$3" '
+        BEGIN { if (f != "") while ((getline l < f) > 0) add = add l "\n" }
+        $0 == b { skip = 1; if (add != "" && !done) printf "%s\n%s%s\n", b, add, e; done = 1; next }
+        skip { if ($0 == e) skip = 0; next }
+        { print }
+        END { if (add != "" && !done) printf "%s\n%s%s\n", b, add, e }' "${DNSMASQ_ADD}" 2>/dev/null
+    [ -f "$DNSMASQ_ADD" ] || { [ -n "$3" ] && [ -s "$3" ] && { echo "$1"; cat "$3"; echo "$2"; }; }
+    return 0
+}
+
 # writes (or removes) our block in dnsmasq.conf.add; dnsmasq is restarted only when the block changed.
 # $2 = force: a domain set was just created. dnsmasq adds an address only when it fetches the answer from its
 # upstream, not when it answers from its cache - so the cache is emptied with SIGHUP (no restart, DNS keeps
@@ -661,8 +681,7 @@ cu_dnsmasq_cache_on() { ! grep -qE '^cache-size=0[[:space:]]*$' /etc/dnsmasq.con
 # start-up of other DNS add-ons (AdGuard Home moves dnsmasq to another port, Unbound ...).
 cu_dnsmasq_write() {
     cdw_new=/tmp/asnmanager-dnsmasq.new
-    if [ -f "$DNSMASQ_ADD" ]; then sed "/^${CU_BEGIN}\$/,/^${CU_END}\$/d" "$DNSMASQ_ADD" > "$cdw_new"; else : > "$cdw_new"; fi
-    if [ -s "$1" ]; then { echo "$CU_BEGIN"; cat "$1"; echo "$CU_END"; } >> "$cdw_new"; fi
+    if [ -s "$1" ]; then dm_block "$CU_BEGIN" "$CU_END" "$1"; else dm_block "$CU_BEGIN" "$CU_END" ""; fi > "$cdw_new"
     if [ -f "$DNSMASQ_ADD" ]; then cdw_cur="$DNSMASQ_ADD"; else cdw_cur=/dev/null; fi
     if cmp -s "$cdw_new" "$cdw_cur"; then
         rm -f "$cdw_new"
@@ -759,23 +778,37 @@ cu_hook_sync() {
     return 0
 }
 
+# one at a time: two runs at once (e.g. the nightly WAN reconnect starts firewall and VPN clients again while the
+# check runs) shared their work files - one saw half a list and took the addresses of many entries out of their sets
+CU_LOCK=/tmp/asnmanager-cu.lock
 cu_apply_dom() {
-    : > "$CU_GROUPS.raw"; : > /tmp/asnmanager-dnsmasq.lines; : > /tmp/asnmanager-seed.ent; cad_new=""; cad_fresh=""
+    cl_i=0
+    while ! mkdir "$CU_LOCK" 2>/dev/null; do
+        if [ -n "$(find "$CU_LOCK" -maxdepth 0 -mmin +5 2>/dev/null)" ]; then rm -rf "$CU_LOCK"; continue; fi
+        cl_i=$((cl_i + 1)); [ $cl_i -ge 120 ] && { logger -t ASNmanager "Domain routing: another run did not finish - skipped"; return 1; }
+        sleep 1
+    done
+    cu_apply_dom_run "$@"; cl_rc=$?
+    rmdir "$CU_LOCK" 2>/dev/null
+    return $cl_rc
+}
+cu_apply_dom_run() {
+    : > "$CU_GROUPS.raw.$$"; : > /tmp/asnmanager-dnsmasq.$$; : > /tmp/asnmanager-seed.$$; cad_new=""; cad_fresh=""
     if [ -s "$CUSTOM_FILE" ]; then
         while IFS=: read -r cid cdest csrc ckind cval; do
             [ "$ckind" = "dom" ] || continue
             case "$cid" in C[0-9]*) ;; *) continue ;; esac
             cad_key="${cdest}|${csrc}"
             cad_set="ASND_${cdest}_$(echo "$cad_key" | md5sum | cut -c1-6)"
-            printf '%s\t%s\t%s\n' "$cad_key" "$cad_set" "$cval" >> "$CU_GROUPS.raw"
+            printf '%s\t%s\t%s\n' "$cad_key" "$cad_set" "$cval" >> "$CU_GROUPS.raw.$$"
             # one line per domain: the group set routes, the entry's own set counts what was learned for this domain
             [ "$(cu_set_make "ASNC_$cid")" = "new" ] && { cad_new=force; cad_fresh="$cad_fresh ASNC_$cid"; }
-            echo "ipset=/$cval/$cad_set,ASNC_$cid" >> /tmp/asnmanager-dnsmasq.lines
-            printf '%s\t%s\t%s\n' "$cid" "$cad_set" "$cval" >> /tmp/asnmanager-seed.ent
+            echo "ipset=/$cval/$cad_set,ASNC_$cid" >> /tmp/asnmanager-dnsmasq.$$
+            printf '%s\t%s\t%s\n' "$cid" "$cad_set" "$cval" >> /tmp/asnmanager-seed.$$
         done < "$CUSTOM_FILE"
     fi
-    awk -F'\t' '{ if ($1 in l) l[$1] = l[$1] " " $3; else { l[$1] = $3; s[$1] = $2 } } END { for (k in l) printf "%s\t%s\t%s\n", k, s[k], l[k] }' "$CU_GROUPS.raw" > "$CU_GROUPS.new"
-    mv -f "$CU_GROUPS.new" "$CU_GROUPS"; rm -f "$CU_GROUPS.raw"
+    awk -F'\t' '{ if ($1 in l) l[$1] = l[$1] " " $3; else { l[$1] = $3; s[$1] = $2 } } END { for (k in l) printf "%s\t%s\t%s\n", k, s[k], l[k] }' "$CU_GROUPS.raw.$$" > "$CU_GROUPS.new.$$"
+    mv -f "$CU_GROUPS.new.$$" "$CU_GROUPS"; rm -f "$CU_GROUPS.raw.$$"
     # marking rules of every domain set go (they are added again below); sets of groups that no longer exist are destroyed
     for cad_s in $(ipset list -n 2>/dev/null | grep '^ASND_'); do
         cu_rules_del "$cad_s"
@@ -788,11 +821,12 @@ cu_apply_dom() {
         if cu_usable "$cad_t"; then cu_route "$cad_t"; cu_rules_add "$cad_set" "$cad_t" "$cad_src"; fi
     done < "$CU_GROUPS"
     cu_learned_restore $cad_fresh
-    cu_seed_known /tmp/asnmanager-seed.ent
-    cu_group_cleanup /tmp/asnmanager-seed.ent
-    cp -f /tmp/asnmanager-seed.ent "$CU_IDMAP" 2>/dev/null; rm -f /tmp/asnmanager-seed.ent
-    cu_dnsmasq_write /tmp/asnmanager-dnsmasq.lines "$cad_new"
-    rm -f /tmp/asnmanager-dnsmasq.lines
+    cu_seed_known /tmp/asnmanager-seed.$$
+    cu_group_cleanup /tmp/asnmanager-seed.$$
+    cu_group_prune /tmp/asnmanager-seed.$$
+    cp -f /tmp/asnmanager-seed.$$ "$CU_IDMAP" 2>/dev/null; rm -f /tmp/asnmanager-seed.$$
+    cu_dnsmasq_write /tmp/asnmanager-dnsmasq.$$ "$cad_new"
+    rm -f /tmp/asnmanager-dnsmasq.$$
     cu_cset_cleanup
     agh_ipset_prune
     cu_hook_sync "$(cut -f2 "$CU_GROUPS" 2>/dev/null)"
@@ -856,6 +890,23 @@ agh_ipset_prune() {
     logger -t ASNmanager "AdGuard Home: lines of removed domain sets taken out of $aip_f (it would not start with them)"
 }
 
+# a group set may only hold addresses that one of its entries learned (each entry fills its own ASNC_<id> as well):
+# addresses of a removed or moved domain - also those put back from the saved copy - are taken out
+cu_group_prune() {
+    [ -s "$1" ] || return 0
+    for cgp_s in $(cut -f2 "$1" | sort -u); do
+        ipset list -n 2>/dev/null | grep -qx "$cgp_s" || continue
+        for cgp_id in $(awk -F'\t' -v s="$cgp_s" '$2 == s { print $1 }' "$1"); do
+            ipset list "ASNC_$cgp_id" 2>/dev/null | awk '/^Members:/ { f = 1; next } f && $1 ~ /^[0-9.]+$/ { print $1 }'
+        done > /tmp/asnmanager-gp.ok
+        ipset list "$cgp_s" 2>/dev/null | awk '/^Members:/ { f = 1; next } f && $1 ~ /^[0-9.]+$/ { print $1 }' > /tmp/asnmanager-gp.all
+        awk 'FILENAME == ARGV[1] { ok[$1] = 1; next } !($1 in ok)' /tmp/asnmanager-gp.ok /tmp/asnmanager-gp.all > /tmp/asnmanager-gp.del
+        while read -r cgp_ip; do ipset -q del "$cgp_s" "$cgp_ip"; done < /tmp/asnmanager-gp.del
+        [ -s /tmp/asnmanager-gp.del ] && logger -t ASNmanager "Domain routing: $(wc -l < /tmp/asnmanager-gp.del) address(es) in $cgp_s belonged to no domain entry any more - removed"
+    done
+    rm -f /tmp/asnmanager-gp.ok /tmp/asnmanager-gp.all /tmp/asnmanager-gp.del
+    return 0
+}
 cu_cset_cleanup() {
     for ccc_s in $(ipset list -n 2>/dev/null | grep '^ASNC_'); do
         cu_has "${ccc_s#ASNC_}" || { cu_rules_del "$ccc_s"; ipset destroy "$ccc_s" 2>/dev/null; }
@@ -1304,6 +1355,7 @@ backup_text() {
     echo "DNS_DEVICE=$(dnsd_on && echo on || echo off)"
     echo "DNS_TLS=$(dnsf_tls_on && echo on || echo off)"
     echo "MAIL_NOTIFY=$(mail_mode)"
+    echo "FO_VPND=$(fo_vpnd_on && echo on || echo off)"
     return 0
 }
 
@@ -1376,7 +1428,8 @@ rs_setting() {
         DNS_DEVICE:on|DNS_DEVICE:off)  dnsd_set "$2" ;;
         DNS_TLS:on|DNS_TLS:off)        dnsf_tls_set "$2" ;;
         MAIL_NOTIFY:off|MAIL_NOTIFY:daily|MAIL_NOTIFY:weekly)  mail_set "$2" ;;
-        STATS:*|STATS_SAVING:*|STATS_MODE:*|RULES_MODE:*|WEBUI_LOCATION:*|SG_DOMAINS:*|DNS_FOLLOW:*|DNS_DEVICE:*|DNS_TLS:*|MAIL_NOTIFY:*)   echo "Invalid value '$2' for $1 skipped."; return 0 ;;
+        FO_VPND:on|FO_VPND:off)        fo_vpnd_set "$2" ;;
+        FO_VPND:*|STATS:*|STATS_SAVING:*|STATS_MODE:*|RULES_MODE:*|WEBUI_LOCATION:*|SG_DOMAINS:*|DNS_FOLLOW:*|DNS_DEVICE:*|DNS_TLS:*|MAIL_NOTIFY:*)   echo "Invalid value '$2' for $1 skipped."; return 0 ;;
         *)                echo "Unknown setting '$1' skipped."; return 0 ;;
     esac
     echo "Setting applied: $1 = $2."
@@ -2359,6 +2412,128 @@ cli_explain() {
 }
 
 # device <IP>: which rules apply to a device and where its traffic goes right now
+# ---------- DNS of a device, overview of all devices ----------
+# AdGuard Home clients: "id<TAB>name<TAB>plain upstreams<TAB>number of own DNS rules for single sites"
+dg_agh_clients() {
+    dac_y=$(agh_yaml) || return 0
+    awk '/^  persistent:/ { p = 1; next } p && /^  [a-z]/ { out(); p = 0 } !p { next }
+        function out(  i) { if (nm != "") for (i in id) print i "\t" nm "\t" u "\t" sp; split("", id); nm = ""; u = ""; sp = 0 }
+        /^    - / { out() }
+        { l = $0; sub(/^    - /, "      ", l) }
+        l ~ /^      name: / { nm = l; sub(/^      name: */, "", nm); gsub(/^["\047]|["\047][[:space:]]*$/, "", nm); s = ""; next }
+        l ~ /^      ids:/ { s = "i"; next } l ~ /^      upstreams:/ { s = "u"; next } l ~ /^      [a-z_]+:/ { s = ""; next }
+        /^        - / { v = $0; sub(/^        - /, "", v); gsub(/\047/, "", v)
+            if (s == "i") id[v] = 1
+            else if (s == "u") { if (v !~ /^\[/) u = u (u == "" ? "" : " ") v; else if (v !~ /:553$/ && v !~ /^\[\/[a-z.]*lan\/\]/ && v !~ /^\[\/\/\]/) sp++ } }
+        END { if (p) out() }' "$dac_y"
+}
+# one line: which DNS the device asks ($1 = device ip, $2 = file of dg_agh_clients)
+dg_dns_label() {
+    dd_norm="normal DNS: $(dnsf_base | awk '{ print $1 " via " $2 }')"
+    dd_l=""; [ -s "$2" ] && dd_l=$(awk -F'\t' -v i="$1" '
+        function n(s,  a) { split(s, a, "."); return ((a[1] * 256 + a[2]) * 256 + a[3]) * 256 + a[4] }
+        $1 == i { print; f = 1; exit }
+        $1 ~ /\// && b == "" { split($1, p, "/"); z = 2 ^ (32 - p[2]); if (int(n(p[1]) / z) == int(n(i) / z)) b = $0 }
+        END { if (!f && b != "") print b }' "$2")
+    if [ -z "$dd_l" ]; then echo "$dd_norm"; return 0; fi
+    dd_u=$(echo "$dd_l" | cut -f3); dd_sp=$(echo "$dd_l" | cut -f4)
+    if [ -z "$dd_u" ]; then dd_out="$dd_norm"
+    else
+        dd_out=$(for dd_x in $dd_u; do echo "$dd_x"; done | awk -v vm="$DNSF_VMAP" -v st="$DNSF_STATE" -v norm="$dd_norm" '
+            BEGIN { while ((getline l < vm) > 0) { split(l, a, " "); v[a[1]] = a[2]; vt[a[1]] = a[3] }
+                    while ((getline l < st) > 0) if (l ~ /^srv /) { k = split(l, a, " "); for (i = 3; i <= k; i++) t[a[i]] = a[2] } }
+            { x = $0
+              if (x ~ /:553$/) d = "dnsmasq (" norm ")"
+              else if (x in v) d = v[x] " (provider DNS, through " vt[x] ")"
+              else if (x ~ /^tls:\/\//) d = x " (encrypted)"
+              else if (x in t) d = x " (through " t[x] ")"
+              else d = x
+              if (!(d in seen)) { seen[d] = 1; o = o (o == "" ? "" : ", ") d } }
+            END { print o }')
+    fi
+    [ "${dd_sp:-0}" -gt 0 ] && dd_out="$dd_out + $dd_sp own DNS rule(s) for single sites"
+    echo "$dd_out"
+}
+# the server a device asks first ("normal" = global upstreams of AdGuard Home / dnsmasq)
+dg_dns_key() {
+    dk_l=""; [ -s "$2" ] && dk_l=$(awk -F'\t' -v i="$1" '
+        function n(s,  a) { split(s, a, "."); return ((a[1] * 256 + a[2]) * 256 + a[3]) * 256 + a[4] }
+        $1 == i { print $3; f = 1; exit }
+        $1 ~ /\// && !hb { split($1, p, "/"); z = 2 ^ (32 - p[2]); if (int(n(p[1]) / z) == int(n(i) / z)) { b = $3; hb = 1 } }
+        END { if (!f && hb) print b }' "$2")
+    dk_l=${dk_l%% *}
+    case "$dk_l" in ''|*:553) echo normal ;; *) echo "$dk_l" ;; esac
+}
+# the real resolver behind a DNS path: the address the name servers see (whoami.akamai.net answers with it), its name
+# and place - asked the same way the device asks (stand-ins and rules route it through the right line); cached 10 min
+dg_dns_real() {
+    dr_c=/tmp/asnmanager-dnsreal.cache; dr_now=$(date +%s)
+    dr_hit=$(awk -F'\t' -v k="$1" -v n="$dr_now" '$1 == k && n - $2 < 600 { print $3; exit }' "$dr_c" 2>/dev/null)
+    [ -n "$dr_hit" ] && { echo "$dr_hit"; return 0; }
+    dr_s=$1
+    case "$dr_s" in
+        normal) dr_s=127.0.0.1 ;;
+        tls://*) dr_n=${dr_s#tls://}; dr_s=""
+                 for dr_x in $(sed -n 's/^srv WAN[0-9]* //p' "$DNSF_STATE" 2>/dev/null); do [ "$(dnsf_tls_name "$dr_x")" = "$dr_n" ] && { dr_s=$dr_x; break; }; done
+                 [ -n "$dr_s" ] || { echo "?"; return 0; } ;;
+    esac
+    dr_ip=$(nslookup whoami.akamai.net "$dr_s" 2>/dev/null | awk '/^Name:/ { f = 1; next } f && /^Address/ { print $3; exit }')
+    if [ -z "$dr_ip" ]; then dr_out="no answer"
+    else
+        dr_j=$(curl -s -m 6 "https://ipinfo.io/$dr_ip/json" 2>/dev/null | tr '\n' ' ')
+        dr_h=$(echo "$dr_j" | sed -n 's/.*"hostname": *"\([^"]*\)".*/\1/p')
+        dr_ci=$(echo "$dr_j" | sed -n 's/.*"city": *"\([^"]*\)".*/\1/p')
+        dr_co=$(echo "$dr_j" | sed -n 's/.*"country": *"\([^"]*\)".*/\1/p')
+        dr_o=$(echo "$dr_j" | sed -n 's/.*"org": *"\([^"]*\)".*/\1/p' | sed 's/^AS[0-9]* //')
+        dr_out="$dr_ip${dr_h:+ ($dr_h)}${dr_o:+ - $dr_o}${dr_ci:+, $dr_ci}${dr_co:+ $dr_co}"
+    fi
+    { awk -F'\t' -v k="$1" '$1 != k' "$dr_c" 2>/dev/null; printf '%s\t%s\t%s\n' "$1" "$dr_now" "$dr_out"; } > "$dr_c.new" && mv -f "$dr_c.new" "$dr_c"
+    echo "$dr_out"
+}
+
+# all devices active right now: normal way, DNS, open connections per line
+cli_devices() {
+    nv_refresh
+    dvs_c=/tmp/asnmanager-dvs.agh; dg_agh_clients > "$dvs_c" 2>/dev/null
+    dvs_n=/tmp/asnmanager-dvs.nat; { echo "$(nvram get wan0_ipaddr) WAN1"; echo "$(nvram get wan1_ipaddr) WAN2"
+        for dvs_t in OVPN1 OVPN2 OVPN3 OVPN4 OVPN5 WGC1 WGC2 WGC3 WGC4 WGC5; do
+            dvs_d=$(get_ifname "$dvs_t"); [ -n "$dvs_d" ] || continue
+            ip -4 addr show "$dvs_d" 2>/dev/null | awk -v t="$dvs_t" '/inet / { split($2, a, "/"); print a[1], t }'
+        done; } | awk '$1 != "" && $1 != "0.0.0.0"' > "$dvs_n"
+    dvs_ct=${DG_CT:-/proc/net/nf_conntrack}
+    echo "Devices active right now (seen by the router in the last minutes):"
+    printf '%-15s %-20s %-7s %-34s %s\n' "IP" "NAME" "WAY" "CONNECTIONS NOW (per line)" "DNS"
+    dvs_k=/tmp/asnmanager-dvs.keys; : > "$dvs_k"
+    awk '$3 == "0x2" && $6 ~ /^br/ && $1 !~ /^169\.254\./ { print $1 }' /proc/net/arp 2>/dev/null | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | while read -r dvs_ip; do
+        dvs_w=$(dg_target_of_dev "$(dg_route_dev 1.1.1.1 "$dvs_ip")")
+        dvs_l=$(awk -v ip="$dvs_ip" -v nf="$dvs_n" 'BEGIN { while ((getline l < nf) > 0) { split(l, a, " "); w[a[1]] = a[2] } }
+            { k = 0; s = ""; for (i = 1; i <= NF; i++) { if ($i ~ /^src=/ && s == "") s = substr($i, 5); if ($i ~ /^dst=/) { k++; if (k == 2) d = substr($i, 5) } }
+              if (s == ip && (d in w)) c[w[d]]++ }
+            END { for (x in c) o = o (o == "" ? "" : " ") x ":" c[x]; print o }' "$dvs_ct" 2>/dev/null)
+        dvs_lb=$(dg_dns_label "$dvs_ip" "$dvs_c")
+        dvs_key="$(dg_dns_key "$dvs_ip" "$dvs_c")|$(echo "$dvs_lb" | sed 's/ + [0-9]* own DNS rule.*//')"
+        grep -qxF "$dvs_key" "$dvs_k" || echo "$dvs_key" >> "$dvs_k"
+        dvs_no=$(grep -nxF "$dvs_key" "$dvs_k" | cut -d: -f1)
+        dvs_sp=$(echo "$dvs_lb" | sed -n 's/.* + \([0-9]*\) own DNS rule.*/ +\1 sites/p')
+        printf '%-15s %-20s %-7s %-34s %s\n' "$dvs_ip" "$(dg_devname "$dvs_ip" | cut -c1-20)" "${dvs_w:-?}" "${dvs_l:--}" "[$dvs_no]$dvs_sp"
+    done
+    echo ""
+    echo "DNS - what the devices ask, and the real resolver behind it (the address name servers and leak tests see):"
+    dvs_i=0
+    while IFS='|' read -r dvs_kk dvs_lab; do
+        dvs_i=$((dvs_i + 1))
+        echo "  [$dvs_i] $dvs_lab"
+        echo "       -> $(dg_dns_real "$dvs_kk")"
+    done < "$dvs_k"
+    echo "  (+N sites: own DNS rules of the device for single sites - see the device check)"
+    rm -f "$dvs_k"
+    echo ""
+    echo "WAY = the normal way of the device (VPN Director); CONNECTIONS = lines its open connections use right now (entries of"
+    echo "ASN Manager send single sites over other lines; a connection keeps the line it was opened on)."
+    rm -f "$dvs_c" "$dvs_n"
+    return 0
+}
+
 cli_device() {
     dv_ip="$1"
     is_valid_ip "$dv_ip" || { echo "Usage: device <IP of the device>"; return 1; }
@@ -2395,6 +2570,10 @@ cli_device() {
     else echo "VPN Director rules for this device (or for all): none"; fi
     dv_def=$(dg_route_dev 1.1.1.1 "$dv_ip")
     echo "Normal way without an ASN Manager rule (test 1.1.1.1): ${dv_def:-?} ($(dg_target_of_dev "$dv_def"))"
+    dg_agh_clients > /tmp/asnmanager-dv.agh 2>/dev/null
+    echo "DNS of this device: $(dg_dns_label "$dv_ip" /tmp/asnmanager-dv.agh)$(awk -F'\t' -v i="$dv_ip" '$1 == i { print "   (AdGuard Home client: " $2 ")"; exit }' /tmp/asnmanager-dv.agh)"
+    echo "   real resolver (what leak tests show): $(dg_dns_real "$(dg_dns_key "$dv_ip" /tmp/asnmanager-dv.agh)")"
+    rm -f /tmp/asnmanager-dv.agh
     echo ""
     # current connections: destination, traffic, which rule, which interface (top 15 by bytes)
     dv_ct=${DG_CT:-/proc/net/nf_conntrack}
@@ -3190,12 +3369,14 @@ web_job() {
         sghide)   sg_hide "$a1" "$a2" > "$OUT" 2>&1 ;;
         explain)  cli_explain "$a1" "$a2" > "$OUT" 2>&1 ;;
         device)   cli_device "$a1" > "$OUT" 2>&1 ;;
+        devices)  cli_devices > "$OUT" 2>&1 ;;
         dnschain) cli_dnschain > "$OUT" 2>&1 ;;
         diagpack) cli_diagpack "$a1" > "$OUT" 2>&1 ;;
         speedtest) st_run "$a1" > "$OUT" 2>&1 ;;
         setting)  rs_setting "$a1" "$a2" > "$OUT" 2>&1 ;;
         dnsfsrv)  dnsf_server_set "$a1" $(echo "$a2" | tr ',' ' ') > "$OUT" 2>&1 ;;
         mailtest) mail_test > "$OUT" 2>&1 ;;
+        aghlogin) rm -f "$AGH_AUTH.refused"; agh_login "$a1" > "$OUT" 2>&1 ;;
         failover) fbs=""; [ -n "$a2" ] && fbs="$a2"; [ -n "$a3" ] && fbs="${fbs:+$fbs,}$a3"
                   fo_set "$a1" "$fbs" > "$OUT" 2>&1 ;;
         *)        echo "Unknown action '$act'" > "$OUT"; false ;;
@@ -3894,10 +4075,9 @@ sgd_file() { case "$(sgd_state)" in on) echo "$SGD_LOG" ;; ext) sgd_foreign ;; e
 # writes or removes our two lines in dnsmasq.conf.add; dnsmasq is restarted only when they changed
 sgd_write() {
     sgw_new=/tmp/asnmanager-dnslog.new
-    if [ -f "$DNSMASQ_ADD" ]; then sed "/^${SGD_BEGIN}\$/,/^${SGD_END}\$/d" "$DNSMASQ_ADD" > "$sgw_new"; else : > "$sgw_new"; fi
-    if sgd_on && [ -z "$(sgd_foreign)" ]; then
-        printf '%s\nlog-queries=extra\nlog-facility=%s\n%s\n' "$SGD_BEGIN" "$SGD_LOG" "$SGD_END" >> "$sgw_new"
-    fi
+    : > "$sgw_new.l"
+    if sgd_on && [ -z "$(sgd_foreign)" ]; then printf 'log-queries=extra\nlog-facility=%s\n' "$SGD_LOG" > "$sgw_new.l"; fi
+    dm_block "$SGD_BEGIN" "$SGD_END" "$sgw_new.l" > "$sgw_new"; rm -f "$sgw_new.l"
     if [ -f "$DNSMASQ_ADD" ]; then sgw_cur="$DNSMASQ_ADD"; else sgw_cur=/dev/null; fi
     if cmp -s "$sgw_new" "$sgw_cur"; then rm -f "$sgw_new"; return 0; fi
     if [ -s "$sgw_new" ]; then mkdir -p "$(dirname "$DNSMASQ_ADD")" && cp "$sgw_new" "$DNSMASQ_ADD"; else rm -f "$DNSMASQ_ADD"; fi
@@ -4005,6 +4185,12 @@ DNSF_SERVERS="$ADDON_DIR/dnsf_servers.conf"      # read by dnsmasq (servers-file
 DNSF_STATE=/tmp/asnmanager-dnsf.state            # last result, for the WebUI / status
 DNSF_RULES=/tmp/asnmanager-dnsf.rules            # the rules set last time
 DNSF_PRIO=10500                                  # before the VPN Director (11xxx), after the ASN marks (99xx)
+# one DNS address on several VPN lines (one provider, a server at the end of each of its tunnels): every line gets a
+# stand-in address 198.18.53.x (a range for tests only, never on the internet); lookups to it get the mark of the
+# line, are rewritten to the real address and leave through that line only (rule before the ASN marks and failover)
+DNSF_VPRIO=9860
+DNSF_VNET=198.18.53
+DNSF_VMAP=/tmp/asnmanager-dnsf.vmap
 DNSF_MAX=${DNSF_MAX:-2000}                       # at most this many learned names
 DNSF_BEGIN="# ASNmanager dnsfollow begin"
 DNSF_END="# ASNmanager dnsfollow end"
@@ -4154,7 +4340,7 @@ dnsf_server_set() {
     dss_ips=$(echo $dss_ips | cut -d' ' -f1-2)
     for dss_i in $dss_ips; do
         dss_o=$(sed -n 's/^srv //p' "$DNSF_STATE" 2>/dev/null | awk -v t="$dss_t" -v i="$dss_i" '$1 != t { for (k = 2; k <= NF; k++) if ($k == i) print $1 }' | head -n 1)
-        [ -n "$dss_o" ] && { echo "$dss_i is already the DNS server of $dss_o - one server can belong to one line only."; return 1; }
+        case "$dss_o" in ''|OVPN*|WGC*) ;; *) echo "$dss_i is already the DNS server of $dss_o - it cannot go through $dss_t as well."; return 1 ;; esac
         case " $(dnsf_upstreams) " in *" $dss_i "*) echo "$dss_i is used by your normal DNS - it cannot go through $dss_t."; return 1 ;; esac
     done
     mkdir -p "$ADDON_DIR"; touch "$DNSF_CONF"
@@ -4177,8 +4363,37 @@ dnsf_set() {
 }
 
 # removes everything: rules, servers file, our dnsmasq block
+# stand-in DNS addresses (see DNSF_VPRIO): mark (mangle OUTPUT) and rewrite to the real address (nat OUTPUT), only for
+# the router itself; rebuilt when the list changed or a firewall restart removed the chains
+dnsf_vnat() {
+    dv_ok=1
+    for dv_tb in nat mangle; do iptables -t $dv_tb -C OUTPUT -j ASNM_DNSV 2>/dev/null || dv_ok=0; done
+    if [ -s "$1" ]; then
+        cmp -s "$1" "$DNSF_VMAP" && [ $dv_ok -eq 1 ] && return 0
+        for dv_tb in nat mangle; do
+            iptables -t $dv_tb -N ASNM_DNSV 2>/dev/null; iptables -t $dv_tb -F ASNM_DNSV
+            iptables -t $dv_tb -C OUTPUT -j ASNM_DNSV 2>/dev/null || iptables -t $dv_tb -I OUTPUT -j ASNM_DNSV
+        done
+        while read -r dv_v dv_r dv_t; do
+            dv_m=$(get_target_info "$dv_t" | cut -d' ' -f2); [ -n "$dv_m" ] || continue
+            iptables -t mangle -A ASNM_DNSV -d "$dv_v/32" -j MARK --set-xmark "$dv_m/$MARK_MASK"
+            for dv_p in udp tcp; do iptables -t nat -A ASNM_DNSV -d "$dv_v/32" -p $dv_p --dport 53 -j DNAT --to-destination "$dv_r"; done
+        done < "$1"
+        cp "$1" "$DNSF_VMAP"
+        logger -t ASNmanager "DNS follows the route: $(wc -l < "$1") stand-in DNS address(es) for servers on several VPN lines"
+    else
+        [ -s "$DNSF_VMAP" ] || iptables -t nat -L ASNM_DNSV -n >/dev/null 2>&1 || return 0
+        for dv_tb in nat mangle; do
+            while iptables -t $dv_tb -D OUTPUT -j ASNM_DNSV 2>/dev/null; do :; done
+            iptables -t $dv_tb -F ASNM_DNSV 2>/dev/null; iptables -t $dv_tb -X ASNM_DNSV 2>/dev/null
+        done
+        rm -f "$DNSF_VMAP"
+    fi
+    return 0
+}
 dnsf_clear() {
-    for dc_p in $DNSF_PRIO $((DNSF_PRIO + 1)); do
+    : > /tmp/asnmanager-dnsf.novmap; dnsf_vnat /tmp/asnmanager-dnsf.novmap; rm -f /tmp/asnmanager-dnsf.novmap
+    for dc_p in $DNSF_PRIO $((DNSF_PRIO + 1)) $DNSF_VPRIO $((DNSF_VPRIO + 1)); do
         while ip rule show 2>/dev/null | grep -q "^${dc_p}:"; do ip rule del prio "$dc_p" 2>/dev/null || break; done
     done
     rm -f "$DNSF_RULES" "$DNSF_STATE"
@@ -4189,8 +4404,8 @@ dnsf_clear() {
 # our block in dnsmasq.conf.add: "servers-file=..." while on; dnsmasq restarts only when the block changed
 dnsf_conf_write() {
     dw_new=/tmp/asnmanager-dnsf.add
-    if [ -f "$DNSMASQ_ADD" ]; then sed "/^${DNSF_BEGIN}\$/,/^${DNSF_END}\$/d" "$DNSMASQ_ADD" > "$dw_new"; else : > "$dw_new"; fi
-    dnsf_on && [ -f "$DNSF_SERVERS" ] && printf '%s\nservers-file=%s\n%s\n' "$DNSF_BEGIN" "$DNSF_SERVERS" "$DNSF_END" >> "$dw_new"
+    : > "$dw_new.l"; dnsf_on && [ -f "$DNSF_SERVERS" ] && printf 'servers-file=%s\n' "$DNSF_SERVERS" > "$dw_new.l"
+    dm_block "$DNSF_BEGIN" "$DNSF_END" "$dw_new.l" > "$dw_new"; rm -f "$dw_new.l"
     if [ -f "$DNSMASQ_ADD" ]; then dw_cur="$DNSMASQ_ADD"; else dw_cur=/dev/null; fi
     if cmp -s "$dw_new" "$dw_cur"; then rm -f "$dw_new"; return 1; fi
     if [ -s "$dw_new" ]; then mkdir -p "$(dirname "$DNSMASQ_ADD")" && cp "$dw_new" "$DNSMASQ_ADD"; else rm -f "$DNSMASQ_ADD"; fi
@@ -4267,19 +4482,27 @@ dnsf_sync_run() {
     # 4b) domain entries for single devices (only DNS per device can give them their own DNS): "name target ip,ip"
     : > "$ds_tmp/ddoms"
     dnsd_on && awk -F: '$4 == "dom" && $3 != "" && $1 ~ /^C[0-9]+$/ { print $5 "\t" $2 "\t" $3 }' "$CUSTOM_FILE" 2>/dev/null > "$ds_tmp/ddoms"
+    # 4c) failover: a target that is down and whose traffic goes via another one (failover of ASN Manager) is looked up
+    #     through the DNS of that one: "target active" (its own servers stay blocked; "BLOCK" keeps them blocked)
+    fo_active_map > "$ds_tmp/act"
     # 5) DNS servers per target (none for the target the normal DNS uses); a server may serve one target only and,
     #    for a VPN, must not be one dnsmasq / the router use anyway (their lookups would follow it)
     ds_used=" $(dnsf_upstreams)"; : > "$ds_tmp/srv"; : > "$ds_tmp/srcs"
     # without "DNS follows the route" only the device part runs: no names, but DNS servers for the device targets
     dnsf_on || { : > "$ds_tmp/doms"; : > "$ds_tmp/learned"; }
-    for ds_t in $( { cut -f2 "$ds_tmp/doms" "$ds_tmp/learned" "$ds_tmp/ddoms"; dnsd_on && dnsd_targets "$ds_base"; } | sort -u); do
+    for ds_t in $( { cut -f2 "$ds_tmp/doms" "$ds_tmp/learned" "$ds_tmp/ddoms"; dnsd_on && dnsd_targets "$ds_base"; awk '$2 != "BLOCK" { print $2 }' "$ds_tmp/act"; } | sort -u); do
         [ "$ds_t" = "$ds_base" ] && continue
         echo " $VALID_DESTS " | grep -q " $ds_t " || continue
         ds_s=$(dnsf_servers_of "$ds_t"); ds_ok=1
         # where the servers come from: own (dns_follow.conf), router (WAN / VPN client settings), auto (free public ones)
         ds_src=router; grep -q "^$ds_t=" "$DNSF_CONF" 2>/dev/null && ds_src=own
         for ds_ip in $(echo "$ds_s" | tr ',' ' '); do
-            grep -q " $ds_ip\$\| $ds_ip " "$ds_tmp/srv" && ds_ok=0
+            # the same own server on several VPN lines: each gets a stand-in address (5c)
+            if [ "$ds_src" = own ] && case "$ds_t" in OVPN*|WGC*) true ;; *) false ;; esac; then
+                grep -E "^(WAN[0-9]*) " "$ds_tmp/srv" | grep -q " $ds_ip\$\| $ds_ip " && ds_ok=0
+            else
+                grep -q " $ds_ip\$\| $ds_ip " "$ds_tmp/srv" && ds_ok=0
+            fi
             case "$ds_t" in WAN*) ;; *) case "$ds_used " in *" $ds_ip "*) ds_ok=0 ;; esac ;; esac
         done
         if [ -z "$ds_s" ] || [ $ds_ok -eq 0 ]; then
@@ -4296,6 +4519,18 @@ dnsf_sync_run() {
         fi
         [ -n "$ds_s" ] && { echo "$ds_t $(echo "$ds_s" | tr ',' ' ')" >> "$ds_tmp/srv"; echo "$ds_t $ds_src" >> "$ds_tmp/srcs"; }
     done
+    # 5c) stand-in addresses for a server on more than one VPN line: srv_v (used for dnsmasq, AdGuard Home and the
+    #     rules) and vmap "stand-in real target"; srv keeps the real ones (status)
+    : > "$ds_tmp/vmap"
+    awk -v vnet="$DNSF_VNET" -v vmapf="$ds_tmp/vmap" '
+        { line[NR] = $0; if ($1 ~ /^(OVPN|WGC)[1-5]$/) for (i = 2; i <= NF; i++) c[$i]++ }
+        END { for (r = 1; r <= NR; r++) { n = split(line[r], a, " "); t = a[1]; o = t
+                for (i = 2; i <= n; i++) { ip = a[i]
+                    if (t ~ /^(OVPN|WGC)[1-5]$/ && c[ip] > 1) {
+                        k = (t ~ /^WGC/ ? 10 : 0) + substr(t, length(t)) + (i - 2) * 20; v = vnet "." k
+                        print v, ip, t > vmapf; ip = v }
+                    o = o " " ip }
+                print o } }' "$ds_tmp/srv" > "$ds_tmp/srv_v"
     # 5a) is the normal DNS encrypted? tunnel = a VPN carries it, fw = DNS over TLS of the firmware, ub = Unbound asks the
     #     name servers itself over WAN (not encrypted), plain = dnsmasq asks the WAN DNS without encryption
     ds_btls=""
@@ -4309,7 +4544,7 @@ dnsf_sync_run() {
     fi
     # 5b) encrypted: WAN targets whose servers all have a TLS name; with Unbound their names go to Unbound (DNS over
     #     TLS, port 853 - routed by the same rules), AdGuard Home gets tls://name
-    : > "$ds_tmp/tlst"; cp "$ds_tmp/srv" "$ds_tmp/srv_agh"; ds_tls=""
+    : > "$ds_tmp/tlst"; cp "$ds_tmp/srv_v" "$ds_tmp/srv_agh"; ds_tls=""
     if dnsf_tls_on; then
         while read -r ds_t ds_ips; do
             case "$ds_t" in WAN*) ;; *) continue ;; esac
@@ -4329,8 +4564,9 @@ dnsf_sync_run() {
     # 6) servers file: domain entries win over learned names; a learned name of the normal target below a domain
     #    of another target gets "#" (= the normal servers); names of an encrypted WAN target go to Unbound instead
     : > "$ds_tmp/ubf"
-    awk -F'\t' -v base="$ds_base" -v srvf="$ds_tmp/srv" -v sf="$ds_tmp/servers" -v stf="$ds_tmp/state" -v tlsf="$ds_tmp/tlst" -v ubf="$ds_tmp/ubf" '
+    awk -F'\t' -v base="$ds_base" -v srvf="$ds_tmp/srv_v" -v sf="$ds_tmp/servers" -v stf="$ds_tmp/state" -v tlsf="$ds_tmp/tlst" -v ubf="$ds_tmp/ubf" -v actf="$ds_tmp/act" '
         BEGIN { while ((getline l < srvf) > 0) { n = split(l, a, " "); s[a[1]] = l }
+                while ((getline l < actf) > 0) { split(l, a, " "); if (a[2] != "BLOCK") act[a[1]] = a[2] }
                 while ((getline l < tlsf) > 0) { t = l; sub(/ .*/, "", t); u = l; sub(/^[^ ]* /, "", u); tls[t] = u } }
         function covered(x,   y) { y = x; while (1) { if (y in dom) return dom[y]; if (index(y, ".") == 0) return ""; sub(/^[^.]*\./, "", y) } }
         FILENAME == ARGV[1] { dom[$1] = $2; next }
@@ -4340,11 +4576,13 @@ dnsf_sync_run() {
             for (x in lr) { c = covered(x); if (c == lr[x]) continue; if (c == "" && lr[x] == base) continue; put(x, lr[x], "l") }
             for (t in cnt) printf "%s %d %d\n", t, cnt[t, "d"], cnt[t, "l"] > stf
         }
-        function put(x, t, k,   n, a, i) {
+        function put(x, t, k,   n, a, i, e) {
             if (t == base) { print "server=/" x "/#" > sf; return }
-            if (!(t in s)) return
-            if (t in tls) print x "\t" tls[t] > ubf
-            else { n = split(s[t], a, " "); for (i = 2; i <= n; i++) print "server=/" x "/" a[i] > sf }
+            e = t; if ((t in act) && (act[t] == base || (act[t] in s))) e = act[t]        # failover: DNS of the line in use
+            if (e == base) { print "server=/" x "/#" > sf; cnt[t]++; cnt[t, k]++; return }
+            if (!(e in s)) return
+            if (e in tls) print x "\t" tls[e] > ubf
+            else { n = split(s[e], a, " "); for (i = 2; i <= n; i++) print "server=/" x "/" a[i] > sf }
             cnt[t]++; cnt[t, k]++
         }' "$ds_tmp/doms" "$ds_tmp/learned"
     touch "$ds_tmp/servers" "$ds_tmp/state" "$ds_tmp/ubf"
@@ -4362,19 +4600,29 @@ dnsf_sync_run() {
             echo "$ds_ip $ds_tab" >> "$ds_tmp/rules"
             case "$ds_t" in WAN*) ;; *) echo "$ds_ip unreachable" >> "$ds_tmp/rules" ;; esac
         done
-    done < "$ds_tmp/srv"
-    ds_nrules=$(ip rule show 2>/dev/null | grep -c "^${DNSF_PRIO}:\|^$((DNSF_PRIO + 1)):")
+    done < "$ds_tmp/srv_v"
+    # stand-in addresses: after the rewrite the lookup goes to the real address with the mark of its line
+    while read -r ds_v ds_r ds_t; do
+        ds_tab=$(get_target_info "$ds_t" | cut -d' ' -f1); ds_m=$(get_target_info "$ds_t" | cut -d' ' -f2)
+        echo "m:$ds_m $ds_r $ds_tab" >> "$ds_tmp/rules"; echo "m:$ds_m $ds_r unreachable" >> "$ds_tmp/rules"
+    done < "$ds_tmp/vmap"
+    ds_nrules=$(ip rule show 2>/dev/null | grep -c "^${DNSF_PRIO}:\|^$((DNSF_PRIO + 1)):\|^${DNSF_VPRIO}:\|^$((DNSF_VPRIO + 1)):")
     if ! cmp -s "$ds_tmp/rules" "$DNSF_RULES" || [ "$ds_nrules" -ne "$(wc -l < "$ds_tmp/rules")" ]; then
-        for ds_p in $DNSF_PRIO $((DNSF_PRIO + 1)); do
+        for ds_p in $DNSF_PRIO $((DNSF_PRIO + 1)) $DNSF_VPRIO $((DNSF_VPRIO + 1)); do
             while ip rule show 2>/dev/null | grep -q "^${ds_p}:"; do ip rule del prio "$ds_p" 2>/dev/null || break; done
         done
-        while read -r ds_ip ds_tab; do
-            if [ "$ds_tab" = "unreachable" ]; then ip rule add iif lo to "$ds_ip/32" unreachable prio $((DNSF_PRIO + 1)) 2>/dev/null
-            else ip rule add iif lo to "$ds_ip/32" lookup "$ds_tab" prio "$DNSF_PRIO" 2>/dev/null; fi
+        while read -r ds_a ds_b ds_c; do
+            case "$ds_a" in
+                m:*) if [ "$ds_c" = "unreachable" ]; then ip rule add iif lo fwmark "${ds_a#m:}/$MARK_MASK" to "$ds_b/32" unreachable prio $((DNSF_VPRIO + 1)) 2>/dev/null
+                     else ip rule add iif lo fwmark "${ds_a#m:}/$MARK_MASK" to "$ds_b/32" lookup "$ds_c" prio "$DNSF_VPRIO" 2>/dev/null; fi ;;
+                *)   if [ "$ds_b" = "unreachable" ]; then ip rule add iif lo to "$ds_a/32" unreachable prio $((DNSF_PRIO + 1)) 2>/dev/null
+                     else ip rule add iif lo to "$ds_a/32" lookup "$ds_b" prio "$DNSF_PRIO" 2>/dev/null; fi ;;
+            esac
         done < "$ds_tmp/rules"
         cp "$ds_tmp/rules" "$DNSF_RULES"
         ip route flush cache 2>/dev/null
     fi
+    dnsf_vnat "$ds_tmp/vmap"
     # 8) servers file: written (flash) only when it changed; dnsmasq reads it again on SIGHUP
     dnsf_on || : > "$ds_tmp/servers"
     ds_changed=0
@@ -4382,10 +4630,10 @@ dnsf_sync_run() {
     if ! dnsf_conf_write && [ $ds_changed -eq 1 ]; then killall -HUP dnsmasq 2>/dev/null; fi
     if [ -s "$ds_tmp/ubf" ] || [ -s "$DNSF_UBSTATE" ]; then dnsf_ub_sync "$ds_tmp/ubf"; fi
     # 10) last: AdGuard Home clients per device (or their removal) - its restart also restarts dnsmasq, nothing else may run then
-    if dnsd_on || [ -f "$DNSD_SUM" ] || grep -qE "^ +(- )?$DNSD_OURS" "$(agh_yaml)" 2>/dev/null; then agh_present && dnsd_apply "$ds_tmp/srv_agh" "$ds_base" "$ds_tmp/ddoms"; fi
+    if dnsd_on || [ -f "$DNSD_SUM" ] || grep -qE "^ +(- )?$DNSD_OURS" "$(agh_yaml)" 2>/dev/null; then agh_present && dnsd_apply "$ds_tmp/srv_agh" "$ds_base" "$ds_tmp/ddoms" "$ds_tmp/act"; fi
     { echo "mode=$ds_mode"; echo "base=$ds_base"; echo "names=$(wc -l < "$ds_tmp/learned")"; echo "tls=$(echo $ds_tls)"; echo "btls=$ds_btls"
       while read -r ds_t ds_ips; do echo "srv $ds_t $ds_ips"; done < "$ds_tmp/srv"
-      sed 's/^/cnt /' "$ds_tmp/state"; sed 's/^/src /' "$ds_tmp/srcs"
+      sed 's/^/cnt /' "$ds_tmp/state"; sed 's/^/src /' "$ds_tmp/srcs"; sed 's/^/act /' "$ds_tmp/act"; sed 's/^/vip /' "$ds_tmp/vmap"
       cut -f2 "$ds_tmp/ddoms" | sort | uniq -c | awk '{ print "ddom", $2, $1 }' 
       if dnsd_on; then dnsd_groups | awk '{ n[$1]++ } END { for (t in n) print "dev", t, n[t] }'; echo "lan $(dnsd_lan)"; fi
       [ -s "$DNSD_ERR" ] && echo "derr $(head -n 1 "$DNSD_ERR")"; } > "$DNSF_STATE"
@@ -4412,7 +4660,12 @@ dnsf_status() {
             *" $st_t:on "*) st_e=" (encrypted, DNS over TLS via Unbound)" ;; *" $st_t:agh "*) st_e=" (encrypted for devices only - no Unbound)" ;; *" $st_t:nofw "*) st_e=" (encrypted for devices only - names: the firmware DNS over TLS would move the normal DNS too)" ;; *" $st_t:noubc "*) st_e=" (encrypted for devices only - unbound-control does not answer: $(ubc status 2>&1 | head -n 1))" ;; *" $st_t:unknown "*) st_e=" (NOT encrypted: no TLS name known for this server)" ;; esac
         echo "  $st_t: DNS $st_ips$st_e - $(echo "$st_c" | cut -d' ' -f1) domain entries, $(echo "$st_c" | cut -d' ' -f2) learned names$(st_dd=$(sed -n "s/^ddom $st_t //p" "$DNSF_STATE"); [ -n "$st_dd" ] && echo ", $st_dd for single devices")"
     done
-    echo "  rules: $(ip rule show 2>/dev/null | grep -c "^${DNSF_PRIO}:\|^$((DNSF_PRIO + 1)):") (prio $DNSF_PRIO/$((DNSF_PRIO + 1))), servers file: $(grep -c . "$DNSF_SERVERS" 2>/dev/null || echo 0) lines"
+    sed -n 's/^vip //p' "$DNSF_STATE" | while read -r st_v st_r st_t; do echo "  $st_t: $st_r is on several VPN lines - asked as $st_v (rewritten, leaves through $st_t only)"; done
+    sed -n 's/^act //p' "$DNSF_STATE" | while read -r st_t st_a; do
+        if [ "$st_a" = "BLOCK" ]; then echo "  FAILOVER: $st_t is down and blocked - its lookups stay blocked"
+        else echo "  FAILOVER: $st_t is down - its names and devices are looked up through the DNS of $st_a"; fi
+    done
+    echo "  rules: $(ip rule show 2>/dev/null | grep -c "^${DNSF_PRIO}:\|^$((DNSF_PRIO + 1)):\|^${DNSF_VPRIO}:\|^$((DNSF_VPRIO + 1)):") (prio $DNSF_PRIO/$((DNSF_PRIO + 1))$([ -s "$DNSF_VMAP" ] && echo ", stand-ins $DNSF_VPRIO/$((DNSF_VPRIO + 1))")), servers file: $(grep -c . "$DNSF_SERVERS" 2>/dev/null || echo 0) lines"
     if dnsd_on; then
         sed -n 's/^dev //p' "$DNSF_STATE" | while read -r st_t st_n; do echo "  devices on $st_t (VPN Director): $st_n"; done
         echo "  other devices ($(sed -n 's/^lan //p' "$DNSF_STATE")): WAN1"
@@ -4423,6 +4676,7 @@ dnsf_status() {
 # for data.js: ,"dnsf":{...}
 dnsf_json() {
     printf ',"dnsf":{"on":%d,"dev":%d,"agh":%d,"tls":%d,"tlsst":"%s"' "$(dnsf_on && echo 1 || echo 0)" "$(dnsd_on && echo 1 || echo 0)" "$(agh_present && echo 1 || echo 0)" "$(dnsf_tls_on && echo 1 || echo 0)" "$(sed -n 's/^tls=//p' "$DNSF_STATE" 2>/dev/null) base:$(sed -n 's/^btls=//p' "$DNSF_STATE" 2>/dev/null)"
+    printf ',"aghlogin":%d,"aghrefused":%d,"aghapi":"%s"' "$([ -s "$AGH_AUTH" ] && echo 1 || echo 0)" "$([ -s "$AGH_AUTH.refused" ] && echo 1 || echo 0)" "$(head -n 1 "$AGH_API_ST" 2>/dev/null | tr -d '"\\' | cut -c1-200)"
     if [ -f "$DNSF_STATE" ]; then
         printf ',"lan":"%s","derr":"%s","devs":{' "$(sed -n 's/^lan //p' "$DNSF_STATE")" "$(sed -n 's/^derr //p' "$DNSF_STATE" | tr -d '"\\')"
         sed -n 's/^dev //p' "$DNSF_STATE" | awk '{ printf "%s\"%s\":%d", (NR > 1 ? "," : ""), $1, $2 }'
@@ -4434,7 +4688,8 @@ dnsf_json() {
              /^cnt / { cd[$2] = $3; cl[$2] = $4 }
              /^src / { sr[$2] = $3 }
              /^ddom / { dd[$2] = $3 }
-             END { for (i = 1; i <= n; i++) printf "%s{\"t\":\"%s\",\"dns\":\"%s\",\"d\":%d,\"l\":%d,\"dd\":%d,\"src\":\"%s\"}", (i > 1 ? "," : ""), o[i], s[o[i]], cd[o[i]], cl[o[i]], dd[o[i]], sr[o[i]] }' "$DNSF_STATE"
+             /^act / { fo[$2] = $3 }
+             END { for (i = 1; i <= n; i++) printf "%s{\"t\":\"%s\",\"dns\":\"%s\",\"d\":%d,\"l\":%d,\"dd\":%d,\"src\":\"%s\",\"fo\":\"%s\"}", (i > 1 ? "," : ""), o[i], s[o[i]], cd[o[i]], cl[o[i]], dd[o[i]], sr[o[i]], fo[o[i]] }' "$DNSF_STATE"
         printf ']'
     fi
     printf '}'
@@ -4524,6 +4779,147 @@ agh_start_wait() {
         [ $asw_q -ge 20 ] && return 0
     done
     return 1
+}
+
+# ---------- AdGuard Home login: its clients are changed through its own API, without a restart ----------
+# The login is kept on the router only (base64 of "user:password", readable by root only, not in backups). Without it,
+# or when the API does not work, ASN Manager writes AdGuardHome.yaml and restarts AdGuard Home as before.
+AGH_AUTH="$ADDON_DIR/agh_auth"
+AGH_API_ST="$ADDON_DIR/agh_api.state"
+# address of its web interface (http.address, older: bind_host / bind_port; https when it forces https)
+agh_web() {
+    aw_y=$(agh_yaml) || return 1
+    awk '
+        /^http:/ { s = "http"; next } /^tls:/ { s = "tls"; next } /^[a-z]/ { s = "" }
+        s == "http" && /^  address:/ { v = $0; sub(/^  address: */, "", v); gsub(/["\047 ]/, "", v); addr = v }
+        /^bind_host:/ { v = $0; sub(/^bind_host: */, "", v); gsub(/["\047 ]/, "", v); bh = v }
+        /^bind_port:/ { v = $0; sub(/^bind_port: */, "", v); gsub(/["\047 ]/, "", v); bp = v }
+        s == "tls" && /^  enabled:/ { te = ($2 == "true") }
+        s == "tls" && /^  force_https:/ { fh = ($2 == "true") }
+        s == "tls" && /^  port_https:/ { ph = $2 + 0 }
+        END {
+            if (addr == "" && bp != "") addr = (bh == "" ? "0.0.0.0" : bh) ":" bp
+            if (addr == "") exit 1
+            n = split(addr, a, ":"); port = a[n]; host = substr(addr, 1, length(addr) - length(port) - 1); gsub(/[][]/, "", host)
+            if (host == "" || host == "0.0.0.0" || host == "::") host = "127.0.0.1"
+            if (te && fh && ph > 0) print "https://" host ":" ph; else print "http://" host ":" port
+        }' "$aw_y"
+}
+# agh_api <method> <path> [json] [output file] [auth file]: 0 = answered 2xx; AGH_HTTP = its status code
+# (the login goes to curl on stdin, so it never shows up in the process list)
+agh_api() {
+    aa_f=${5:-$AGH_AUTH}
+    [ -s "$aa_f" ] || { AGH_HTTP=nologin; return 2; }
+    aa_u=$(agh_web) || { AGH_HTTP=noweb; return 3; }
+    AGH_HTTP=$( { printf 'header = "Authorization: Basic %s"\n' "$(cat "$aa_f")"; [ -n "$3" ] && printf 'header = "Content-Type: application/json"\n'; } |
+        if [ -n "$3" ]; then curl -sk --connect-timeout 5 -m 20 -K - -X "$1" --data-binary "$3" -o "${4:-/dev/null}" -w '%{http_code}' "$aa_u$2"
+        else curl -sk --connect-timeout 5 -m 20 -K - -o "${4:-/dev/null}" -w '%{http_code}' "$aa_u$2"; fi 2>/dev/null)
+    case "$AGH_HTTP" in 2??) return 0 ;; esac
+    return 1
+}
+agh_api_why() {
+    case "$AGH_HTTP" in
+        401|403) echo "AdGuard Home refused the login (user name or password wrong)" ;;
+        000|"")  echo "the web interface of AdGuard Home did not answer at $(agh_web 2>/dev/null)" ;;
+        noweb)   echo "no address of the AdGuard Home web interface found in AdGuardHome.yaml" ;;
+        nologin) echo "no login saved" ;;
+        *)       echo "AdGuard Home answered HTTP $AGH_HTTP" ;;
+    esac
+}
+agh_api_state() { printf '%s\n' "$1" > "$AGH_API_ST"; }
+# agh_login <user> <password> | <base64 of user:password> (from the page) | off
+agh_login() {
+    case "$1" in
+        off|"") rm -f "$AGH_AUTH" "$AGH_API_ST"; echo "AdGuard Home login removed - client changes restart AdGuard Home again."; return 0 ;;
+    esac
+    agh_present || { echo "AdGuard Home not found."; return 1; }
+    if [ $# -ge 2 ]; then
+        al_b=$(printf '%s:%s' "$1" "$2" | { base64 2>/dev/null || openssl base64 -A 2>/dev/null; } | tr -d '\n')
+    else al_b=$1; fi
+    case "$al_b" in ''|*[!A-Za-z0-9+/=]*) echo "Login not saved: invalid input."; return 1 ;; esac
+    mkdir -p "$ADDON_DIR"
+    ( umask 077; printf '%s' "$al_b" > "$AGH_AUTH.new" ); chmod 600 "$AGH_AUTH.new"
+    if agh_api GET /control/clients "" "" "$AGH_AUTH.new"; then
+        mv -f "$AGH_AUTH.new" "$AGH_AUTH"; agh_api_state ok
+        echo "AdGuard Home login saved - its clients are now changed without restarting it."
+        return 0
+    fi
+    rm -f "$AGH_AUTH.new"
+    echo "Login not saved: $(agh_api_why)."
+    return 1
+}
+agh_login_status() {
+    if [ ! -s "$AGH_AUTH" ]; then echo "AdGuard Home login: not saved (client changes restart AdGuard Home)"; return 0; fi
+    if agh_api GET /control/clients; then agh_api_state ok; echo "AdGuard Home login: saved, works ($(agh_web))"
+    else echo "AdGuard Home login: saved, but $(agh_api_why)"; fi
+}
+# our client items (yaml lines as dnsd_apply builds them) as "name<TAB>json" lines for the API
+dnsd_items_json() {
+    awk '
+        function q(s) { gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); return "\"" s "\"" }
+        function out() {
+            if (name == "") return
+            printf "%s\t{\"name\":%s,\"ids\":[%s],\"tags\":[],\"upstreams\":[%s],\"use_global_settings\":true,\"filtering_enabled\":true,\"parental_enabled\":false,\"safebrowsing_enabled\":false,\"use_global_blocked_services\":true,\"ignore_querylog\":false,\"ignore_statistics\":false,\"upstreams_cache_enabled\":false,\"upstreams_cache_size\":0}\n", name, q(name), ids, ups
+            name = ""; ids = ""; ups = ""
+        }
+        /^    - name: / { out(); name = $0; sub(/^    - name: /, "", name); sec = ""; next }
+        /^      ids:/ { sec = "ids"; next }
+        /^      upstreams:/ { sec = "up"; next }
+        /^      [a-z_]+:/ { sec = ""; next }
+        /^        - / { v = $0; sub(/^        - /, "", v); if (v ~ /^\047.*\047$/) v = substr(v, 2, length(v) - 2)
+                        if (sec == "ids") ids = ids (ids == "" ? "" : ",") q(v); else if (sec == "up") ups = ups (ups == "" ? "" : ",") q(v) }
+        END { out() }' "$1"
+}
+# our clients as AdGuard Home has them now (it writes AdGuardHome.yaml itself after every change)
+dnsd_have() {
+    awk -v ours="$DNSD_OURS" '/^  persistent:/ { inb = 1; next } inb && /^  [a-z_]/ { inb = 0 }
+        inb { l = $0; sub(/^    - /, "      ", l); if (l ~ ("^      " ours)) { sub(/^      name: */, "", l); gsub(/^["\047]|["\047][[:space:]]*$/, "", l); print l } }' "$1"
+}
+# the clients through the API: $1 = items file, $2 = yaml; 0 = done (no restart needed)
+dnsd_api_apply() {
+    [ -s "$AGH_AUTH" ] || return 1
+    # AdGuard Home may be restarting right now (its start script does that after a dnsmasq restart): wait for it
+    if ! agh_up || agh_busy; then agh_settle && ! agh_busy || return 1; fi
+    dp_t=$(dirname "$1")
+    dnsd_items_json "$1" > "$dp_t/json"
+    cut -f1 "$dp_t/json" > "$dp_t/newn"
+    dnsd_have "$2" > "$dp_t/have"
+    dp_n=0
+    # removed first (their addresses may belong to a new client), then changed, then new
+    while IFS= read -r dp_x; do
+        [ -n "$dp_x" ] || continue
+        grep -qxF "$dp_x" "$dp_t/newn" && continue
+        agh_api POST /control/clients/delete "{\"name\":\"$dp_x\"}" || { dp_err=$(agh_api_why); break; }
+        dp_n=$((dp_n + 1))
+    done < "$dp_t/have"
+    if [ -z "$dp_err" ]; then
+        while IFS="$(printf '\t')" read -r dp_x dp_j; do
+            if grep -qxF "$dp_x" "$dp_t/have"; then agh_api POST /control/clients/update "{\"name\":\"$dp_x\",\"data\":$dp_j}"
+            else agh_api POST /control/clients/add "$dp_j"; fi || { dp_err="$(agh_api_why) (client $dp_x)"; break; }
+            dp_n=$((dp_n + 1))
+        done < "$dp_t/json"
+    fi
+    if [ -n "$dp_err" ]; then
+        agh_api_state "error: $dp_err"
+        # a refused login is not tried again (AdGuard Home would lock its login after a few failures)
+        case "$AGH_HTTP" in 401|403) mv -f "$AGH_AUTH" "$AGH_AUTH.refused" ;; esac
+        logger -t ASNmanager "DNS per device: AdGuard Home API failed - $dp_err - writing its configuration and restarting it instead"
+        return 1
+    fi
+    # it writes its configuration right away; check that ours are there
+    dp_i=0
+    while [ $dp_i -lt 10 ]; do
+        [ "$(dnsd_have "$2" | sort)" = "$(sort "$dp_t/newn" | sed '/^$/d')" ] && break
+        sleep 1; dp_i=$((dp_i + 1))
+    done
+    if [ $dp_i -ge 10 ]; then
+        agh_api_state "error: AdGuard Home took the changes but its configuration file did not show them"
+        logger -t ASNmanager "DNS per device: AdGuard Home API - the clients did not show up in $2 - writing it and restarting instead"
+        return 1
+    fi
+    agh_api_state ok
+    logger -t ASNmanager "DNS per device: $dp_n AdGuard Home client change(s) through its API - no restart"
+    return 0
 }
 
 # "target ip" of the VPN Director: active rules for a device (source, no destination)
@@ -4637,16 +5033,18 @@ dnsd_yaml_write() {
 #  entry would learn nothing, so dnsmasq keeps them. Prints "N name" lines for the names, then the upstream lines.
 dnsd_spec() {
     [ -s "$5" ] && [ -n "$7" ] && [ -r "$7" ] || return 0
-    awk -F'\t' -v ip="$1" -v own="$2" -v base="$3" -v srvf="$4" -v dm="$6" -v ipf="$7" '
+    awk -F'\t' -v ip="$1" -v own="$2" -v base="$3" -v srvf="$4" -v dm="$6" -v ipf="$7" -v actf="$8" '
         BEGIN { while ((getline l < srvf) > 0) { n = split(l, a, " "); k = a[1]; sub(/^[^ ]* /, "", l); srv[k] = l }
+                if (actf != "") while ((getline l < actf) > 0) { split(l, a, " "); if (a[2] != "BLOCK") act[a[1]] = a[2] }
                 # domains of the ipset copy of AdGuard Home ("a.com,b.com/set,set" or "/a.com/b.com/set,set")
                 while ((getline l < ipf) > 0) { n = split(l, p, "/"); if (n < 2 || p[n] !~ /ASN[CD]_/) continue
                     for (i = 1; i < n; i++) { m = split(p[i], q, ","); for (j = 1; j <= m; j++) if (q[j] != "") fill[q[j]] = 1 } } }
         {
             n = split($3, d, ","); hit = 0; for (i = 1; i <= n; i++) if (d[i] == ip) hit = 1
-            if (!hit || $2 == own) next
+            tg = $2; if ((tg in act) && (act[tg] == base || (act[tg] in srv))) tg = act[tg]     # failover: the line in use
+            if (!hit || tg == own) next
             if (!($1 in fill)) next                                # AdGuard Home does not fill its set: leave it to dnsmasq
-            if ($2 == base) to = dm; else if ($2 in srv) to = srv[$2]; else next
+            if (tg == base) to = dm; else if (tg in srv) to = srv[tg]; else next
             print "N " $1; names[to] = names[to] $1 "/"
         }
         END { for (to in names) { n = split(to, s, " "); for (i = 1; i <= n; i++) print "        - '\''[/" names[to] "]" s[i] "'\''" } }' "$5"
@@ -4677,8 +5075,13 @@ dnsd_apply() {
         dnsd_foreign_ids "$da_y" | sort -u > "$da_tmp/foreign"
         : > "$da_tmp/names"
         for da_t in $( { cut -d' ' -f1 "$da_tmp/groups"; echo WAN1; } | sort -u); do
-            da_same=0; [ "$da_t" = "$2" ] && [ "$(echo "$2" | cut -c1-3)" = "WAN" ] && da_same=1   # normal DNS goes over WAN
-            da_srv=""; [ "$da_t" != "$2" ] && da_srv=$(awk -v t="$da_t" '$1 == t { $1 = ""; print }' "$1")
+            # failover: the devices of a target that is down look up through the DNS of the line in use - also when the
+            # VPN Director does not follow (its devices then go over WAN or are blocked by the firmware; their DNS
+            # still never goes over WAN and does not stay on the dead line). The client keeps its name.
+            da_e=$da_t; da_a=$(awk -v t="$da_t" '$1 == t && $2 != "BLOCK" { print $2 }' "$4" 2>/dev/null)
+            [ -n "$da_a" ] && { [ "$da_a" = "$2" ] || grep -q "^$da_a " "$1"; } && da_e=$da_a
+            da_same=0; [ "$da_e" = "$2" ] && [ "$(echo "$2" | cut -c1-3)" = "WAN" ] && da_same=1   # normal DNS goes over WAN
+            da_srv=""; [ "$da_e" != "$2" ] && da_srv=$(awk -v t="$da_e" '$1 == t { $1 = ""; print }' "$1")
             da_ids=$(awk -v t="$da_t" '$1 == t { print $2 }' "$da_tmp/groups")
             [ "$da_t" = "WAN1" ] && [ "$da_t" != "$2" ] && [ -n "$da_lan" ] && da_ids="$da_ids @LAN@"
             for da_i in $da_ids; do
@@ -4691,7 +5094,7 @@ dnsd_apply() {
                     da_n=$(dnsd_name "$da_i")
                 fi
                 # own DNS for the domain entries only for this device
-                : > "$da_tmp/spec"; case "$da_i" in */*) ;; *) dnsd_spec "$da_i" "$da_t" "$2" "$1" "$3" "$da_dm" "$da_ipf" > "$da_tmp/spec" ;; esac
+                : > "$da_tmp/spec"; case "$da_i" in */*) ;; *) dnsd_spec "$da_i" "$da_e" "$2" "$1" "$3" "$da_dm" "$da_ipf" "$4" > "$da_tmp/spec" ;; esac
                 [ $da_same -eq 1 ] && [ ! -s "$da_tmp/spec" ] && continue                            # nothing differs from the global upstreams
                 da_ddoms=$da_doms
                 if [ -s "$da_tmp/spec" ]; then
@@ -4736,6 +5139,11 @@ dnsd_apply() {
         inb { l = $0; sub(/^    - /, "      ", l); if (l ~ ("^      " ours)) { sub(/^      name: */, "", l); gsub(/^["\047]|["\047][[:space:]]*$/, "", l); print l } }' "$da_y" | sort)
     da_ok=1; [ "$da_have" = "$(echo "$da_names" | sed '/^$/d' | sort)" ] || da_ok=0
     if [ "$(cat "$DNSD_SUM" 2>/dev/null)" = "$da_sum" ] && [ $da_ok -eq 1 ]; then rm -rf "$da_tmp"; return 0; fi
+    # with the login of AdGuard Home: through its API, no restart
+    if dnsd_api_apply "$da_tmp/items" "$da_y"; then
+        if [ -s "$da_tmp/items" ]; then echo "$da_sum" > "$DNSD_SUM"; else rm -f "$DNSD_SUM"; fi
+        rm -rf "$da_tmp"; return 0
+    fi
     # write: a uid per client, backup first, AdGuard Home restarted and checked
     while grep -q '@UID@' "$da_tmp/items"; do
         da_u=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || echo "$(date +%s)-$$-$RANDOM")
@@ -5662,6 +6070,154 @@ fo_info() {   # table fwmark prio - same values as the worker
         WGC1) echo "211 0x6100 9996" ;; WGC2) echo "212 0x6200 9997" ;; WGC3) echo "213 0x6300 9998" ;; WGC4) echo "214 0x6400 9999" ;; WGC5) echo "215 0x6500 10000" ;;
     esac
 }
+# devices in the VPN Director on a target that is down go with its failover too: its rules (enabled, with a device or
+# destination) are copied with the table of the line in use, before the VPN Director (11xxx/12xxx, also before its kill
+# switch) - the list of the VPN Director itself is not changed. The router's own rule (e.g. Unbound through a VPN) goes
+# along, so the normal DNS keeps working. Removed again as soon as the target works.
+FO_VPND_PRIO=10700
+# routing table of the firmware for a line (the VPN Director's own: wgc1 ... / ovpnc1 ..., main for WAN)
+fo_fwtable() {
+    case "$1" in
+        WAN|WAN1) echo main ;;
+        WGC[1-5]) ff_t=wgc${1#WGC} ;;
+        OVPN[1-5]) ff_t=ovpnc${1#OVPN} ;;
+        *) return 1 ;;
+    esac
+    [ -n "$ff_t" ] || return 1
+    # only when the firmware has it filled (the line runs); otherwise no rule - the VPN Director decides as before.
+    # A VPN table must route through its tunnel (0.0.0.0/1 or default via its device) - its "default via WAN" alone is not enough
+    case "$ff_t" in
+        main) ip route show table main 2>/dev/null | grep -q '^default' || { ff_t=""; return 1; } ;;
+        *)    ff_d=$(get_ifname "$1"); [ -n "$ff_d" ] || { ff_t=""; return 1; }
+              ip route show table "$ff_t" 2>/dev/null | grep -qE "^(default|0\.0\.0\.0/1) .*dev $ff_d( |\$)" || { ff_t=""; return 1; } ;;
+    esac
+    echo "$ff_t"; ff_t=""
+}
+FO_VPND_FLAG="$ADDON_DIR/fo_vpnd"                 # option: the VPN Director follows the failover (off by default)
+fo_vpnd_on() { [ -f "$FO_VPND_FLAG" ]; }
+fo_vpnd_set() {
+    case "$1" in
+        on)  mkdir -p "$ADDON_DIR"; : > "$FO_VPND_FLAG" ;;
+        off) rm -f "$FO_VPND_FLAG" ;;
+        *)   echo "VPN Director follows the failover: $(fo_vpnd_on && echo on || echo off)"; return 0 ;;
+    esac
+    fo_vpnd_sync; fo_export
+    if dnsd_on; then ( "$SCRIPT_PATH" dnsfollow sync >/dev/null 2>&1 & ); fi
+    echo "VPN Director follows the failover: $1."
+}
+# enabled VPN Director rules per line: "LINE count" (for the page)
+fo_vpnd_counts() {
+    [ -r "$VPND_FILE" ] || return 0
+    tr '<' '\n' < "$VPND_FILE" | awk -F'>' '$1 == "1" && ($3 != "" || $4 != "") { i = toupper($5); if (i == "WAN") i = "WAN1"; n[i]++ } END { for (i in n) print i, n[i] }'
+}
+fo_vpnd_sync() {
+    mkdir -p "$FO_RT"; fv_new="$FO_RT/vpnd.new"; : > "$fv_new"
+    if [ -s "$FO_CONF" ] && fo_vpnd_on && [ -r "$VPND_FILE" ]; then
+        fo_active_map | while read -r fv_t fv_a; do
+            # the table of the firmware for that line (it holds the LAN routes as well, like the VPN Director uses it) -
+            # never the routing table of ASN Manager (default route only: the router itself would answer into the tunnel)
+            if [ "$fv_a" = "BLOCK" ]; then fv_to="unreachable"
+            else fv_tab=$(fo_fwtable "$fv_a"); [ -n "$fv_tab" ] || continue; fv_to="lookup $fv_tab"; fi
+            tr '<' '\n' < "$VPND_FILE" | awk -F'>' -v t="$fv_t" '$1 == "1" { i = toupper($5); if (i == "WAN") i = "WAN1"
+                if (i == t && ($3 != "" || $4 != "")) print $3 ">" $4 }' |
+            while IFS='>' read -r fv_s fv_d; do echo "${fv_s:-all}>${fv_d:-all}>$fv_to>$fv_t>$fv_a"; done
+        done > "$fv_new"
+    fi
+    if cmp -s "$fv_new" "$FO_RT/vpnd.rules" 2>/dev/null && [ "$(ip rule show 2>/dev/null | grep -c "^${FO_VPND_PRIO}:")" = "$(grep -c . "$fv_new")" ] &&
+       { [ ! -s "$fv_new" ] || ip rule show 2>/dev/null | grep -q "^$((FO_VPND_PRIO - 1)):"; }; then
+        rm -f "$fv_new"; return 0
+    fi
+    while ip rule del prio "$FO_VPND_PRIO" 2>/dev/null; do :; done
+    while ip rule del prio $((FO_VPND_PRIO - 1)) 2>/dev/null; do :; done
+    # first: everything the main table reaches without its default route (LAN, guest networks, VPN server clients, the
+    # WAN network) stays as it is - only internet traffic follows the failover. Prefix length 1: a VPN that sets its
+    # routes as 0.0.0.0/1 + 128.0.0.0/1 (like the firmware does in its own tables) must not catch everything in main
+    [ -s "$fv_new" ] && ip rule add lookup main suppress_prefixlength 1 prio $((FO_VPND_PRIO - 1)) 2>/dev/null
+    while IFS='>' read -r fv_s fv_d fv_to fv_t fv_a; do
+        [ "$fv_s" = "all" ] && [ "$fv_d" = "all" ] && continue          # never a rule for everything
+        set --; [ "$fv_s" != "all" ] && set -- from "$fv_s"; [ "$fv_d" != "all" ] && set -- "$@" to "$fv_d"
+        ip rule add "$@" $fv_to prio "$FO_VPND_PRIO" 2>/dev/null
+    done < "$fv_new"
+    fv_was=$(cut -d'>' -f4,5 "$FO_RT/vpnd.rules" 2>/dev/null | sort -u | tr '\n' ' ')
+    mv -f "$fv_new" "$FO_RT/vpnd.rules"; ip route flush cache 2>/dev/null
+    fv_now=$(cut -d'>' -f4,5 "$FO_RT/vpnd.rules" | sort -u | tr '\n' ' ')
+    if [ -n "$fv_now" ]; then
+        logger -t ASNmanager "Failover: $(grep -c . "$FO_RT/vpnd.rules") VPN Director rule(s) follow it ($(echo $fv_now | sed 's/>/ -> /g'))"
+    elif [ -n "$fv_was" ]; then
+        logger -t ASNmanager "Failover: VPN Director rules use their own lines again"
+    fi
+    return 0
+}
+
+# a line works again: open connections of its VPN Director devices that went another way meanwhile would stay on it
+# until they end (the router keeps a connection on its way, hardware acceleration as well) - they are closed, the
+# devices open them again through their own line. Meanwhile = the fallback (VPN Director follows) or WAN (the firmware
+# sends them there without kill switch). $1 = line that works again, $2 = line it used meanwhile
+fo_ct_reset() {
+    if fo_vpnd_on; then fcr_l=$2; else fcr_l=WAN1; fi
+    # the address the fallback had (the firmware restarts all WireGuard clients when one comes back - the fallback may
+    # be down for a moment right now): remembered when the failover started
+    fcr_ip=$(cat "$FO_RT/ctip_$1" 2>/dev/null)
+    case "$fcr_l" in WAN*) fcr_ip="" ;; esac
+    # this round and the next two (connections may still be on their way back)
+    echo "$fcr_l $fcr_ip 3" > "$FO_RT/ctback_$1"
+}
+fo_ct_pending() {
+    for fcp_f in "$FO_RT"/ctback_*; do
+        [ -f "$fcp_f" ] || continue
+        fcp_t=${fcp_f##*/ctback_}; read -r fcp_l fcp_ip fcp_n < "$fcp_f"
+        case "$fcp_ip" in *.*) ;; *) fcp_n=$fcp_ip; fcp_ip="" ;; esac      # "line count" when no address was known
+        case "$fcp_n" in ''|*[!0-9]*) fcp_n=1 ;; esac
+        if [ "$(cat "$FO_RT/active_$fcp_t" 2>/dev/null)" = "$fcp_t" ]; then fo_ct_close "$fcp_t" "$fcp_l" back $fcp_ip; fcp_n=$((fcp_n - 1))
+        else fcp_n=0; fi
+        if [ $fcp_n -le 0 ]; then rm -f "$fcp_f" "$FO_RT/ctip_$fcp_t"; else echo "$fcp_l $fcp_ip $fcp_n" > "$fcp_f"; fi
+    done
+    return 0
+}
+# closes the connections of the VPN Director devices of line $1 that leave through line $2 ($3: back = $1 works
+# again, moved = $1 is down and its devices go over the fallback now - those that went over WAN meanwhile, e.g. after a
+# reboot before the failover took over, are closed and open again through the fallback)
+fo_ct_close() {
+    [ -r "$VPND_FILE" ] || return 0
+    # by its path: "command -v" did not find it when cron started the script
+    fr_ct=""; for fr_x in /usr/sbin/conntrack /sbin/conntrack /usr/bin/conntrack /opt/sbin/conntrack; do [ -x "$fr_x" ] && { fr_ct=$fr_x; break; }; done
+    [ -n "$fr_ct" ] || { logger -t ASNmanager "Failover: conntrack not found - old connections of $1 are not closed"; return 0; }
+    fr_l=$2
+    case "$fr_l" in
+        BLOCK|"") return 0 ;;
+        *) [ -n "$4" ] && fr_ip=$4 ;;
+    esac
+    [ -n "$4" ] || case "$fr_l" in
+        WAN|WAN1) fr_ip=$(nvram get wan0_ipaddr) ;;
+        WAN2) fr_ip=$(nvram get wan1_ipaddr) ;;
+        *) fr_ip=$(ip -4 addr show "$(get_ifname "$fr_l")" 2>/dev/null | awk '/inet / { split($2, a, "/"); print a[1]; exit }') ;;
+    esac
+    case "$fr_ip" in ''|0.0.0.0) [ "$3" = "back" ] && logger -t ASNmanager "Failover: $1 - address of $fr_l unknown right now, old connections checked again in the next round"; return 1 ;; esac
+    fr_n=0
+    for fr_s in $(tr '<' '\n' < "$VPND_FILE" | awk -F'>' -v t="$1" '$1 == "1" && $4 == "" { i = toupper($5); if (i == "WAN") i = "WAN1"
+            if (i == t && $3 ~ /^[0-9.]+(\/32)?$/) { sub(/\/32$/, "", $3); print $3 } }'); do
+        fr_c=$("$fr_ct" -D -s "$fr_s" -q "$fr_ip" 2>&1 | sed -n 's/.* \([0-9][0-9]*\) flow entries have been deleted.*/\1/p')
+        fr_n=$((fr_n + ${fr_c:-0}))
+    done
+    if [ $fr_n -eq 0 ]; then
+        logger -t ASNmanager "Failover: $1 - no open connection(s) of its devices via $fr_l ($fr_ip) left"
+    else
+        if [ "$3" = "moved" ]; then logger -t ASNmanager "Failover: $1 is down - $fr_n open connection(s) of its devices went via $fr_l: closed, they reconnect through the fallback"
+        else logger -t ASNmanager "Failover: $1 works again - $fr_n open connection(s) of its devices still went via $fr_l: closed, they reconnect through $1"; fi
+    fi
+    return 0
+}
+
+# targets that are down and moved to another one right now: "target active" (active may be BLOCK)
+fo_active_map() {
+    [ -s "$FO_CONF" ] || return 0
+    while IFS='=' read -r fa_t fa_ch; do
+        [ -n "$fa_t" ] || continue
+        fa_a=$(cat "$FO_RT/active_$fa_t" 2>/dev/null)
+        [ -n "$fa_a" ] && [ "$fa_a" != "$fa_t" ] && echo "$fa_t $fa_a"
+    done < "$FO_CONF"
+    return 0
+}
 fo_tname() { case "$1" in 254) echo main ;; 253) echo default ;; 255) echo local ;; *) echo "$1" ;; esac; }
 
 fo_probe() {
@@ -5677,6 +6233,10 @@ fo_health() {
     hf="$FO_RT/h_$1"; hs=""; hok=0; hfl=0
     [ -f "$hf" ] && read -r hs hok hfl < "$hf"
     if fo_probe "$1"; then hok=$((hok + 1)); hfl=0; else hfl=$((hfl + 1)); hok=0; fi
+    # a WireGuard client that is switched off in the WebUI is down at once - no second ping round. Only "switched off"
+    # (wgcN_enable=0): when one client is switched on or off the firmware restarts all of them ("restart wgc"), their
+    # interfaces are gone for a moment - that is no outage
+    case "$1" in WGC[1-5]) [ $hfl -gt 0 ] && [ "$(nvram get "wgc${1#WGC}_enable" 2>/dev/null)" = "0" ] && hfl=2 ;; esac
     if [ -z "$hs" ]; then if [ $hok -gt 0 ]; then hs=up; else hs=down; fi
     elif [ "$hs" = "up" ] && [ $hfl -ge 2 ]; then hs=down
     elif [ "$hs" = "down" ] && [ $hok -ge 2 ]; then hs=up; fi
@@ -5729,7 +6289,7 @@ fo_round() {
     [ -s "$FO_CONF" ] || return 0
     rt_heal
     mkdir -p "$FO_RT"
-    fo_now=$(date +%s); fo_changed=0
+    fo_now=$(date +%s); fo_changed=0; fo_ct_old=""; fo_ct_mv=""
     for fo_i in $(sed 's/=/,/' "$FO_CONF" | tr ',' '\n' | grep -v '^$' | sort -u); do echo "$fo_i $(fo_health "$fo_i")"; done > "$FO_RT/health.txt"
     while IFS='=' read -r fo_t fo_ch; do
         [ -n "$(fo_info "$fo_t")" ] || continue
@@ -5741,15 +6301,28 @@ fo_round() {
         fo_old=$(cat "$FO_RT/active_$fo_t" 2>/dev/null)
         if [ "$fo_act" != "$fo_old" ]; then
             echo "$fo_act" > "$FO_RT/active_$fo_t"; echo "$fo_now" > "$FO_RT/since_$fo_t"; fo_changed=1
-            if [ "$fo_act" = "$fo_t" ]; then [ -n "$fo_old" ] && logger -t ASNmanager "Failover: $fo_t works again - traffic via $fo_t"
+            if [ "$fo_act" = "$fo_t" ]; then [ -n "$fo_old" ] && { logger -t ASNmanager "Failover: $fo_t works again - traffic via $fo_t"; fo_ct_old="$fo_ct_old $fo_t:$fo_old"; }
             elif [ "$fo_act" = "BLOCK" ]; then logger -t ASNmanager "Failover: $fo_t is down - traffic for its ASNs is blocked"
-            else logger -t ASNmanager "Failover: $fo_t is down - traffic for its ASNs goes via $fo_act"; fi
+            else logger -t ASNmanager "Failover: $fo_t is down - traffic for its ASNs goes via $fo_act"
+                 case "$fo_act" in WAN*) ;; *) fo_ct_mv="$fo_ct_mv $fo_t"
+                     ip -4 addr show "$(get_ifname "$fo_act")" 2>/dev/null | awk '/inet / { split($2, a, "/"); print a[1]; exit }' > "$FO_RT/ctip_$fo_t" ;; esac; fi
         fi
         fo_set_rule "$fo_t" "$fo_act"
         fo_self_rule "$fo_t" "$fo_act"
+        if [ "$fo_act" != "$fo_t" ] && [ ! -s "$FO_RT/ctip_$fo_t" ]; then
+            case "$fo_act" in WAN*|BLOCK) ;; *) ip -4 addr show "$(get_ifname "$fo_act")" 2>/dev/null | awk '/inet / { split($2, a, "/"); print a[1]; exit }' > "$FO_RT/ctip_$fo_t" ;; esac
+        fi
     done < "$FO_CONF"
+    fo_vpnd_sync
+    # after the rules are back: close the connections that still use the way of the outage
+    for fo_x in $fo_ct_old; do fo_ct_reset "${fo_x%%:*}" "${fo_x#*:}"; done; fo_ct_old=""
+    fo_ct_pending
+    if fo_vpnd_on; then for fo_x in $fo_ct_mv; do fo_ct_close "$fo_x" WAN1 moved; done; fi; fo_ct_mv=""
     fo_export
     [ $fo_changed -eq 1 ] && rc_check >/dev/null 2>&1
+    # DNS follows: the names of the target that is down are looked up through the line in use (in the background:
+    # the sync waits for its lock and may wait for AdGuard Home)
+    if [ $fo_changed -eq 1 ] && { dnsf_on || dnsd_on; }; then ( "$SCRIPT_PATH" dnsfollow sync >/dev/null 2>&1 & ); fi
     return 0
 }
 
@@ -5775,7 +6348,9 @@ fo_export() {
         done
         printf '],"health":{'
         awk '{ printf "%s\"%s\":\"%s\"", (NR > 1 ? "," : ""), $1, $2 }' "$FO_RT/health.txt" 2>/dev/null
-        printf '}}\n'
+        printf '},"vpnd":%d,"vd":{' "$(fo_vpnd_on && echo 1 || echo 0)"
+        fo_vpnd_counts | awk '{ printf "%s\"%s\":%d", (NR > 1 ? "," : ""), $1, $2 }'
+        printf '},"vdmoved":%d}\n' "$(cat "$FO_RT/vpnd.rules" 2>/dev/null | grep -c .)"
     } > "$WEB_DIR/failover.js.tmp" && mv -f "$WEB_DIR/failover.js.tmp" "$WEB_DIR/failover.js"
 }
 
@@ -5784,9 +6359,14 @@ fo_cron_sync() {
         cru a ASN_Failover "* * * * * $SCRIPT_PATH failover run" 2>/dev/null
         ensure_script "$SERVICES_START"
         grep -q "# ${FO_HOOK}\$" "$SERVICES_START" 2>/dev/null || echo "$SCRIPT_PATH failover cron >/dev/null 2>&1 # ${FO_HOOK}" >> "$SERVICES_START"
+        # a VPN client is started / stopped (also by hand in the WebUI): check at once instead of at the next minute -
+        # three rounds 5 s apart, so a line that works again has its two good rounds within about 15 s
+        ensure_script "$SERVICE_EVENT"
+        grep -q "# ${FO_HOOK}\$" "$SERVICE_EVENT" 2>/dev/null || echo 'case "$2" in wgc*|vpnclient*|wireguard*) (sleep 6; '"$SCRIPT_PATH"' failover once; sleep 5; '"$SCRIPT_PATH"' failover once; sleep 5; '"$SCRIPT_PATH"' failover once) </dev/null >/dev/null 2>&1 & ;; esac # '"${FO_HOOK}" >> "$SERVICE_EVENT"
     else
         cru d ASN_Failover 2>/dev/null
         [ -f "$SERVICES_START" ] && sed -i "/# ${FO_HOOK}\$/d" "$SERVICES_START"
+        [ -f "$SERVICE_EVENT" ] && sed -i "/# ${FO_HOOK}\$/d" "$SERVICE_EVENT"
         rm -rf "$FO_RT"
     fi
 }
@@ -5821,6 +6401,8 @@ fo_set() {
         fo_set_rule "$fs_t" "$fs_t"; fo_self_rule "$fs_t" "$fs_t"
         rm -f "$FO_RT/active_$fs_t" "$FO_RT/since_$fs_t"
         [ -s "$FO_CONF" ] || rm -f "$FO_CONF"
+        fo_vpnd_sync
+        if dnsf_on || dnsd_on; then ( "$SCRIPT_PATH" dnsfollow sync >/dev/null 2>&1 & ); fi
         fo_cron_sync
         fo_export
         echo "Failover for ${fs_t} removed."
@@ -5829,18 +6411,24 @@ fo_set() {
 
 fo_show() {
     [ -s "$FO_CONF" ] || { echo "No failover configured."; return 0; }
+    echo "VPN Director follows the failover: $(fo_vpnd_on && echo on || echo off)   (failover vpnd on|off)"
     while IFS='=' read -r fw_t fw_ch; do
         fw_act=$(cat "$FO_RT/active_$fw_t" 2>/dev/null)
         echo "${fw_t} -> $(echo "$fw_ch" | sed 's/,/ -> /g')   active: ${fw_act:-(not checked yet)}"
     done < "$FO_CONF"
     [ -f "$FO_RT/health.txt" ] && sed 's/^/  /' "$FO_RT/health.txt"
+    [ -s "$FO_RT/vpnd.rules" ] && awk -F'>' '{ printf "  VPN Director (%s is down): %s%s -> %s\n", $4, ($1 == "all" ? "" : "from " $1 " "), ($2 == "all" ? "" : "to " $2), $5 }' "$FO_RT/vpnd.rules"
+    return 0
 }
 
 # complete removal (uninstall): ip rules are removed with the other rules
 fo_purge() {
     cru d ASN_Failover 2>/dev/null
     while ip rule del prio "$FO_SELF_PRIO" 2>/dev/null; do :; done
+    while ip rule del prio "$FO_VPND_PRIO" 2>/dev/null; do :; done
+    while ip rule del prio $((FO_VPND_PRIO - 1)) 2>/dev/null; do :; done
     [ -f "$SERVICES_START" ] && sed -i "/# ${FO_HOOK}\$/d" "$SERVICES_START"
+    [ -f "$SERVICE_EVENT" ] && sed -i "/# ${FO_HOOK}\$/d" "$SERVICE_EVENT"
     rm -rf "$FO_RT" "$FO_CONF" "$WEB_DIR/failover.js"
 }
 
@@ -6465,6 +7053,8 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   rescue                             stop stuck ASN Manager jobs, remove locks, restart failover and statistics
   amtmupdate [check]                 update for amtm (check: exit code 0 = amtm may update)
   mail off|daily|weekly|test|check|status  e-mail on new versions (amtm e-mail settings; a notice only)
+  devices                            all active devices: normal way, open connections per line, DNS
+  agh login <user> [password] | logout | status  login of AdGuard Home: "DNS per device" changes its clients without restarting it
   webui install [local] | enable | disable | update | uninstall | mount | unmount | export
   webui location <vpn|addons>        show the tab in the VPN (default) or the Addons menu
 USAGE_EOF
@@ -6563,8 +7153,9 @@ cli_main() {
                 cron)    fo_cron_sync ;;
                 set)     fo_set "$2" "$3" ;;
                 clear)   fo_set "$2" "" ;;
+                vpnd)    fo_vpnd_set "$2" ;;
                 show|"") fo_show ;;
-                *)       echo "Usage: failover show | set <TARGET> <FALLBACK>[,<FALLBACK>] | clear <TARGET> | once"; false ;;
+                *)       echo "Usage: failover show | set <TARGET> <FALLBACK>[,<FALLBACK>] | clear <TARGET> | vpnd on|off | once"; false ;;
             esac ;;
         check)
             case "$1" in
@@ -6585,6 +7176,15 @@ cli_main() {
                 status|"")   mail_status ;;
                 *)           echo "Usage: mail off|daily|weekly|test|check|status"; false ;;
             esac ;;
+        agh)
+            case "$1" in
+                login)       [ -n "$2" ] || { echo "Usage: agh login <user> [password] (asks for the password if left out)"; return 1; }
+                             al_p=$3; if [ -z "$al_p" ]; then printf 'AdGuard Home password: '; stty -echo 2>/dev/null; read -r al_p; stty echo 2>/dev/null; echo; fi
+                             rm -f "$AGH_AUTH.refused"; agh_login "$2" "$al_p" ;;
+                logout|off)  rm -f "$AGH_AUTH.refused"; agh_login off ;;
+                status|"")   agh_login_status ;;
+                *)           echo "Usage: agh login <user> [password] | logout | status"; false ;;
+            esac ;;
         update)
             case "$1" in
                 check)       upd_check; sed 's/[{}"]//g' "$WEB_DIR/update.js" 2>/dev/null ;;
@@ -6592,6 +7192,7 @@ cli_main() {
                 *)           echo "Usage: update check | install"; false ;;
             esac ;;
         service_event) service_event "$1" "$2"; return 0 ;;
+        devices)  cli_devices ;;
         help|-h|--help) cli_usage ;;
         *)        cli_usage; false ;;
     esac
