@@ -772,23 +772,37 @@ cu_hook_sync() {
     return 0
 }
 
+# one at a time: two runs at once (e.g. the nightly WAN reconnect starts firewall and VPN clients again while the
+# check runs) shared their work files - one saw half a list and took the addresses of many entries out of their sets
+CU_LOCK=/tmp/asnmanager-cu.lock
 cu_apply_dom() {
-    : > "$CU_GROUPS.raw"; : > /tmp/asnmanager-dnsmasq.lines; : > /tmp/asnmanager-seed.ent; cad_new=""; cad_fresh=""
+    cl_i=0
+    while ! mkdir "$CU_LOCK" 2>/dev/null; do
+        if [ -n "$(find "$CU_LOCK" -maxdepth 0 -mmin +5 2>/dev/null)" ]; then rm -rf "$CU_LOCK"; continue; fi
+        cl_i=$((cl_i + 1)); [ $cl_i -ge 120 ] && { logger -t ASNmanager "Domain routing: another run did not finish - skipped"; return 1; }
+        sleep 1
+    done
+    cu_apply_dom_run "$@"; cl_rc=$?
+    rmdir "$CU_LOCK" 2>/dev/null
+    return $cl_rc
+}
+cu_apply_dom_run() {
+    : > "$CU_GROUPS.raw.$$"; : > /tmp/asnmanager-dnsmasq.$$; : > /tmp/asnmanager-seed.$$; cad_new=""; cad_fresh=""
     if [ -s "$CUSTOM_FILE" ]; then
         while IFS=: read -r cid cdest csrc ckind cval; do
             [ "$ckind" = "dom" ] || continue
             case "$cid" in C[0-9]*) ;; *) continue ;; esac
             cad_key="${cdest}|${csrc}"
             cad_set="ASND_${cdest}_$(echo "$cad_key" | md5sum | cut -c1-6)"
-            printf '%s\t%s\t%s\n' "$cad_key" "$cad_set" "$cval" >> "$CU_GROUPS.raw"
+            printf '%s\t%s\t%s\n' "$cad_key" "$cad_set" "$cval" >> "$CU_GROUPS.raw.$$"
             # one line per domain: the group set routes, the entry's own set counts what was learned for this domain
             [ "$(cu_set_make "ASNC_$cid")" = "new" ] && { cad_new=force; cad_fresh="$cad_fresh ASNC_$cid"; }
-            echo "ipset=/$cval/$cad_set,ASNC_$cid" >> /tmp/asnmanager-dnsmasq.lines
-            printf '%s\t%s\t%s\n' "$cid" "$cad_set" "$cval" >> /tmp/asnmanager-seed.ent
+            echo "ipset=/$cval/$cad_set,ASNC_$cid" >> /tmp/asnmanager-dnsmasq.$$
+            printf '%s\t%s\t%s\n' "$cid" "$cad_set" "$cval" >> /tmp/asnmanager-seed.$$
         done < "$CUSTOM_FILE"
     fi
-    awk -F'\t' '{ if ($1 in l) l[$1] = l[$1] " " $3; else { l[$1] = $3; s[$1] = $2 } } END { for (k in l) printf "%s\t%s\t%s\n", k, s[k], l[k] }' "$CU_GROUPS.raw" > "$CU_GROUPS.new"
-    mv -f "$CU_GROUPS.new" "$CU_GROUPS"; rm -f "$CU_GROUPS.raw"
+    awk -F'\t' '{ if ($1 in l) l[$1] = l[$1] " " $3; else { l[$1] = $3; s[$1] = $2 } } END { for (k in l) printf "%s\t%s\t%s\n", k, s[k], l[k] }' "$CU_GROUPS.raw.$$" > "$CU_GROUPS.new.$$"
+    mv -f "$CU_GROUPS.new.$$" "$CU_GROUPS"; rm -f "$CU_GROUPS.raw.$$"
     # marking rules of every domain set go (they are added again below); sets of groups that no longer exist are destroyed
     for cad_s in $(ipset list -n 2>/dev/null | grep '^ASND_'); do
         cu_rules_del "$cad_s"
@@ -801,12 +815,12 @@ cu_apply_dom() {
         if cu_usable "$cad_t"; then cu_route "$cad_t"; cu_rules_add "$cad_set" "$cad_t" "$cad_src"; fi
     done < "$CU_GROUPS"
     cu_learned_restore $cad_fresh
-    cu_seed_known /tmp/asnmanager-seed.ent
-    cu_group_cleanup /tmp/asnmanager-seed.ent
-    cu_group_prune /tmp/asnmanager-seed.ent
-    cp -f /tmp/asnmanager-seed.ent "$CU_IDMAP" 2>/dev/null; rm -f /tmp/asnmanager-seed.ent
-    cu_dnsmasq_write /tmp/asnmanager-dnsmasq.lines "$cad_new"
-    rm -f /tmp/asnmanager-dnsmasq.lines
+    cu_seed_known /tmp/asnmanager-seed.$$
+    cu_group_cleanup /tmp/asnmanager-seed.$$
+    cu_group_prune /tmp/asnmanager-seed.$$
+    cp -f /tmp/asnmanager-seed.$$ "$CU_IDMAP" 2>/dev/null; rm -f /tmp/asnmanager-seed.$$
+    cu_dnsmasq_write /tmp/asnmanager-dnsmasq.$$ "$cad_new"
+    rm -f /tmp/asnmanager-dnsmasq.$$
     cu_cset_cleanup
     agh_ipset_prune
     cu_hook_sync "$(cut -f2 "$CU_GROUPS" 2>/dev/null)"
