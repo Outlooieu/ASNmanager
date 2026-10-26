@@ -527,7 +527,7 @@ var ASNM_I18N = {
     upd_available: 'v{r} available', upd_error: 'GitHub not reachable', upd_install: 'Update now', upd_notes: 'What is new?', upd_running: 'Updating - please wait, the page reloads afterwards...',
     banner_update: 'A new version is available: ASN Manager v{r} (installed: v{l}).',
     upd_confirm: 'Install ASN Manager v{r} now?\nThe page reloads afterwards. ASN list, schedule and statistics are kept.',
-    rc_title: 'Routing check', rc_more: 'show {n} more', rc_less: 'show less', rc_now: 'Check now', rc_checking: 'Checking...', rc_summary: '{ok} OK · {warn} warnings · {fail} errors', rc_checked: 'checked {t}',
+    rc_title: 'Routing check', q_step: 'Step {d} of {t}: {a}', q_done: 'Done in {s} s.', act_rsset: 'Settings', act_cimport: 'Domains & IPs', act_nimport: 'Notes', rc_more: 'show {n} more', rc_less: 'show less', rc_now: 'Check now', rc_checking: 'Checking...', rc_summary: '{ok} OK · {warn} warnings · {fail} errors', rc_checked: 'checked {t}',
     rc_none: 'no ASNs', rc_th: 'Routing', rc_down: 'offline', rc_noroute: 'no route', rc_norule: 'not active', rc_nosub: 'no subnets',
     rc_tip_ok: 'Sample address {ip} goes via {dev} as intended.', rc_tip_wrong: 'Sample address {ip} goes via {got} instead of {dev}!',
     rc_tip_down: 'Target interface {dev} is offline.', rc_tip_noroute: 'No route found for {ip}.', rc_tip_norule: 'The rule is not active - click "Apply rules".',
@@ -680,7 +680,7 @@ var ASNM_I18N = {
     upd_available: 'v{r} verfügbar', upd_error: 'GitHub nicht erreichbar', upd_install: 'Jetzt aktualisieren', upd_notes: 'Was ist neu?', upd_running: 'Update läuft - bitte warten, danach lädt die Seite neu...',
     banner_update: 'Neue Version verfügbar: ASN Manager v{r} (installiert: v{l}).',
     upd_confirm: 'ASN Manager v{r} jetzt installieren?\nDanach lädt die Seite neu. ASN-Liste, Zeitplan und Statistik bleiben erhalten.',
-    rc_title: 'Routing-Prüfung', rc_more: '{n} weitere anzeigen', rc_less: 'weniger anzeigen', rc_now: 'Jetzt prüfen', rc_checking: 'Wird geprüft...', rc_summary: '{ok} OK · {warn} Warnungen · {fail} Fehler', rc_checked: 'geprüft {t}',
+    rc_title: 'Routing-Prüfung', q_step: 'Schritt {d} von {t}: {a}', q_done: 'Fertig in {s} s.', act_rsset: 'Einstellungen', act_cimport: 'Domains & IPs', act_nimport: 'Notizen', rc_more: '{n} weitere anzeigen', rc_less: 'weniger anzeigen', rc_now: 'Jetzt prüfen', rc_checking: 'Wird geprüft...', rc_summary: '{ok} OK · {warn} Warnungen · {fail} Fehler', rc_checked: 'geprüft {t}',
     rc_none: 'keine ASNs', rc_th: 'Routing', rc_down: 'offline', rc_noroute: 'keine Route', rc_norule: 'nicht aktiv', rc_nosub: 'keine Subnetze',
     rc_tip_ok: 'Beispiel-Adresse {ip} geht wie geplant über {dev}.', rc_tip_wrong: 'Beispiel-Adresse {ip} geht über {got} statt über {dev}!',
     rc_tip_down: 'Ziel-Interface {dev} ist offline.', rc_tip_noroute: 'Für {ip} wurde keine Route gefunden.', rc_tip_norule: 'Die Regel ist nicht aktiv - "Regeln anwenden" klicken.',
@@ -1482,7 +1482,7 @@ function asnmCsLoad() {
 }
 function asnmSend(action, args) {
     if (ASNM.busy) return false;
-    var id = String(Date.now());
+    var id = String(Date.now()) + (ASNM.queue && ASNM.queue.length ? 'q' : '');       // more jobs follow: the router writes the page data after the last one
     var parts = [id, action];
     for (var i = 0; i < args.length; i++) parts.push(asnmClean(args[i]));
     var f = document.formAsnm;
@@ -1505,7 +1505,18 @@ function asnmSend(action, args) {
 function asnmSendQueue(jobs) {
     if (ASNM.busy || !jobs.length) return;
     ASNM.queue = jobs.slice(1);
+    ASNM.qTotal = jobs.length; ASNM.qDone = 0; ASNM.qStart = Date.now();
     asnmSend(jobs[0][0], jobs[0][1]);
+}
+// progress of a queue (import): step n of N, what runs now, seconds so far
+function asnmQueueProgress(action) {
+    if (!(ASNM.qTotal > 1)) return;
+    var box = document.getElementById('asnm_progress');
+    box.style.display = 'block'; box.className = 'asnm-progress';
+    var pct = Math.round((ASNM.qDone + 0.5) / ASNM.qTotal * 100);
+    document.getElementById('asnm_progress_bar').style.width = Math.max(pct, 3) + '%';
+    document.getElementById('asnm_progress_text').textContent = t('q_step', { d: ASNM.qDone + 1, t: ASNM.qTotal, a: asnmActLabel(action || ASNM.jobAction) }) +
+        '   ' + Math.round((Date.now() - ASNM.qStart) / 1000) + 's';
 }
 
 function asnmActLabel(a) { var k = 'act_' + a, v = t(k); return v === k ? a : v; }
@@ -1540,7 +1551,7 @@ function asnmPoll() {
             // refused because another job runs: follow that one instead
             if (job.state === 'error' && job.busyid && job.busyid !== ASNM.jobId) { asnmFollowJob(job.busyid, job.busy, true); return; }
             if (job.state !== 'running') { asnmJobDone(job); return; }
-            if (job.total > 0) asnmShowProgress(job);
+            if (job.total > 0) asnmShowProgress(job); else asnmQueueProgress();
         }
         asnmPollAgain();
     }, asnmPollAgain);
@@ -1606,10 +1617,13 @@ function asnmJobDone(job) {
 
     if (ok && ASNM.queue.length) {
         var next = ASNM.queue.shift();
+        ASNM.qDone++;
         asnmSend(next[0], next[1]);
+        asnmQueueProgress(next[0]);
         return;
     }
-    ASNM.queue = [];
+    if (ASNM.qTotal > 1 && ok) asnmSetStatus(t('q_done', { s: Math.round((Date.now() - ASNM.qStart) / 1000) }), false);
+    ASNM.queue = []; ASNM.qTotal = 0;
     asnmLoadData(false);
 }
 
@@ -2302,9 +2316,11 @@ function asnmImportRun() {
         for (i = 0; i < r.failover.length; i++) { var p = r.failover[i][1].split(','); jobs.push(['failover', [r.failover[i][0], p[0] || '', p[1] || '']]); }
     }
     if (chk('asnm_rs_set')) {
-        var order = ['STATS_SAVING', 'STATS_MODE', 'RULES_MODE', 'WEBUI_LOCATION', 'SG_DOMAINS', 'DNS_FOLLOW', 'DNS_DEVICE', 'DNS_TLS', 'MAIL_NOTIFY', 'FO_VPND', 'STATS'];
-        for (i = 0; i < order.length; i++) if (r.settings[order[i]]) jobs.push(['setting', [order[i], r.settings[order[i]]]]);
-        for (i = 0; i < r.dnssrv.length; i++) jobs.push(['dnsfsrv', [r.dnssrv[i][0], r.dnssrv[i][1]]]);              // DNS of the VPN provider per line
+        // all settings in one job: the router syncs DNS once at the end (one restart of dnsmasq / AdGuard Home instead of one per setting)
+        var order = ['STATS_SAVING', 'STATS_MODE', 'RULES_MODE', 'WEBUI_LOCATION', 'SG_DOMAINS', 'DNS_FOLLOW', 'DNS_DEVICE', 'DNS_TLS', 'MAIL_NOTIFY', 'FO_VPND', 'STATS'], kv = [];
+        for (i = 0; i < order.length; i++) if (r.settings[order[i]]) kv.push(order[i] + '=' + r.settings[order[i]]);
+        for (i = 0; i < r.dnssrv.length; i++) kv.push('DNS_SERVER_' + r.dnssrv[i][0] + '=' + r.dnssrv[i][1]);     // DNS of the VPN provider per line
+        if (kv.length) jobs.push(['rsset', [kv.join(';')]]);
         if (r.presets.length) {                                                                                        // own presets of the router
             var pchunk = [], plen = 0;
             for (i = 0; i < r.presets.length; i++) {

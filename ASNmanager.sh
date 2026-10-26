@@ -1450,6 +1450,23 @@ rs_setting() {
     return 0
 }
 
+# several settings at once ("KEY=value;KEY=value"): DNS is synced once at the end
+rs_settings_batch() {
+    rm -f /tmp/asnmanager-dnsf.deferred
+    DNSF_DEFER=1; export DNSF_DEFER
+    for rsb_kv in $(echo "$1" | tr ';' ' '); do
+        case "$rsb_kv" in *=*) rs_setting "${rsb_kv%%=*}" "${rsb_kv#*=}" ;; esac
+    done
+    DNSF_DEFER=""; export DNSF_DEFER
+    if [ -f /tmp/asnmanager-dnsf.deferred ]; then
+        rm -f /tmp/asnmanager-dnsf.deferred
+        echo "DNS: applying all DNS settings at once ..."; dnsf_sync
+        [ -s "$DNSD_ERR" ] && cat "$DNSD_ERR"
+    fi
+    echo "Settings restored."
+    return 0
+}
+
 # rs_apply <categories: asn,schedule,failover,settings> <replace|merge>
 rs_apply() {
     ra_cats=",$1,"; ra_mode="${2:-replace}"
@@ -1482,7 +1499,7 @@ rs_apply() {
         while IFS='=' read -r ra_t ra_c; do [ -n "$ra_t" ] && fo_set "$ra_t" "$ra_c"; done < "$RS_DIR/fo.txt" ;;
     esac
     case "$ra_cats" in *,settings,*)
-        while IFS='=' read -r ra_k ra_v; do [ -n "$ra_k" ] && rs_setting "$ra_k" "$ra_v"; done < "$RS_DIR/set.txt"
+        rs_settings_batch "$(grep '=' "$RS_DIR/set.txt" | tr -d ' ' | tr '\n' ';')"
         if [ -s "$RS_DIR/presets.txt" ]; then
             cli_pimport "$ra_mode" "$(awk '{ printf "%s%s", (NR > 1 ? ";" : ""), $0 }' "$RS_DIR/presets.txt" | sed 's/%/%25/g; s/ /%20/g')"
         fi ;;
@@ -3340,7 +3357,8 @@ web_job() {
     IFS=$old_ifs
     set +f
     id="$1"; act="$2"; a1="$3"; a2="$4"; a3="$5"; a4="$6"; a5="$7"; a6="$8"; a7="$9"
-    case "$id" in ''|*[!0-9]*) return 1 ;; esac
+    # "<id>q": a job of a queue with more jobs after it - the page data is written after the last one only
+    case "$id" in ''|q*|*[!0-9q]*) return 1 ;; esac
     case "$act" in ''|*[!a-z]*) return 1 ;; esac
 
     JOB_NEXT_ACT="$act"; JOB_NEXT_ID="$id"
@@ -3392,6 +3410,7 @@ web_job() {
         diagpack) cli_diagpack "$a1" > "$OUT" 2>&1 ;;
         speedtest) st_run "$a1" > "$OUT" 2>&1 ;;
         setting)  rs_setting "$a1" "$a2" > "$OUT" 2>&1 ;;
+        rsset)    rs_settings_batch "$a1" > "$OUT" 2>&1 ;;
         dnsfsrv)  dnsf_server_set "$a1" $(echo "$a2" | tr ',' ' ') > "$OUT" 2>&1 ;;
         mailtest) mail_test > "$OUT" 2>&1 ;;
         aghlogin) rm -f "$AGH_AUTH.refused"; agh_login "$a1" > "$OUT" 2>&1 ;;
@@ -3403,7 +3422,8 @@ web_job() {
     esc=$(printf '\033')
     sed -i "s/${esc}\[[0-9;]*m//g" "$OUT"
     # after an update this process is still the OLD script (old version number in its data): the new script writes the data
-    if [ "$act" = "update" ] && grep -q '^Updated to' "$OUT"; then "$SCRIPT_PATH" webui export >/dev/null 2>&1; else web_export; fi
+    if [ "$act" = "update" ] && grep -q '^Updated to' "$OUT"; then "$SCRIPT_PATH" webui export >/dev/null 2>&1
+    else case "$id" in *q) ;; *) web_export ;; esac; fi
     msg=$(grep . "$OUT" | tail -n 1)
     [ $rc -eq 0 ] && job_status "$id" "$act" "done" "$msg" || job_status "$id" "$act" "error" "${msg:-Failed}"
     rm -rf "$LOCK_DIR"; trap - EXIT
@@ -4438,6 +4458,9 @@ dnsf_conf_write() {
 # them would both restart AdGuard Home); a second one waits for the first and then runs with the new state
 DNSF_LOCK=/tmp/asnmanager-dnsf.lock
 dnsf_sync() {
+    # several settings in a row (restore): one sync at the end instead of one per setting (each one may restart
+    # dnsmasq / AdGuard Home)
+    if [ "$DNSF_DEFER" = "1" ]; then : > /tmp/asnmanager-dnsf.deferred; return 0; fi
     dsl_i=0
     while ! mkdir "$DNSF_LOCK" 2>/dev/null; do
         dsl_p=$(cat "$DNSF_LOCK/pid" 2>/dev/null)

@@ -634,5 +634,8 @@ window.ASNM_LANGPACK = {"code": "da", "locale": "da-DK", "name": "Dansk", "t": {
 "agh_add": "Indtast login",
 "rc_more": "vis {n} mere",
 "rc_less": "vis mindre",
+"q_step": "Trin {d} af {t}: {a}",
+"q_done": "Færdig på {s} s.",
+"act_rsset": "Indstillinger",
 "footer": "ASN Manager til Asuswrt-Merlin"
 }};

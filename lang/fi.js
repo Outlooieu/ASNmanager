@@ -634,5 +634,8 @@ window.ASNM_LANGPACK = {"code": "fi", "locale": "fi-FI", "name": "Suomi", "t": {
 "agh_add": "Anna tunnukset",
 "rc_more": "näytä {n} lisää",
 "rc_less": "näytä vähemmän",
+"q_step": "Vaihe {d}/{t}: {a}",
+"q_done": "Valmis {s} sekunnissa.",
+"act_rsset": "Asetukset",
 "footer": "ASN Manager Asuswrt-Merlinille"
 }};

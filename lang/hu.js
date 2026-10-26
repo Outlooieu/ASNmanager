@@ -634,5 +634,8 @@ window.ASNM_LANGPACK = {"code": "hu", "locale": "hu-HU", "name": "Magyar", "t": 
 "agh_add": "Bejelentkezés megadása",
 "rc_more": "még {n} megjelenítése",
 "rc_less": "kevesebb",
+"q_step": "{d}. lépés / {t}: {a}",
+"q_done": "Kész {s} mp alatt.",
+"act_rsset": "Beállítások",
 "footer": "ASN Manager Asuswrt-Merlinhez"
 }};
