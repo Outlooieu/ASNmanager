@@ -422,6 +422,7 @@
 .asnm-dw-txt { flex: 1 1 auto; min-width: 0; }
 .asnm-dw-txt .asnm-label { display: block; margin-bottom: 3px; }
 .asnm-dw-row .asnm-seg { flex: none; }
+.asnm-fo-vd { margin-top: 18px; padding: 14px 14px !important; border: 1px solid var(--line2) !important; border-radius: 10px; background: var(--card2, transparent); }
 .asnm-dw-sub { margin: -6px 0 12px 2px; padding: 4px 0 4px 12px; border-left: 3px solid var(--line2); font-size: 12px; }
 .asnm-dw-sub .asnm-dw-sublabel { display: inline; margin-right: 8px; }
 @media (max-width: 560px) { .asnm-dw-row { flex-direction: column; align-items: flex-start; gap: 8px; } }
@@ -3298,11 +3299,12 @@ function asnmFoRender() {
         if (used && !seen[id]) { seen[id] = 1; tgs.push(id); }
     }
     var vd = d && d.vpnd ? 1 : 0;
-    var h = '<div class="asnm-fo-head"><span class="asnm-sec-title">' + asnmEsc(t('fo_title')) + '</span><span class="asnm-dev">' + asnmEsc(t('fo_sub')) + '</span></div>' +
-        '<div class="asnm-dw-row" style="border-top:0;padding-top:0;"><div class="asnm-dw-txt"><span class="asnm-label">' + asnmEsc(t('fo_vd')) + '</span><span class="asnm-help">' + asnmEsc(t('fo_vd_desc')) + '</span>' +
+    var h = '<div class="asnm-fo-head"><span class="asnm-sec-title">' + asnmEsc(t('fo_title')) + '</span><span class="asnm-dev">' + asnmEsc(t('fo_sub')) + '</span></div>';
+    // the switch for the VPN Director comes last, set apart: the chains above work without it
+    var vdh = '<div class="asnm-dw-row asnm-fo-vd"><div class="asnm-dw-txt"><span class="asnm-label">' + asnmEsc(t('fo_vd')) + '</span><span class="asnm-help">' + asnmEsc(t('fo_vd_desc')) + '</span>' +
         (d && d.vdmoved ? '<div class="asnm-help"><span class="asnm-dw-no">' + asnmEsc(t('fo_vd_moved', { n: d.vdmoved })) + '</span></div>' : '') + '</div>' +
         '<div class="asnm-seg"><span class="' + (vd ? '' : 'asnm-on') + '" onclick="asnmFoVd(0);">' + asnmEsc(t('dnsf_off')) + '</span><span class="' + (vd ? 'asnm-on' : '') + '" onclick="asnmFoVd(1);">' + asnmEsc(t('dnsf_on')) + '</span></div></div>';
-    if (!tgs.length) { box.innerHTML = h + '<div class="asnm-muted">' + asnmEsc(t('fo_noasn')) + '</div>'; return; }
+    if (!tgs.length) { box.innerHTML = h + '<div class="asnm-muted">' + asnmEsc(t('fo_noasn')) + '</div>' + vdh; return; }
     h += '<table class="asnm-table"><tr><th>' + t('fo_th_t') + '</th><th>' + t('fo_th_1') + '</th><th>' + t('fo_th_2') + '</th><th>' + t('fo_th_state') + '</th><th></th></tr>';
     for (i = 0; i < tgs.length; i++) {
         var tg = tgs[i], c = asnmFoChain(tg), ed = ASNM_FO.edit[tg] || (c ? [c.fb[0] || '', c.fb[1] || ''] : ['', '']);
@@ -3313,7 +3315,7 @@ function asnmFoRender() {
              '<td>' + asnmFoState(tg, c) + '</td>' +
              '<td><input type="button" class="button_gen asnm-small-btn asnm-btn asnm-primary" value="' + asnmEsc(t('fo_save')) + '" onclick="asnmFoSave(\'' + tg + '\');"/></td></tr>';
     }
-    box.innerHTML = h + '</table><div class="asnm-sg-foot">' + asnmEsc(t('fo_note', { s: (d && d.interval) || 30 })) + '</div>';
+    box.innerHTML = h + '</table><div class="asnm-sg-foot">' + asnmEsc(t('fo_note', { s: (d && d.interval) || 30 })) + '</div>' + vdh;
     asnmApplyBusy();
 }
 
