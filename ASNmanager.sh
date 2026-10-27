@@ -7155,6 +7155,7 @@ SM_PID="/tmp/${WEBUI_NS}-smwatch.pid"
 SM_ROLLED="/tmp/${WEBUI_NS}-sm.rolled"         # a rollback was done this boot
 SM_NOTUS="/tmp/${WEBUI_NS}-sm.notus"           # the rollback did not help: the problem is elsewhere (this boot)
 SM_LAST="/tmp/${WEBUI_NS}-sm.last"             # last test result (time result reason)
+SM_STATE="/tmp/${WEBUI_NS}-sm.state"           # what the running self-test does right now
 SM_HOOK="ASNmanager-Safemode"
 SM_READY_MAX=${SM_READY_MAX:-600}
 SM_WINDOW=${SM_WINDOW:-120}
@@ -7174,15 +7175,16 @@ sm_hook_sync() {
 }
 
 # the router is fully up: internet line connected, time set, dnsmasq (and AdGuard Home) running, no rule building
-sm_ready() {
+sm_ready() {      # sm_why = what is missing
+    sm_why="WAN not connected"
     [ "$(nvram get wan0_state_t 2>/dev/null)" = "2" ] || [ "$(nvram get wan1_state_t 2>/dev/null)" = "2" ] || return 1
-    [ "$(nvram get ntp_ready 2>/dev/null)" = "1" ] || return 1
-    pidof dnsmasq >/dev/null 2>&1 || return 1
-    if agh_present; then pidof AdGuardHome >/dev/null 2>&1 || return 1; fi
-    ps w 2>/dev/null | grep -v grep | grep -q 'asn-bypass-worker' && return 1
-    [ -d "$DNSF_LOCK" ] && return 1
-    [ -d "$CU_LOCK" ] && return 1
-    return 0
+    sm_why="time not set (NTP)";               [ "$(nvram get ntp_ready 2>/dev/null)" = "1" ] || return 1
+    sm_why="dnsmasq not running";              pidof dnsmasq >/dev/null 2>&1 || return 1
+    sm_why="AdGuard Home not running";         if agh_present; then pidof AdGuardHome >/dev/null 2>&1 || return 1; fi
+    sm_why="ASN rules are being built";        ps w 2>/dev/null | grep -v grep | grep -q 'asn-bypass-worker' && return 1
+    sm_why="DNS sync running ($DNSF_LOCK)";    [ -d "$DNSF_LOCK" ] && return 1
+    sm_why="domain rules being built ($CU_LOCK)"; [ -d "$CU_LOCK" ] && return 1
+    sm_why=""; return 0
 }
 
 # the router reaches the internet through the WAN line itself (bound to the WAN interface: no rule of ASN Manager
@@ -7237,7 +7239,7 @@ sm_test() {
     if pidof dnsmasq >/dev/null 2>&1; then echo "[OK]   dnsmasq is running"; else echo "[FAIL] dnsmasq is not running"; fi
     if sm_dns_ok; then echo "[OK]   DNS answers from the router"; else echo "[FAIL] no DNS answers from the router (127.0.0.1)"; fi
     if st_l=$(sm_lan_bad); then echo "[FAIL] $st_l"; else echo "[OK]   LAN routing"; fi
-    if sm_ready; then echo "[OK]   router is fully up"; else echo "[--]   router is not fully up yet (WAN / time / dnsmasq / AdGuard Home / rule building)"; fi
+    if sm_ready; then echo "[OK]   router is fully up"; else echo "[--]   router is not fully up yet: $sm_why"; fi
 }
 
 # start the self-test in the background (a running one is replaced: its time starts again)
@@ -7257,23 +7259,26 @@ sm_watch() {
     echo $$ > "$SM_PID"
     [ "$sw_why" = "boot" ] && [ -f "$SM_FLAG" ] && sm_log "last boot ended in safemode ($(cut -d' ' -f2- "$SM_FLAG")) - starting normally once more, with the self-test"
     sw_t=0
+    sw_t0=$(date +%s)
     until sm_ready; do
         [ "$(cat "$SM_PID" 2>/dev/null)" = "$$" ] || return 0
+        echo "$sw_t0 $sw_why: waiting until the router is fully up - $sm_why" > "$SM_STATE"
         sw_t=$((sw_t + 10))
         if [ $sw_t -ge "$SM_READY_MAX" ]; then
-            echo "$(date +%s) skip $sw_why: router not fully up after ${SM_READY_MAX}s" > "$SM_LAST"
-            sm_log "self-test ($sw_why) not done: router not fully up after ${SM_READY_MAX}s"; rm -f "$SM_PID"; return 0
+            echo "$(date +%s) skip $sw_why: router not fully up after ${SM_READY_MAX}s - $sm_why" > "$SM_LAST"
+            sm_log "self-test ($sw_why) not done: router not fully up after ${SM_READY_MAX}s - $sm_why"; rm -f "$SM_PID" "$SM_STATE"; return 0
         fi
         sleep 10
     done
-    sw_end=$(( $(date +%s) + SM_WINDOW )); sw_fails=0; sw_pass=0; sw_res=""; sw_r=""
+    sw_end=$(( $(date +%s) + SM_WINDOW )); sw_fails=0; sw_pass=0; sw_res=""; sw_r=""; sw_last=""
     while :; do
         [ "$(cat "$SM_PID" 2>/dev/null)" = "$$" ] || return 0        # replaced by a newer test
-        sm_on && { rm -f "$SM_PID"; return 0; }
+        sm_on && { rm -f "$SM_PID" "$SM_STATE"; return 0; }
         if sm_wan_ok; then
             if sw_r=$(sm_fail); then sw_fails=$((sw_fails + 1)); sw_pass=0; sw_last=$sw_r; else sw_pass=$((sw_pass + 1)); sw_fails=0; fi
         fi
         sw_now=$(date +%s)
+        echo "$sw_t0 $sw_why: testing - $sw_pass ok / $sw_fails failed in a row${sw_last:+ (last: $sw_last)}" > "$SM_STATE"
         if [ "$sw_now" -ge "$sw_end" ]; then
             [ $sw_pass -ge 1 ] && { sw_res=ok; break; }
             [ $sw_fails -ge 4 ] && { sw_res=fail; break; }
@@ -7281,7 +7286,7 @@ sm_watch() {
         fi
         sleep "$SM_STEP"
     done
-    rm -f "$SM_PID"
+    rm -f "$SM_PID" "$SM_STATE"
     case "$sw_res" in
         ok)   echo "$(date +%s) ok $sw_why" > "$SM_LAST"
               if [ -f "$SM_FLAG" ]; then rm -f "$SM_FLAG"; sm_log "self-test ($sw_why) passed - safemode over"; [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1; fi ;;
@@ -7401,7 +7406,11 @@ sm_status() {
                    echo "All rules of ASN Manager are out. \"safemode off\" (or Apply) turns them on again."
     elif [ -f "$SM_FLAG" ]; then echo "Safemode: off - the last boot ended in safemode ($(cut -d' ' -f2- "$SM_FLAG")); the self-test decides again"
     else echo "Safemode: off"; fi
-    sl_p=$(cat "$SM_PID" 2>/dev/null); [ -n "$sl_p" ] && [ -d "/proc/$sl_p" ] && echo "Self-test: running"
+    sl_p=$(cat "$SM_PID" 2>/dev/null)
+    if [ -n "$sl_p" ] && [ -d "/proc/$sl_p" ] && grep -q 'safemode' "/proc/$sl_p/cmdline" 2>/dev/null; then
+        if [ -s "$SM_STATE" ]; then read -r ss_t ss_r < "$SM_STATE"; echo "Self-test: running since $(date -d "@$ss_t" '+%H:%M:%S' 2>/dev/null) ($ss_r)"
+        else echo "Self-test: running"; fi
+    fi
     [ -s "$SM_LAST" ] && { read -r sl_t sl_r < "$SM_LAST"; echo "Last self-test: $(date -d "@$sl_t" '+%Y-%m-%d %H:%M' 2>/dev/null) $sl_r"; }
     return 0
 }
