@@ -2678,8 +2678,9 @@ cli_devices() {
     awk '$3 == "0x2" && $6 ~ /^br/ && $1 !~ /^169\.254\./ { print $1 }' /proc/net/arp 2>/dev/null | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | while read -r dvs_ip; do
         dvs_w=$(dg_target_of_dev "$(dg_route_dev 1.1.1.1 "$dvs_ip")")
         dvs_l=$(awk -v ip="$dvs_ip" -v nf="$dvs_n" 'BEGIN { while ((getline l < nf) > 0) { split(l, a, " "); w[a[1]] = a[2] } }
-            { k = 0; s = ""; for (i = 1; i <= NF; i++) { if ($i ~ /^src=/ && s == "") s = substr($i, 5); if ($i ~ /^dst=/) { k++; if (k == 2) d = substr($i, 5) } }
-              if (s == ip && (d in w)) c[w[d]]++ }
+            { k = 0; s = ""; f = ""; for (i = 1; i <= NF; i++) { if ($i ~ /^src=/ && s == "") s = substr($i, 5); if ($i ~ /^dst=/) { k++; if (k == 1) f = substr($i, 5); if (k == 2) d = substr($i, 5) } }
+              # over WAN to a private address: the network in front of the router (e.g. the Fritz!Box), not the internet
+              if (s == ip && (d in w)) { x = w[d]; if (x ~ /^WAN/ && f ~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.)/) x = x "-lan"; c[x]++ } }
             END { for (x in c) o = o (o == "" ? "" : " ") x ":" c[x]; print o }' "$dvs_ct" 2>/dev/null)
         dvs_lb=$(dg_dns_label "$dvs_ip" "$dvs_c")
         dvs_key="$(dg_dns_key "$dvs_ip" "$dvs_c")|$(echo "$dvs_lb" | sed 's/ + [0-9]* own DNS rule.*//')"
@@ -2699,6 +2700,7 @@ cli_devices() {
     echo "  (+N sites: own DNS rules of the device for single sites - see the device check)"
     rm -f "$dvs_k"
     echo ""
+    echo "WAN1-lan = connections over WAN to the network in front of the router (e.g. the Fritz!Box and its devices), not to the internet."
     echo "WAY = the normal way of the device (VPN Director); CONNECTIONS = lines its open connections use right now (entries of"
     echo "ASN Manager send single sites over other lines; a connection keeps the line it was opened on)."
     rm -f "$dvs_c" "$dvs_n"
