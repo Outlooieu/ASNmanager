@@ -587,6 +587,7 @@ var ASNM_I18N = {
     disp_unit_desc: 'Used for the live throughput, the speed test and the summaries. 1 MB/s = 8 Mbit/s. Data amounts (for example 1.2 GB) are not affected.',
     disp_change: 'Change unit',
     perf_title: 'Performance', perf_sub: 'Reduce the CPU load of the router',
+    ex_title: 'Excluded devices', ex_desc: 'Devices or networks ASN Manager leaves alone - e.g. the guest network (192.168.2.0/24). None of its entries applies to them (also not those for single devices); they take their normal way (VPN Director / WAN). Several separated by commas.', ex_ph: 'e.g. 192.168.2.0/24, 192.168.1.50', ex_save: 'Save', ex_now: '{n} excluded', ex_none: 'None excluded - the entries apply to all devices.', ex_bad: '"{v}" is not an IP address or network (e.g. 192.168.2.0/24).',
     perf_rules: 'Marking rules', perf_rules_desc: 'Combined: all ASNs of a target share one set and one rule, so the router checks each packet only once per target (far less CPU with many ASNs). One per ASN: the old way, for comparison or if something behaves differently.',
     perf_rules_comb: 'Combined (fast)', perf_rules_single: 'One per ASN',
     perf_rules_confirm: 'Switch the marking rules to "{m}" and rebuild the rules now? (a few seconds, the saved ASN lists are used)',
@@ -742,6 +743,7 @@ var ASNM_I18N = {
     disp_unit_desc: 'Wird für den Live-Durchsatz, den Speedtest und die Zusammenfassungen verwendet. 1 MB/s = 8 Mbit/s. Datenmengen (zum Beispiel 1,2 GB) bleiben unverändert.',
     disp_change: 'Einheit ändern',
     perf_title: 'Leistung', perf_sub: 'CPU-Last des Routers verringern',
+    ex_title: 'Ausgenommene Geräte', ex_desc: 'Geräte oder Netze, die ASN Manager in Ruhe lässt - z. B. das Gast-Netz (192.168.2.0/24). Keiner seiner Einträge gilt für sie (auch nicht die für einzelne Geräte); sie nehmen ihren normalen Weg (VPN Director / WAN). Mehrere mit Komma trennen.', ex_ph: 'z. B. 192.168.2.0/24, 192.168.1.50', ex_save: 'Speichern', ex_now: '{n} ausgenommen', ex_none: 'Keine ausgenommen - die Einträge gelten für alle Geräte.', ex_bad: '"{v}" ist keine IP-Adresse und kein Netz (z. B. 192.168.2.0/24).',
     perf_rules: 'Marker-Regeln', perf_rules_desc: 'Zusammengefasst: Alle ASNs eines Ziels teilen sich eine Menge und eine Regel, der Router prüft jedes Paket nur einmal pro Ziel (mit vielen ASNs deutlich weniger CPU). Einzeln: eine Regel pro ASN wie früher, zum Vergleichen oder wenn sich etwas anders verhält.',
     perf_rules_comb: 'Zusammengefasst (schnell)', perf_rules_single: 'Einzeln pro ASN',
     perf_rules_confirm: 'Marker-Regeln auf "{m}" umstellen und die Regeln jetzt neu aufbauen? (einige Sekunden, die gespeicherten ASN-Listen werden genutzt)',
@@ -2200,7 +2202,7 @@ function asnmExportDone(txt, note) {
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.parentNode.removeChild(a); }, 1000);
 }
-var ASNM_SET_OK = { MAIL_NOTIFY: /^(off|daily|weekly)$/, STATS: /^(enabled|disabled)$/, STATS_SAVING: /^(on|off)$/, STATS_MODE: /^(asn|iface)$/, RULES_MODE: /^(combined|single)$/, WEBUI_LOCATION: /^(vpn|addons)$/, SG_DOMAINS: /^(on|off)$/, DNS_FOLLOW: /^(on|off)$/, DNS_DEVICE: /^(on|off)$/, DNS_TLS: /^(on|off)$/, FO_VPND: /^(on|off)$/ };
+var ASNM_SET_OK = { MAIL_NOTIFY: /^(off|daily|weekly)$/, STATS: /^(enabled|disabled)$/, STATS_SAVING: /^(on|off)$/, STATS_MODE: /^(asn|iface)$/, RULES_MODE: /^(combined|single)$/, WEBUI_LOCATION: /^(vpn|addons)$/, SG_DOMAINS: /^(on|off)$/, DNS_FOLLOW: /^(on|off)$/, DNS_DEVICE: /^(on|off)$/, DNS_TLS: /^(on|off)$/, FO_VPND: /^(on|off)$/, FO_KS: /^(on|off)$/, EXCLUDE: /^(none|[0-9.\/,]+)$/ };
 
 function asnmParseBackup(txt) {
     var lines = txt.replace(/\r/g, '').split('\n'), section = null, hasSections = /^\[(ASN_LIST|CUSTOM)\]/m.test(txt);
@@ -2346,7 +2348,7 @@ function asnmImportRun() {
     }
     if (chk('asnm_rs_set')) {
         // all settings in one job: the router syncs DNS once at the end (one restart of dnsmasq / AdGuard Home instead of one per setting)
-        var order = ['STATS_SAVING', 'STATS_MODE', 'RULES_MODE', 'WEBUI_LOCATION', 'SG_DOMAINS', 'DNS_FOLLOW', 'DNS_DEVICE', 'DNS_TLS', 'MAIL_NOTIFY', 'FO_VPND', 'STATS'], kv = [];
+        var order = ['STATS_SAVING', 'STATS_MODE', 'RULES_MODE', 'WEBUI_LOCATION', 'SG_DOMAINS', 'DNS_FOLLOW', 'DNS_DEVICE', 'DNS_TLS', 'MAIL_NOTIFY', 'FO_VPND', 'FO_KS', 'EXCLUDE', 'STATS'], kv = [];
         for (i = 0; i < order.length; i++) if (r.settings[order[i]]) kv.push(order[i] + '=' + r.settings[order[i]]);
         for (i = 0; i < r.dnssrv.length; i++) kv.push('DNS_SERVER_' + r.dnssrv[i][0] + '=' + r.dnssrv[i][1]);     // DNS of the VPN provider per line
         if (kv.length) jobs.push(['rsset', [kv.join(';')]]);
@@ -2548,6 +2550,7 @@ function asnmPerfMark() {
     var rm = (ASNM.data && ASNM.data.rules) || 'combined', sm = (ASNM_TR.data && ASNM_TR.data.mode) || 'asn';
     var m = { asnm_rm_combined: rm !== 'single', asnm_rm_single: rm === 'single', asnm_sm_asn: sm !== 'iface', asnm_sm_iface: sm === 'iface' };
     for (var id in m) { var e = document.getElementById(id); if (e) e.className = m[id] ? 'asnm-on' : ''; }
+    asnmExRender();
     asnmDnsfRender();
     asnmMailRender();
 }
@@ -2684,6 +2687,24 @@ function asnmSetRules(m) {
     if (m === cur || ASNM.busy) return;
     if (!confirm(t('perf_rules_confirm', { m: t(m === 'combined' ? 'perf_rules_comb' : 'perf_rules_single') }))) return;
     asnmSendQueue([['setting', ['RULES_MODE', m]], ['retry', []]]);
+}
+
+// excluded devices / networks: shown as a comma list (not while the user types in it)
+function asnmExRender() {
+    var inp = document.getElementById('asnm_ex_in'), info = document.getElementById('asnm_ex_info');
+    if (!inp) return;
+    var ex = (ASNM.data && ASNM.data.exclude) || [];
+    if (document.activeElement !== inp && !inp.getAttribute('data-dirty')) inp.value = ex.join(', ');
+    info.textContent = ex.length ? t('ex_now', { n: ex.length }) : t('ex_none');
+    inp.oninput = function () { inp.setAttribute('data-dirty', '1'); };
+}
+function asnmExSave() {
+    var inp = document.getElementById('asnm_ex_in'), v = inp.value.replace(/[\s;]+/g, ',').replace(/^,+|,+$/g, '').replace(/,+/g, ',');
+    var parts = v ? v.split(',') : [];
+    for (var i = 0; i < parts.length; i++) if (!/^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(parts[i])) { alert(t('ex_bad', { v: parts[i] })); return; }
+    if (ASNM.busy) return;
+    inp.removeAttribute('data-dirty');
+    asnmSend('setting', ['EXCLUDE', v || 'none']);
 }
 
 function asnmSetStatsMode(m) {
@@ -4033,6 +4054,12 @@ function initial() {
     <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><div class="asnm-card-titles"><h3 data-i18n="perf_title"></h3><div class="asnm-card-sub" data-i18n="perf_sub"></div></div></div>
     <div class="asnm-field"><span class="asnm-label" data-i18n="perf_rules"></span><span class="asnm-help" data-i18n="perf_rules_desc"></span>
       <div class="asnm-row" style="margin-top:8px;"><div class="asnm-seg"><span id="asnm_rm_combined" onclick="asnmSetRules('combined');" data-i18n="perf_rules_comb"></span><span id="asnm_rm_single" onclick="asnmSetRules('single');" data-i18n="perf_rules_single"></span></div></div>
+    </div>
+    <div class="asnm-divider"></div>
+    <div class="asnm-field"><span class="asnm-label" data-i18n="ex_title"></span><span class="asnm-help" data-i18n="ex_desc"></span>
+      <div class="asnm-dw-ed" style="margin-top:8px;"><input type="text" id="asnm_ex_in" maxlength="400" autocomplete="off" spellcheck="false" data-i18n-ph="ex_ph" style="flex:1;min-width:220px;"/>
+        <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="ex_save" onclick="asnmExSave();"/></div>
+      <div class="asnm-help" id="asnm_ex_info" style="margin-top:6px;"></div>
     </div>
     <div class="asnm-divider"></div>
     <div class="asnm-field"><span class="asnm-label" data-i18n="perf_stats"></span><span class="asnm-help" data-i18n="perf_stats_desc"></span>

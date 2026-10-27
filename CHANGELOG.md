@@ -8,6 +8,7 @@
 - **Kill switch for VPN lines** (option, Targets & failover): a VPN line is down and no fallback works - its entries are blocked instead of taking the normal way (WAN / VPN Director). Command `failover killswitch on|off`, part of the backup
 - A VPN client that starts again (provider reconnect, GUI) gets the route of its ASN Manager table back within seconds (before: at the next check, up to 5 minutes)
 - The routing check every 5 minutes repairs what it finds missing (routing rule of a line, marking rules of ASNs / domains / IPs - e.g. removed by another add-on) instead of only showing a warning; at most every 15 minutes, logged
+- **Excluded devices** (Settings > Rules): devices or networks ASN Manager leaves alone, e.g. the guest network (192.168.2.0/24) - none of its entries applies to them, they take their normal way. Command `exclude list | set <IP|net>,... | none`, shown in the device check, part of the backup
 
 ## v3.9.28
 

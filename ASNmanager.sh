@@ -612,6 +612,7 @@ rt_heal() {
             logger -t ASNmanager "Routing: route of $rh_t (table $rh_tab, $rh_dev) was missing - VPN client restarted? Added again"
     done
     ks_sync
+    ex_sync
 }
 
 cu_usable() {
@@ -620,6 +621,53 @@ cu_usable() {
     case "$1" in OVPN*|WGC*) [ -f "$ADDON_DIR/killswitch" ] ;; *) return 1 ;; esac      # kill switch: the rules block it
 }
 cu_fw() { cf=$(get_target_info "$1" | cut -d' ' -f2); echo "${cf}/${MARK_MASK}"; }
+
+# Excluded devices / networks (e.g. a guest network): ASN Manager leaves them alone - none of its entries applies to them,
+# they take their normal way (VPN Director / WAN). One rule per address at the very top of mangle PREROUTING gives
+# their packets the mark 0x0f00 (no target uses it); every marking rule of ASN Manager only marks packets without a
+# mark in its field, so none of them matches any more. Kept at the top after every build (rules are inserted at 1).
+EX_FILE="$ADDON_DIR/exclude"
+EX_MARK=0x0f00
+ex_list() { grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(/[0-9]+)?$' "$EX_FILE" 2>/dev/null; }
+ex_has() { ex_list | awk -v i="$1" '
+    function n(s,  a) { split(s, a, "."); return ((a[1] * 256 + a[2]) * 256 + a[3]) * 256 + a[4] }
+    { split($0, p, "/"); l = (p[2] == "") ? 32 : p[2]; z = 2 ^ (32 - l); if (int(n(p[1]) / z) == int(n(i) / z)) { print; f = 1; exit } }
+    END { exit !f }'; }
+ex_sync() {
+    ex_n=$(ex_list | grep -c .)
+    ex_cur=$(iptables -t mangle -S PREROUTING 2>/dev/null | grep -c -- "--set-xmark 0xf00/0xff00")
+    if [ "$ex_n" -eq 0 ] || sm_on; then
+        [ "$ex_cur" -eq 0 ] && return 0
+        ex_clear; return 0
+    fi
+    # already in place: exactly these rules, all at the top
+    if [ "$ex_cur" -eq "$ex_n" ] && [ "$(iptables -t mangle -S PREROUTING 2>/dev/null | sed -n "2,$((ex_n + 1))p" | grep -c -- "--set-xmark 0xf00/0xff00")" -eq "$ex_n" ]; then return 0; fi
+    ex_clear
+    ex_list | while read -r ex_a; do
+        iptables -t mangle -I PREROUTING 1 -s "$ex_a" -m mark --mark "0/$MARK_MASK" -j MARK --set-mark "$EX_MARK/$MARK_MASK" 2>/dev/null
+    done
+    return 0
+}
+ex_clear() {
+    iptables -t mangle -S PREROUTING 2>/dev/null | grep -- "--set-xmark 0xf00/0xff00" | sed 's/^-A /-D /' | while read -r ex_r; do iptables -t mangle $ex_r 2>/dev/null; done
+}
+# $1 = "ip,cidr,..." or "none"
+ex_set() {
+    ex_new=""; ex_bad=""
+    for ex_a in $(echo "$1" | tr ',;' '  '); do
+        [ "$ex_a" = "none" ] && continue
+        if cu_is_cidr "$ex_a" || { is_valid_ip "${ex_a%%/*}" && [ "${ex_a#*/}" = "$ex_a" ]; }; then
+            case " $ex_new " in *" $ex_a "*) ;; *) ex_new="$ex_new $ex_a" ;; esac
+        else ex_bad="$ex_bad $ex_a"; fi
+    done
+    [ -n "$ex_bad" ] && echo "Not an IP address / network (skipped):$ex_bad"
+    mkdir -p "$ADDON_DIR"
+    if [ -n "$ex_new" ]; then for ex_a in $ex_new; do echo "$ex_a"; done > "$EX_FILE"; else rm -f "$EX_FILE"; fi
+    ex_sync
+    if [ -n "$ex_new" ]; then echo "Excluded devices / networks:$ex_new - ASN Manager leaves them alone."
+    else echo "No excluded devices."; fi
+    return 0
+}
 cu_route() {
     cr_info=$(get_target_info "$1"); [ -n "$cr_info" ] || return 1
     cr_table=$(echo "$cr_info" | cut -d' ' -f1); cr_mark=$(echo "$cr_info" | cut -d' ' -f2); cr_prio=$(echo "$cr_info" | cut -d' ' -f3)
@@ -799,6 +847,7 @@ cu_apply_dom() {
     done
     cu_apply_dom_run "$@"; cl_rc=$?
     rmdir "$CU_LOCK" 2>/dev/null
+    ex_sync
     return $cl_rc
 }
 cu_apply_dom_run() {
@@ -973,8 +1022,8 @@ cu_learned_js() {
     } > "$WEB_DIR/learned.js.tmp" 2>/dev/null && mv -f "$WEB_DIR/learned.js.tmp" "$WEB_DIR/learned.js"
 }
 
-cu_apply() {
-    sm_on && return 0
+cu_apply() { sm_on && return 0; cu_apply_body "$@"; cab_r=$?; ex_sync; return $cab_r; }
+cu_apply_body() {
     : > "$CU_STATUS"
     cu_apply_ip
     cu_apply_dom
@@ -1377,6 +1426,7 @@ backup_text() {
     echo "MAIL_NOTIFY=$(mail_mode)"
     echo "FO_VPND=$(fo_vpnd_on && echo on || echo off)"
     echo "FO_KS=$(ks_on && echo on || echo off)"
+    echo "EXCLUDE=$(ex_list | tr '\n' ',' | sed 's/,$//; s/^$/none/')"
     # DNS of the VPN provider per line ("DNS fitting the line")
     [ -s "$DNSF_CONF" ] && awk -F= '$1 ~ /^(OVPN|WGC)[1-5]$/ && $2 != "" { v = $2; gsub(/ +/, ",", v); print "DNS_SERVER_" $1 "=" v }' "$DNSF_CONF"
     # own presets - from the router and from a USB device (restored to the router)
@@ -1457,6 +1507,7 @@ rs_setting() {
         MAIL_NOTIFY:off|MAIL_NOTIFY:daily|MAIL_NOTIFY:weekly)  mail_set "$2" ;;
         FO_VPND:on|FO_VPND:off)        fo_vpnd_set "$2" ;;
         FO_KS:on|FO_KS:off)            ks_set "$2" ;;
+        EXCLUDE:*)                     ex_set "$2"; return 0 ;;
         DNS_SERVER_OVPN[1-5]:*|DNS_SERVER_WGC[1-5]:*)
                                        dnsf_server_set "${1#DNS_SERVER_}" $(echo "$2" | tr ',' ' '); return $? ;;
         FO_VPND:*|FO_KS:*|STATS:*|STATS_SAVING:*|STATS_MODE:*|RULES_MODE:*|WEBUI_LOCATION:*|SG_DOMAINS:*|DNS_FOLLOW:*|DNS_DEVICE:*|DNS_TLS:*|MAIL_NOTIFY:*)   echo "Invalid value '$2' for $1 skipped."; return 0 ;;
@@ -1665,6 +1716,7 @@ uninstall_menu() {
             st_cleanup >/dev/null 2>&1
             rm -f "$ADDON_DIR/sg_domains"; sgd_write >/dev/null 2>&1; rm -f "$SGD_LOG"; rm -f "$DNSF_FLAG" "$DNSD_FLAG" "$DNSF_TLS_FLAG"; dnsf_sync >/dev/null 2>&1
             cu_purge >/dev/null 2>&1
+            ex_clear; rm -f "$EX_FILE"
             rm -f /tmp/asn_groups.txt
             # safemode: self-test, flags, boot hook
             sm_p=$(cat "$SM_PID" 2>/dev/null); [ -n "$sm_p" ] && kill "$sm_p" 2>/dev/null
@@ -2674,6 +2726,7 @@ cli_device() {
             else dv_oth=$((dv_oth + 1)); fi
         done < "$CUSTOM_FILE"
     fi
+    if dv_x=$(ex_has "$dv_ip"); then echo "EXCLUDED ($dv_x): ASN Manager leaves this device alone - none of the rules below applies to it, it takes its normal way"; fi
     echo "Rules for all devices: $dv_a ASN(s), $dv_d domain(s), $dv_i IP range(s)"
     echo "Rules only for this device:${dv_own:- none}"
     [ $dv_oth -gt 0 ] && echo "Rules only for other devices (not for this one): $dv_oth"
@@ -3222,6 +3275,7 @@ web_export() {
             "$SCRIPT_VERSION" "$(date +%s)" "$last_apply" "$pending" "$cron" "$worker"
         printf '"schedule":{"interval":%s,"time":"%s"},' "$INTERVAL" "$(json_esc "$TIME_VAL")"
         printf '"rules":"%s",' "$(rules_mode)"
+        printf '"exclude":[%s],' "$(ex_list | awk '{ printf "%s\"%s\"", (NR > 1 ? "," : ""), $1 }')"
         sm_json
 
         printf '"entries":['
@@ -7450,7 +7504,7 @@ sm_disable() {
     # DNS per line / per device: rules, stand-in addresses, Unbound, AdGuard Home clients (sm_on: everything out)
     dnsf_sync >/dev/null 2>&1
     # failover, VPN Director copies, tunnel protection, speed test
-    ks_clear
+    ks_clear; ex_clear
     for sd_p in "$FO_SELF_PRIO" "$FO_VPND_PRIO" $((FO_VPND_PRIO - 1)) "$EP_PRIO"; do
         while ip rule del prio "$sd_p" 2>/dev/null; do :; done
     done
@@ -7599,6 +7653,7 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   rescue                             stop stuck ASN Manager jobs, remove locks, restart failover and statistics
   amtmupdate [check]                 update for amtm (check: exit code 0 = amtm may update)
   mail off|daily|weekly|test|check|status  e-mail on new versions (amtm e-mail settings; a notice only)
+  exclude list | set <IP|net>,... | none   devices / networks ASN Manager leaves alone (e.g. the guest network)
   safemode status | on | off | test  self-test with rollback: show / take all rules out / put them back / test the router now
   devices                            all active devices: normal way, open connections per line, DNS
   agh login <user> [password] | logout | status  login of AdGuard Home: "DNS per device" changes its clients without restarting it
@@ -7650,7 +7705,7 @@ cli_main() {
                 *)         cli_usage; false ;;
             esac ;;
         stats)    ts_cli "$@" ;;
-        guard)    ep_show; ks_sync ;;
+        guard)    ep_show; ks_sync; ex_sync ;;
         job)      cli_job "$1" ;;
         speedtest) st_cli "$1" ;;
         rulemode) rules_set_mode "$1" ;;
@@ -7742,6 +7797,12 @@ cli_main() {
         service_event) service_event "$1" "$2"; return 0 ;;
         devices)  cli_devices ;;
         safemode) cli_safemode "$@" ;;
+        exclude)  case "$1" in
+                      ""|list) if ex_list | grep -q .; then ex_list | while read -r el_a; do echo "$el_a  $(dg_devname "${el_a%%/*}")"; done; else echo "No excluded devices."; fi ;;
+                      set)     shift; ex_set "$(echo "$*" | tr ' ' ',')" ;;
+                      none|clear) ex_set none ;;
+                      *)       echo "Usage: exclude list | set <IP|network>[,...] | none"; false ;;
+                  esac ;;
         routes)   case "$1" in heal) sm_on || { nv_refresh; rt_heal; } ;; *) echo "Usage: routes heal"; false ;; esac ;;
         help|-h|--help) cli_usage ;;
         *)        cli_usage; false ;;
