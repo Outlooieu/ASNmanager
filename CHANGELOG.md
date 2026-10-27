@@ -5,6 +5,9 @@
 - Device check / device list: a device that gets its own DNS by DHCP - from its DHCP reservation (LAN > DHCP server) or its guest network (YazFi, Guest Network Pro), e.g. 8.8.8.8 - is shown with that DNS ("directly, not via the router", with YazFi Force DNS) and the real resolver behind it - before it wrongly showed the DNS of the router
 - Devices connected through the WireGuard server of the router show their user name (VPN server > WireGuard) instead of the bare address - in the device check, the device list and in AdGuard Home ("Vivo (ASNM WGC1)")
 - Themes: **Default** in the colours of the router pages (grey-green, yellow titles) replaces "Dark"; Light and Blue stay. Who had "Dark" gets Default
+- **Kill switch for VPN lines** (option, Targets & failover): a VPN line is down and no fallback works - its entries are blocked instead of taking the normal way (WAN / VPN Director). Command `failover killswitch on|off`, part of the backup
+- A VPN client that starts again (provider reconnect, GUI) gets the route of its ASN Manager table back within seconds (before: at the next check, up to 5 minutes)
+- The routing check every 5 minutes repairs what it finds missing (routing rule of a line, marking rules of ASNs / domains / IPs - e.g. removed by another add-on) instead of only showing a warning; at most every 15 minutes, logged
 
 ## v3.9.28
 

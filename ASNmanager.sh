@@ -452,6 +452,7 @@ proc_kids() { for pk_d in /proc/[0-9]*; do [ "$(awk '{ print $4 }' "$pk_d/stat" 
 # the cron run of the routing check: not while the previous one still works, and never longer than 4 minutes
 rc_run_once() {
     sm_on && return 0
+    RC_HEAL=1
     rr_d=/tmp/asnmanager-check.lock
     if ! mkdir "$rr_d" 2>/dev/null; then
         rr_o=$(cat "$rr_d/pid" 2>/dev/null)
@@ -610,9 +611,14 @@ rt_heal() {
         ip route add default dev "$rh_dev" table "$rh_tab" 2>/dev/null &&
             logger -t ASNmanager "Routing: route of $rh_t (table $rh_tab, $rh_dev) was missing - VPN client restarted? Added again"
     done
+    ks_sync
 }
 
-cu_usable() { check_iface_up "$1" >/dev/null 2>&1 || grep -q "^${1}=" "$FO_CONF" 2>/dev/null; }
+cu_usable() {
+    check_iface_up "$1" >/dev/null 2>&1 && return 0
+    grep -q "^${1}=" "$FO_CONF" 2>/dev/null && return 0
+    case "$1" in OVPN*|WGC*) [ -f "$ADDON_DIR/killswitch" ] ;; *) return 1 ;; esac      # kill switch: the rules block it
+}
 cu_fw() { cf=$(get_target_info "$1" | cut -d' ' -f2); echo "${cf}/${MARK_MASK}"; }
 cu_route() {
     cr_info=$(get_target_info "$1"); [ -n "$cr_info" ] || return 1
@@ -1058,6 +1064,10 @@ cu_check_rows() {          # $1 = rc_out file, $2 = number of rows already writt
         # nothing learned yet (no device has looked the name up since it was added / since a reinstall) is no fault:
         # shown as a note, not as a warning - the same as for a domain whose target already has other addresses
         case "$code" in ok|oknl|nolearned) state=ok ;; skipped|norule|failover|blocked) state=warn ;; *) state=fail ;; esac
+        case "$code" in
+            norule) cu_usable "$d" && echo "$code $d cu" >> "$RC_HEALF" ;;      # (a line that is down has no rules on purpose)
+            wrongdev|noroute) echo "$code $d cu" >> "$RC_HEALF" ;;
+        esac
         [ "$code" = "skipped" ] && code=ok
         dev=$(get_ifname "$d")
         [ $ccr_n -gt 0 ] && printf ',' >> "$1"
@@ -1366,6 +1376,7 @@ backup_text() {
     echo "DNS_TLS=$(dnsf_tls_on && echo on || echo off)"
     echo "MAIL_NOTIFY=$(mail_mode)"
     echo "FO_VPND=$(fo_vpnd_on && echo on || echo off)"
+    echo "FO_KS=$(ks_on && echo on || echo off)"
     # DNS of the VPN provider per line ("DNS fitting the line")
     [ -s "$DNSF_CONF" ] && awk -F= '$1 ~ /^(OVPN|WGC)[1-5]$/ && $2 != "" { v = $2; gsub(/ +/, ",", v); print "DNS_SERVER_" $1 "=" v }' "$DNSF_CONF"
     # own presets - from the router and from a USB device (restored to the router)
@@ -1445,9 +1456,10 @@ rs_setting() {
         DNS_TLS:on|DNS_TLS:off)        dnsf_tls_set "$2" ;;
         MAIL_NOTIFY:off|MAIL_NOTIFY:daily|MAIL_NOTIFY:weekly)  mail_set "$2" ;;
         FO_VPND:on|FO_VPND:off)        fo_vpnd_set "$2" ;;
+        FO_KS:on|FO_KS:off)            ks_set "$2" ;;
         DNS_SERVER_OVPN[1-5]:*|DNS_SERVER_WGC[1-5]:*)
                                        dnsf_server_set "${1#DNS_SERVER_}" $(echo "$2" | tr ',' ' '); return $? ;;
-        FO_VPND:*|STATS:*|STATS_SAVING:*|STATS_MODE:*|RULES_MODE:*|WEBUI_LOCATION:*|SG_DOMAINS:*|DNS_FOLLOW:*|DNS_DEVICE:*|DNS_TLS:*|MAIL_NOTIFY:*)   echo "Invalid value '$2' for $1 skipped."; return 0 ;;
+        FO_VPND:*|FO_KS:*|STATS:*|STATS_SAVING:*|STATS_MODE:*|RULES_MODE:*|WEBUI_LOCATION:*|SG_DOMAINS:*|DNS_FOLLOW:*|DNS_DEVICE:*|DNS_TLS:*|MAIL_NOTIFY:*)   echo "Invalid value '$2' for $1 skipped."; return 0 ;;
         *)                echo "Unknown setting '$1' skipped."; return 0 ;;
     esac
     echo "Setting applied: $1 = $2."
@@ -2122,7 +2134,9 @@ while IFS=':' read -r asn dest src_ip; do
         awk -v set="$IPSET_NAME" '{print "add " set " " $1}' "$tmp_file" | ipset restore 2>/dev/null
 
         # with a failover chain the rules are needed while the target is offline as well (the chain decides where the traffic goes)
-        if check_iface_up "$dest" || grep -q "^$(echo "$dest" | sed 's/^WAN$/WAN1/')=" /jffs/addons/asnmanager/failover.conf 2>/dev/null; then
+        # (kill switch: also for a VPN line that is down - its rules then block the traffic)
+        if check_iface_up "$dest" || grep -q "^$(echo "$dest" | sed 's/^WAN$/WAN1/')=" /jffs/addons/asnmanager/failover.conf 2>/dev/null || \
+           { case "$dest" in OVPN*|WGC*) [ -f /jffs/addons/asnmanager/killswitch ] ;; *) false ;; esac; }; then
             iface_dev=$(get_ifname "$dest")
             
             # routing rule and table of this target: once per target
@@ -6228,6 +6242,70 @@ fo_vpnd_set() {
     if dnsd_on; then ( "$SCRIPT_PATH" dnsfollow sync >/dev/null 2>&1 & ); fi
     echo "VPN Director follows the failover: $1."
 }
+# Kill switch per line (option, off by default): when a VPN line of ASN Manager is down and no fallback of the failover
+# works, the traffic of its entries is blocked instead of taking the normal way (WAN or the VPN Director).
+# Own routing table of the line: a second default route "unreachable" (metric 4096) - while the tunnel runs its own
+# default route wins, when the tunnel is gone the lookup ends there (no fall-through to the next rules).
+# A table the firmware uses as well (/etc/iproute2/rt_tables): an "unreachable" rule for the mark at KS_PRIO instead.
+KS_FLAG="$ADDON_DIR/killswitch"
+KS_PRIO=10690
+ks_on() { [ -f "$KS_FLAG" ]; }
+ks_shared() { awk -v t="$1" '$1 == t { f = 1 } END { exit !f }' /etc/iproute2/rt_tables 2>/dev/null; }
+# blocks set / taken away to match the option and the lines that have rules of ASN Manager
+ks_sync() {
+    ks_rules=$(ip rule show 2>/dev/null)
+    ks_hook_sync
+    for ks_t in OVPN1 OVPN2 OVPN3 OVPN4 OVPN5 WGC1 WGC2 WGC3 WGC4 WGC5; do
+        ks_i=$(get_target_info "$ks_t"); ks_tab=${ks_i%% *}; ks_m=$(echo "$ks_i" | cut -d' ' -f2)
+        ks_want=0
+        if ks_on && ! sm_on && echo "$ks_rules" | grep -q "fwmark ${ks_m}/${MARK_MASK} "; then ks_want=1; fi
+        if ks_shared "$ks_tab"; then
+            ks_has=0; echo "$ks_rules" | grep -q "^${KS_PRIO}:.*fwmark ${ks_m}/${MARK_MASK} unreachable" && ks_has=1
+            if [ $ks_want -eq 1 ] && [ $ks_has -eq 0 ]; then ip rule add fwmark "$ks_m/$MARK_MASK" unreachable prio "$KS_PRIO" 2>/dev/null
+            elif [ $ks_want -eq 0 ] && [ $ks_has -eq 1 ]; then ip rule del fwmark "$ks_m/$MARK_MASK" unreachable prio "$KS_PRIO" 2>/dev/null; fi
+        else
+            ks_has=0; ip route show table "$ks_tab" 2>/dev/null | grep -q '^unreachable default' && ks_has=1
+            if [ $ks_want -eq 1 ] && [ $ks_has -eq 0 ]; then ip route add unreachable default metric 4096 table "$ks_tab" 2>/dev/null
+            elif [ $ks_want -eq 0 ] && [ $ks_has -eq 1 ]; then ip route del unreachable default metric 4096 table "$ks_tab" 2>/dev/null; fi
+        fi
+    done
+    return 0
+}
+# service-event: a VPN client is started again (provider reconnect, GUI) - its table of ASN Manager gets its route back
+# at once (6 and 20 s later) instead of at the next check (up to 5 minutes: until then its entries took the normal way,
+# with the kill switch they were blocked). Only while lines of ASN Manager go over a VPN.
+KS_HOOK="ASNmanager-Routes"
+ks_hook_sync() {
+    if echo "$ks_rules" | grep -qE "fwmark 0x[1-6][0-9a-f]00/${MARK_MASK} " && [ -f "$SCRIPT_PATH" ]; then
+        grep -q "# ${KS_HOOK}\$" "$SERVICE_EVENT" 2>/dev/null && return 0
+        ensure_script "$SERVICE_EVENT"
+        echo 'case "$2" in wgc*|vpnclient*|wireguard*) (sleep 6; '"$SCRIPT_PATH"' routes heal; sleep 14; '"$SCRIPT_PATH"' routes heal) </dev/null >/dev/null 2>&1 & ;; esac # '"${KS_HOOK}" >> "$SERVICE_EVENT"
+    elif [ -f "$SERVICE_EVENT" ] && grep -q "# ${KS_HOOK}\$" "$SERVICE_EVENT"; then
+        sed -i "/# ${KS_HOOK}\$/d" "$SERVICE_EVENT"
+    fi
+}
+ks_clear() {
+    [ -f "$SERVICE_EVENT" ] && sed -i "/# ${KS_HOOK}\$/d" "$SERVICE_EVENT"
+    while ip rule del prio "$KS_PRIO" 2>/dev/null; do :; done
+    for ks_t in OVPN1 OVPN2 OVPN3 OVPN4 OVPN5 WGC1 WGC2 WGC3 WGC4 WGC5; do
+        ks_tab=$(get_target_info "$ks_t" | cut -d' ' -f1)
+        ks_shared "$ks_tab" || ip route del unreachable default metric 4096 table "$ks_tab" 2>/dev/null
+    done
+    return 0
+}
+ks_set() {
+    case "$1" in
+        on)  mkdir -p "$ADDON_DIR"; : > "$KS_FLAG"
+             echo "Kill switch: on - the entries of a VPN line that is down (and has no working fallback) are blocked."
+             # lines that are down right now get their rules only with a new build
+             echo "Applying the rules again (also for lines that are down right now) ..."; cli_apply cache >/dev/null 2>&1 ;;
+        off) rm -f "$KS_FLAG"; echo "Kill switch: off - the entries of a VPN line that is down take the normal way (VPN Director / WAN)." ;;
+        *)   echo "Kill switch: $(ks_on && echo on || echo off)"; return 0 ;;
+    esac
+    ks_sync; fo_export
+    return 0
+}
+
 # enabled VPN Director rules per line: "LINE count" (for the page)
 fo_vpnd_counts() {
     [ -r "$VPND_FILE" ] || return 0
@@ -6473,7 +6551,7 @@ fo_export() {
         done
         printf '],"health":{'
         awk '{ printf "%s\"%s\":\"%s\"", (NR > 1 ? "," : ""), $1, $2 }' "$FO_RT/health.txt" 2>/dev/null
-        printf '},"vpnd":%d,"vd":{' "$(fo_vpnd_on && echo 1 || echo 0)"
+        printf '},"vpnd":%d,"ks":%d,"vd":{' "$(fo_vpnd_on && echo 1 || echo 0)" "$(ks_on && echo 1 || echo 0)"
         fo_vpnd_counts | awk '{ printf "%s\"%s\":%d", (NR > 1 ? "," : ""), $1, $2 }'
         printf '},"vdmoved":%d}\n' "$(cat "$FO_RT/vpnd.rules" 2>/dev/null | grep -c .)"
     } > "$WEB_DIR/failover.js.tmp" && mv -f "$WEB_DIR/failover.js.tmp" "$WEB_DIR/failover.js"
@@ -6535,6 +6613,7 @@ fo_set() {
 }
 
 fo_show() {
+    echo "Kill switch (VPN line down without a working fallback: block): $(ks_on && echo on || echo off)   (failover killswitch on|off)"
     [ -s "$FO_CONF" ] || { echo "No failover configured."; return 0; }
     echo "VPN Director follows the failover: $(fo_vpnd_on && echo on || echo off)   (failover vpnd on|off)"
     while IFS='=' read -r fw_t fw_ch; do
@@ -6549,6 +6628,7 @@ fo_show() {
 # complete removal (uninstall): ip rules are removed with the other rules
 fo_purge() {
     cru d ASN_Failover 2>/dev/null
+    ks_clear; rm -f "$KS_FLAG"
     while ip rule del prio "$FO_SELF_PRIO" 2>/dev/null; do :; done
     while ip rule del prio "$FO_VPND_PRIO" 2>/dev/null; do :; done
     while ip rule del prio $((FO_VPND_PRIO - 1)) 2>/dev/null; do :; done
@@ -6566,6 +6646,7 @@ fo_purge() {
 #  Runs every 5 minutes (cron, only while the WebUI is installed), after "apply" and on demand.
 # =====================================================================
 RC_PREV="/tmp/${WEBUI_NS}-check.prev"
+RC_HEALF="/tmp/${WEBUI_NS}-check.heal"
 
 rc_info() {   # same fwmarks / tables as the worker
     case "$1" in
@@ -6596,6 +6677,7 @@ rc_rule_active() {
 }
 
 rc_check() {
+    : > "$RC_HEALF"
     nv_refresh
     rt_heal
     ep_guard_sync >/dev/null 2>&1
@@ -6641,6 +6723,7 @@ rc_check() {
             fi
         fi
         case "$code" in ok) state=ok ;; nosubnets|norule|failover|blocked) state=warn ;; *) state=fail ;; esac
+        case "$code" in norule|wrongdev|noroute) echo "$code $d asn" >> "$RC_HEALF" ;; esac
         recent=-1
         if [ "$rc_stats" -eq 1 ]; then
             cur=$(awk -F'\t' -v k="$d|$asn" '$1 == k { print $2; exit }' "$RC_PREV.new")
@@ -6659,6 +6742,36 @@ rc_check() {
     printf ']}\n' >> "$rc_out"
     mv -f "$rc_out" "$WEB_DIR/check.js"
     mv -f "$RC_PREV.new" "$RC_PREV"
+    [ -n "$RC_HEAL" ] && rc_heal "$RC_HEALF"
+    rm -f "$RC_HEALF"
+}
+
+# the check every 5 minutes found entries whose rule is missing (removed from outside, e.g. by another add-on or a
+# firewall restart) or whose line does not route them: build the missing pieces again - at most every 15 minutes, not
+# while a job of the page or a rule build runs. "code target asn|cu" per line in $1.
+RC_HEAL_TS="/tmp/${WEBUI_NS}-heal.ts"
+rc_heal() {
+    [ -s "$1" ] || return 0
+    rh_now=$(date +%s); rh_last=$(cat "$RC_HEAL_TS" 2>/dev/null); case "$rh_last" in ''|*[!0-9]*) rh_last=0 ;; esac
+    [ $((rh_now - rh_last)) -lt 900 ] && return 0
+    [ -d "$LOCK_DIR" ] && return 0
+    ps w 2>/dev/null | grep -v grep | grep -q 'asn-bypass-worker' && return 0
+    [ -d "$CU_LOCK" ] && return 0
+    echo "$rh_now" > "$RC_HEAL_TS"
+    rh_what=""
+    # routing rule of the line (ip rule for its mark) - only added when it is missing
+    for rh_d in $(awk '$1 != "norule" { print $2 }' "$1" | sort -u); do
+        [ -s "$FO_CONF" ] && [ -n "$(cat "$FO_RT/active_$rh_d" 2>/dev/null)" ] && [ "$(cat "$FO_RT/active_$rh_d" 2>/dev/null)" != "$rh_d" ] && continue
+        ip rule show 2>/dev/null | grep -q "fwmark $(get_target_info "$rh_d" | cut -d' ' -f2)/${MARK_MASK} " && continue
+        cu_route "$rh_d" && rh_what="$rh_what routing rule $rh_d,"
+    done
+    if awk '$1 == "norule" && $3 == "cu"' "$1" | grep -q .; then cu_apply >/dev/null 2>&1; rh_what="$rh_what domain / IP rules,"; fi
+    if awk '$1 == "norule" && $3 == "asn"' "$1" | grep -q . && [ -x "$WORKER_SCRIPT" ]; then
+        ASN_QUICK=1 "$WORKER_SCRIPT" </dev/null >/dev/null 2>&1 &
+        rh_what="$rh_what ASN rules (from the cache),"
+    fi
+    [ -n "$rh_what" ] && logger -t ASNmanager "Routing check: $(wc -l < "$1" | tr -d ' ') entr(y/ies) without a working rule - built again:${rh_what%,}"
+    return 0
 }
 
 # command line: readable table
@@ -7337,6 +7450,7 @@ sm_disable() {
     # DNS per line / per device: rules, stand-in addresses, Unbound, AdGuard Home clients (sm_on: everything out)
     dnsf_sync >/dev/null 2>&1
     # failover, VPN Director copies, tunnel protection, speed test
+    ks_clear
     for sd_p in "$FO_SELF_PRIO" "$FO_VPND_PRIO" $((FO_VPND_PRIO - 1)) "$EP_PRIO"; do
         while ip rule del prio "$sd_p" 2>/dev/null; do :; done
     done
@@ -7475,6 +7589,7 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   check                              routing check: does every ASN leave through its target interface? (also every 5 min)
   failover set WGC1 WGC2,WAN1        failover chain for a target (up to 2 fallbacks, BLOCK = block the traffic)
   failover clear WGC1 | show | once  remove a chain / show the state / run one check round now
+  failover killswitch on | off       a VPN line that is down (no working fallback): block its entries instead of the normal way
   guard                              show the VPN servers that always go via WAN (tunnel protection)
   install                            set up ASN Manager (used by the installer)
   job [clear]                        show the running WebUI job / remove a stuck job lock
@@ -7535,7 +7650,7 @@ cli_main() {
                 *)         cli_usage; false ;;
             esac ;;
         stats)    ts_cli "$@" ;;
-        guard)    ep_show ;;
+        guard)    ep_show; ks_sync ;;
         job)      cli_job "$1" ;;
         speedtest) st_cli "$1" ;;
         rulemode) rules_set_mode "$1" ;;
@@ -7586,8 +7701,9 @@ cli_main() {
                 set)     fo_set "$2" "$3" ;;
                 clear)   fo_set "$2" "" ;;
                 vpnd)    fo_vpnd_set "$2" ;;
+                killswitch) ks_set "$2" ;;
                 show|"") fo_show ;;
-                *)       echo "Usage: failover show | set <TARGET> <FALLBACK>[,<FALLBACK>] | clear <TARGET> | vpnd on|off | once"; false ;;
+                *)       echo "Usage: failover show | set <TARGET> <FALLBACK>[,<FALLBACK>] | clear <TARGET> | vpnd on|off | killswitch on|off | once"; false ;;
             esac ;;
         check)
             case "$1" in
@@ -7626,6 +7742,7 @@ cli_main() {
         service_event) service_event "$1" "$2"; return 0 ;;
         devices)  cli_devices ;;
         safemode) cli_safemode "$@" ;;
+        routes)   case "$1" in heal) sm_on || { nv_refresh; rt_heal; } ;; *) echo "Usage: routes heal"; false ;; esac ;;
         help|-h|--help) cli_usage ;;
         *)        cli_usage; false ;;
     esac
