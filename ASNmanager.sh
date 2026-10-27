@@ -2765,7 +2765,7 @@ cli_device() {
         sort -t "$(printf '\t')" -k1,1nr | head -n 15 > /tmp/asnmanager-dv.c
     if [ ! -s /tmp/asnmanager-dv.c ]; then echo "No connections to the internet right now."; rm -f /tmp/asnmanager-dv.c; return 0; fi
     echo "Current connections (top 15 by traffic):"
-    printf '   %-16s %-28s %9s  %-6s %s\n' "DESTINATION" "NAME" "TRAFFIC" "VIA" "RULE"
+    printf '   %-16s %-28s %5s %9s  %-6s %s\n' "DESTINATION" "NAME" "CONN" "TRAFFIC" "VIA" "RULE"
     dg_rules > /tmp/asnmanager-dv.r
     while IFS="$(printf '\t')" read -r dc_b dc_ip dc_n dc_pt; do
         dc_nm=$(awk -F'\t' -v ip="$dc_ip" '$1 == ip { split($2, a, ","); print a[1]; exit }' "$TS_RT/sg_dns.txt" 2>/dev/null)
@@ -2776,7 +2776,7 @@ cli_device() {
         done < /tmp/asnmanager-dv.r
         dc_dev=$(dg_route_dev "$dc_ip" "$dv_ip" "$dc_mk")
         dc_rule="normal way"; [ -n "$dc_set" ] && dc_rule="$(dg_desc "$dc_set" "$dc_ip") -> $(dg_target_of_mark "$dc_mk")"
-        printf '   %-16s %-28s %9s  %-6s %s\n' "$dc_ip" "$(echo "${dc_nm:--}" | cut -c1-28)" "$(fmt_bytes "$dc_b")" "$(dg_target_of_dev "$dc_dev")" "$dc_rule"
+        printf '   %-16s %-28s %5s %9s  %-6s %s\n' "$dc_ip" "$(echo "${dc_nm:--}" | cut -c1-28)" "$dc_n" "$(fmt_bytes "$dc_b")" "$(dg_target_of_dev "$dc_dev")" "$dc_rule"
     done < /tmp/asnmanager-dv.c
     rm -f /tmp/asnmanager-dv.c /tmp/asnmanager-dv.r
     [ "$(cat /proc/sys/net/netfilter/nf_conntrack_acct 2>/dev/null)" = "1" ] || echo "(traffic counters are off - turn on the traffic statistics to see the bytes)"
