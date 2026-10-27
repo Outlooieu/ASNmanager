@@ -626,7 +626,7 @@ cu_fw() { cf=$(get_target_info "$1" | cut -d' ' -f2); echo "${cf}/${MARK_MASK}";
 # they take their normal way (VPN Director / WAN). One rule per address at the very top of mangle PREROUTING gives
 # their packets the mark 0x0f00 (no target uses it); every marking rule of ASN Manager only marks packets without a
 # mark in its field, so none of them matches any more. Kept at the top after every build (rules are inserted at 1).
-EX_FILE="$ADDON_DIR/exclude"
+EX_FILE="/jffs/addons/asnmanager/exclude"      # (ADDON_DIR is set further down in the script)
 EX_MARK=0x0f00
 ex_list() { grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(/[0-9]+)?$' "$EX_FILE" 2>/dev/null; }
 ex_has() { ex_list | awk -v i="$1" '
@@ -662,7 +662,9 @@ ex_set() {
     done
     [ -n "$ex_bad" ] && echo "Not an IP address / network (skipped):$ex_bad"
     mkdir -p "$ADDON_DIR"
-    if [ -n "$ex_new" ]; then for ex_a in $ex_new; do echo "$ex_a"; done > "$EX_FILE"; else rm -f "$EX_FILE"; fi
+    if [ -n "$ex_new" ]; then
+        for ex_a in $ex_new; do echo "$ex_a"; done > "$EX_FILE" || { echo "Could not write $EX_FILE - nothing changed."; return 1; }
+    else rm -f "$EX_FILE"; fi
     ex_sync
     if [ -n "$ex_new" ]; then echo "Excluded devices / networks:$ex_new - ASN Manager leaves them alone."
     else echo "No excluded devices."; fi
