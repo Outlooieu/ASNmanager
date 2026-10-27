@@ -63,15 +63,6 @@ stream|Vimeo|vimeo.com vimeocdn.com|
 stream|Dailymotion|dailymotion.com dmcdn.net|
 stream|ProSieben / Sat.1 / Kabel Eins|prosieben.de sat1.de kabeleins.de sixx.de|
 stream|Kick|kick.com|
-tvde|ARD Mediathek & regional broadcasters|ard.de ardmediathek.de ard-mcdn.de brvod-pckgr.akamaized.net brvod-rwrtr.akamaized.net daserste.de tagesschau.de ardaudiothek.de br.de wdr.de ndr.de swr.de hr.de mdr.de rbb-online.de sr-online.de radiobremen.de kika.de phoenix.de deutschlandfunk.de wdrmedien-a.akamaihd.net wdradaptiv-vh.akamaihd.net mediandr-a.akamaihd.net hrardmediathek-a.akamaihd.net odmdr-a.akamaihd.net pdodswr-a.akamaihd.net rbbmediapmdp-a.akamaihd.net srstorage01-a.akamaihd.net pmdonlinekika-a.akamaihd.net|
-tvde|ZDF Mediathek & 3sat|zdf.de zdfmediathek.de heute.de 3sat.de zdfvod.akamaized.net zdfvod-pckgr.akamaized.net zdfvod-rwrtr.akamaized.net zdf-hls-15.akamaized.net zdf-hls-16.akamaized.net zdf-hls-17.akamaized.net zdf-hls-18.akamaized.net zdf-hls-19.akamaized.net kika-live.ard-mcdn.de tvdlzdf-a.akamaihd.net nrodlzdf-a.akamaihd.net rodlzdf-a.akamaihd.net ssl.zdf.de.edgekey.net|
-tvde|arte|arte.tv arte.de arte-cmafhls.akamaized.net arte-cmafhlssub.akamaized.net manifest-arte.akamaized.net artesimulcast.akamaized.net arteconcert-a.akamaihd.net arteptweb-a.akamaihd.net arte.gl-systemhaus.de|
-tvde|Deutsche Welle|dw.com dw.de tvdownloaddw-a.akamaihd.net|
-tvde|HbbTV (ARD / ZDF red button)|hbbtv.zdf.de itv.ard.de cdn.hbbtvlive.de|
-tvde|ORF (Austria)|orf.at|
-tvde|SRF / SRG (Switzerland)|srf.ch srgssr.ch hdvodsrforigin-f.akamaihd.net srfvodhd-vh.akamaihd.net|
-tvde|funk|funk.net|
-tvde|ServusTV|servustv.com|
 news|BBC|bbc.co.uk bbc.com bbci.co.uk|
 news|CNN|cnn.com|
 news|New York Times|nytimes.com nyt.com|

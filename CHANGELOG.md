@@ -1,3 +1,7 @@
+## v3.9.32
+
+- The built-in presets of the category "TV & media libraries" are removed - this category is for own presets now (presets.txt)
+
 ## v3.9.31
 
 - **Connections on the wrong line are closed**: a connection to an address of an entry that runs over another line than the entry says (opened before the address was learned, e.g. with an answer from the DNS cache of AdGuard Home, or before a rule or failover change) is closed - the device opens it again on the right line. Done by the routing check every 5 minutes and by Apply / Reload all, logged with device and destination. Example: a Mediathek stream that kept running over the VPN instead of WAN
