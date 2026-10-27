@@ -3105,6 +3105,8 @@ APPLIED_ASNS="/tmp/asnmanager-applied.asns"
 cli_apply() {
     sm_on && { rm -f "$SM_RT" "$SM_FLAG"; sm_log "turned off by Apply"; echo "Safemode turned off - the rules are applied again."; sgd_write >/dev/null 2>&1; }
     cli_apply_run "$@"; ca_rc=$?
+    # answers from DNS caches and connections opened on the old way would keep a site on the wrong line
+    agh_cache_clear; ct_fix apply
     sm_watch_start apply
     return $ca_rc
 }
@@ -6802,6 +6804,91 @@ rc_check() {
     mv -f "$RC_PREV.new" "$RC_PREV"
     [ -n "$RC_HEAL" ] && rc_heal "$RC_HEALF"
     rm -f "$RC_HEALF"
+    [ -n "$RC_HEAL" ] && ct_fix check
+}
+
+# Connections to addresses of the entries that run over another line than the entry says - opened before the address
+# was learned (an answer from a DNS cache that did not pass dnsmasq), before a rule was built again or before a failover
+# ended. A connection keeps its line until it ends; TV apps and streams keep theirs open for a long time and try again
+# on the same way. They are closed, the device opens them again at once - now on the right line.
+# The rules are evaluated like the firewall does it: excluded devices first, then the marking rules in their order (the
+# first one whose set holds the address wins, rules for single devices only for them); the line of a connection is the
+# address its answers go to (WAN address or tunnel address). $1 = why (check | apply), logged.
+CTF_MAX=${CTF_MAX:-300}
+ct_fix() {
+    sm_on && return 0
+    cf_ct=""; for cf_x in /usr/sbin/conntrack /sbin/conntrack /usr/bin/conntrack /opt/sbin/conntrack; do [ -x "$cf_x" ] && { cf_ct=$cf_x; break; }; done
+    [ -n "$cf_ct" ] && [ -r /proc/net/nf_conntrack ] || return 0
+    cf_d=/tmp/asnmanager-ctfix.$$; rm -rf "$cf_d"; mkdir -p "$cf_d"
+    # marks -> targets
+    for cf_t in $VALID_DESTS; do echo "$(get_target_info "$cf_t" | cut -d' ' -f2) $cf_t"; done > "$cf_d/marks"
+    # rules in their order: "EX <net>" or "R <source|-> <set> <target>"
+    iptables -t mangle -S PREROUTING 2>/dev/null | awk -v mf="$cf_d/marks" '
+        BEGIN { while ((getline l < mf) > 0) { split(l, a, " "); m[a[1]] = a[2] } }
+        { src = "-"; set = ""; mk = ""
+          for (i = 1; i <= NF; i++) { if ($i == "-s") src = $(i + 1); if ($i == "--match-set" && $(i + 2) == "dst") set = $(i + 1); if ($i == "--set-xmark") mk = $(i + 1) }
+          sub(/\/32$/, "", src); split(mk, k, "/")
+          if (k[1] == "0xf00" && set == "" && src != "-") { print "EX", src; next }
+          if (set != "" && (k[1] in m)) print "R", src, set, m[k[1]] }' > "$cf_d/rules"
+    grep -q '^R ' "$cf_d/rules" || { rm -rf "$cf_d"; return 0; }
+    # members of the sets of those rules: "set prefix"
+    for cf_s in $(awk '$1 == "R" { print $3 }' "$cf_d/rules" | sort -u); do
+        ipset list "$cf_s" 2>/dev/null | awk -v s="$cf_s" 'f && $1 ~ /^[0-9]/ { print s, $1 } /^Members:/ { f = 1 }'
+    done > "$cf_d/sets"
+    # the line a target is expected on (failover: the fallback in use) and whether it is up; addresses of the lines
+    : > "$cf_d/exp"; : > "$cf_d/nat"
+    for cf_t in $(awk '$1 == "R" { print $4 }' "$cf_d/rules" | sort -u); do
+        cf_e=$(cat "$FO_RT/active_$cf_t" 2>/dev/null); [ -n "$cf_e" ] || cf_e=$cf_t
+        [ "$cf_e" = "BLOCK" ] && continue
+        check_iface_up "$cf_e" >/dev/null 2>&1 || continue
+        echo "$cf_t $cf_e" >> "$cf_d/exp"
+    done
+    { echo "$(nvram get wan0_ipaddr) WAN1"; echo "$(nvram get wan1_ipaddr) WAN2"
+      for cf_t in OVPN1 OVPN2 OVPN3 OVPN4 OVPN5 WGC1 WGC2 WGC3 WGC4 WGC5; do
+          cf_v=$(get_ifname "$cf_t"); [ -n "$cf_v" ] || continue
+          ip -4 addr show "$cf_v" 2>/dev/null | awk -v t="$cf_t" '/inet / { split($2, a, "/"); print a[1], t }'
+      done; } | awk '$1 != "" && $1 != "0.0.0.0"' > "$cf_d/nat"
+    # connections of LAN devices to public addresses: "device destination line" -> the ones on the wrong line
+    awk -v rf="$cf_d/rules" -v sf="$cf_d/sets" -v ef="$cf_d/exp" -v nf="$cf_d/nat" -v lan="$(nvram get lan_ipaddr)" '
+        function n(x,  a) { split(x, a, "."); return ((a[1] * 256 + a[2]) * 256 + a[3]) * 256 + a[4] }
+        function inset(s, ip,  l, z, v) { v = n(ip); for (l = 32; l >= 1; l--) if ((s, l) in L) { z = 2 ^ (32 - l); if ((s, l, int(v / z)) in N) return 1 } return 0 }
+        function innet(c, ip,  p, l, z) { split(c, p, "/"); l = (p[2] == "") ? 32 : p[2]; z = 2 ^ (32 - l); return int(n(p[1]) / z) == int(n(ip) / z) }
+        function priv(x) { return x ~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|127\.|169\.254\.|22[4-9]\.|2[3-5][0-9]\.|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.)/ }
+        BEGIN {
+            while ((getline l < rf) > 0) { split(l, a, " "); if (a[1] == "EX") ex[++ne] = a[2]; else { nr++; rs[nr] = a[2]; rset[nr] = a[3]; rt[nr] = a[4] } }
+            while ((getline l < sf) > 0) { split(l, a, " "); split(a[2], p, "/"); ln = (p[2] == "") ? 32 : p[2] + 0; z = 2 ^ (32 - ln); L[a[1], ln] = 1; N[a[1], ln, int(n(p[1]) / z)] = 1 }
+            while ((getline l < ef) > 0) { split(l, a, " "); E[a[1]] = a[2] }
+            while ((getline l < nf) > 0) { split(l, a, " "); T[a[1]] = a[2] }
+        }
+        { src = ""; dst = ""; k = 0; nat = ""
+          for (i = 1; i <= NF; i++) if ($i ~ /^src=/ && src == "") src = substr($i, 5); else if ($i ~ /^dst=/) { k++; if (k == 1) dst = substr($i, 5); else if (k == 2) nat = substr($i, 5) }
+          if (src == "" || src == lan || !priv(src) || priv(dst) || !(nat in T)) next
+          key = src " " dst; if (key in done) next; done[key] = 1
+          for (i = 1; i <= ne; i++) if (innet(ex[i], src)) next
+          for (i = 1; i <= nr; i++) {
+              if (rs[i] != "-" && rs[i] != src) continue
+              if (!inset(rset[i], dst)) continue
+              if ((rt[i] in E) && T[nat] != E[rt[i]]) print src, dst, T[nat], E[rt[i]]
+              next
+          } }' /proc/net/nf_conntrack 2>/dev/null | head -n "$CTF_MAX" > "$cf_d/wrong"
+    cf_n=0; cf_c=0; cf_ex=""
+    while read -r cf_s cf_t cf_got cf_want; do
+        cf_r=$("$cf_ct" -D -s "$cf_s" -d "$cf_t" 2>&1 | sed -n 's/.* \([0-9][0-9]*\) flow entries have been deleted.*/\1/p')
+        cf_c=$((cf_c + ${cf_r:-0})); cf_n=$((cf_n + 1))
+        [ $cf_n -le 3 ] && cf_ex="$cf_ex $cf_s -> $cf_t ($cf_got instead of $cf_want),"
+    done < "$cf_d/wrong"
+    [ $cf_c -gt 0 ] && logger -t ASNmanager "Connections on the wrong line ($1): $cf_c closed ($cf_n device / destination pair(s)) - they reconnect on the right line:${cf_ex%,}$([ $cf_n -gt 3 ] && echo " ...")"
+    rm -rf "$cf_d"
+    [ "$1" = "apply" ] && [ $cf_c -gt 0 ] && echo "$cf_c connection(s) on the wrong line closed - the devices open them again on the right line."
+    return 0
+}
+# the DNS cache of AdGuard Home (in front of dnsmasq: its cached answers do not pass dnsmasq, a domain entry does not
+# learn them) - emptied through its API when the login is saved
+agh_cache_clear() {
+    agh_present || return 0
+    [ -s "$AGH_AUTH" ] || return 0
+    agh_api POST /control/cache_clear '{}' && echo "AdGuard Home: DNS cache emptied."
+    return 0
 }
 
 # the check every 5 minutes found entries whose rule is missing (removed from outside, e.g. by another add-on or a
