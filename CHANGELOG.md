@@ -2,6 +2,7 @@
 
 - **Connections on the wrong line are closed**: a connection to an address of an entry that runs over another line than the entry says (opened before the address was learned, e.g. with an answer from the DNS cache of AdGuard Home, or before a rule or failover change) is closed - the device opens it again on the right line. Done by the routing check every 5 minutes and by Apply / Reload all, logged with device and destination. Example: a Mediathek stream that kept running over the VPN instead of WAN
 - Apply / Reload all also empties the DNS cache of AdGuard Home (with the saved login)
+- After this update the rules are built again once by themselves (in the background, from the cache)
 
 ## v3.9.30
 

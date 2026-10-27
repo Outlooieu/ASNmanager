@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.9.30
+version=3.9.31
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -12,7 +12,7 @@ case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
 export PATH
 
-SCRIPT_VERSION="3.9.30"
+SCRIPT_VERSION="3.9.31"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -6882,6 +6882,20 @@ ct_fix() {
     [ "$1" = "apply" ] && [ $cf_c -gt 0 ] && echo "$cf_c connection(s) on the wrong line closed - the devices open them again on the right line."
     return 0
 }
+# Versions whose changes need the rules built again: the first run of the new script after an update (the update itself
+# is done by the old one - it starts "webui update" and "stats boot" of the new one; the check every 5 minutes as well)
+# rebuilds them once from the cache, in the background, with the new code (worker, marking rules, closing connections).
+REBUILD_VER="3.9.31"
+upd_post() {
+    [ "$(cat "$ADDON_DIR/rebuilt" 2>/dev/null)" = "$REBUILD_VER" ] && return 0
+    sm_on && return 0
+    mkdir -p "$ADDON_DIR"; echo "$REBUILD_VER" > "$ADDON_DIR/rebuilt"
+    { [ -s "$ASN_FILE" ] || [ -s "$CUSTOM_FILE" ]; } || return 0
+    logger -t ASNmanager "Update to v$SCRIPT_VERSION: rules are built again once (from the cache)"
+    ( sleep 5; "$SCRIPT_PATH" apply cache ) </dev/null >/dev/null 2>&1 &
+    return 0
+}
+
 # the DNS cache of AdGuard Home (in front of dnsmasq: its cached answers do not pass dnsmasq, a domain entry does not
 # learn them) - emptied through its API when the login is saved
 agh_cache_clear() {
@@ -7755,6 +7769,7 @@ USAGE_EOF
 
 cli_main() {
     cmd="$1"; [ $# -gt 0 ] && shift
+    case "$cmd:$1" in webui:update|webui:mount|stats:boot|check:run) upd_post ;; esac
     rc=0
     case "$cmd" in
         list)     cli_list ;;
