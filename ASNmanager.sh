@@ -7810,7 +7810,7 @@ cli_main() {
     rc=$?
     case "$cmd" in dnstls|dnsdevice|dnsfollow|failover) case "$1" in on|off|set|clear|vpnd|server) sm_watch_start "$cmd" ;; esac ;; esac
     # Keep the WebUI view in sync after CLI changes
-    case "$cmd" in add|preset|remove|del|clear|apply|reload|retry|edit|import|schedule|restore|custom)
+    case "$cmd" in add|preset|remove|del|clear|apply|reload|retry|edit|import|schedule|restore|custom|exclude)
         [ -f "$ADDON_DIR/webui_page" ] && web_export ;;
     esac
     return $rc
