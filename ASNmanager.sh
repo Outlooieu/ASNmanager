@@ -2519,7 +2519,20 @@ cli_explain() {
         if [ -n "$ex_win" ]; then
             ex_want=$(dg_target_of_mark "$ex_win"); ex_got=$(dg_target_of_dev "$ex_dv")
             if [ "$ex_got" = "$ex_want" ]; then echo "   Leaves via: $ex_dv ($ex_got)  [OK]"
-            else echo "   Leaves via: ${ex_dv:-?} (${ex_got:-?}) instead of $ex_want  [CHECK - interface down, failover or route missing?]"; fi
+            else
+                ex_act=$(cat "$FO_RT/active_$ex_want" 2>/dev/null)
+                if [ -n "$ex_act" ] && [ "$ex_act" != "$ex_want" ] && [ "$ex_act" = "$ex_got" ]; then
+                    echo "   Leaves via: $ex_dv ($ex_got)  [OK - failover: $ex_want is down, its fallback $ex_got is used]"
+                elif [ "$ex_act" = "BLOCK" ] && [ -z "$ex_dv" ]; then
+                    echo "   Leaves via: - (blocked)  [OK - failover: $ex_want is down, its chain ends with BLOCK]"
+                elif [ -z "$ex_dv" ] && ! check_iface_up "$ex_want" >/dev/null 2>&1 && ks_on; then
+                    echo "   Leaves via: - (blocked)  [OK - kill switch: $ex_want is down and no fallback works]"
+                elif ! check_iface_up "$ex_want" >/dev/null 2>&1; then
+                    echo "   Leaves via: ${ex_dv:-?} (${ex_got:-?}) instead of $ex_want  [$ex_want is down - without failover / kill switch the normal way is taken]"
+                else
+                    echo "   Leaves via: ${ex_dv:-?} (${ex_got:-?}) instead of $ex_want  [CHECK - route or routing rule missing?]"
+                fi
+            fi
         else
             echo "   Leaves via: ${ex_dv:-?} ($(dg_target_of_dev "$ex_dv")) - the normal way (VPN Director / main route), no ASN Manager rule"
         fi
