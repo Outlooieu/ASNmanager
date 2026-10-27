@@ -263,7 +263,7 @@ mark_old_rules_del() { while ip rule del fwmark "$1/$1" 2>/dev/null; do :; done;
 get_target_info() {
     case "$1" in
         WAN|WAN1) echo "254 0x8000 9990" ;;
-        WAN2)     echo "253 0x8500 9890" ;;
+        WAN2)     echo "216 0x7200 9890" ;;
         OVPN1)    echo "111 0x1000 9991" ;; OVPN2) echo "112 0x2000 9992" ;; OVPN3) echo "113 0x3000 9993" ;; OVPN4) echo "114 0x4000 9994" ;; OVPN5) echo "115 0x5000 9995" ;;
         WGC1)     echo "211 0x6100 9996" ;; WGC2) echo "212 0x6200 9997" ;; WGC3) echo "213 0x6300 9998" ;; WGC4) echo "214 0x6400 9999" ;; WGC5) echo "215 0x6500 10000" ;;
         *)        echo "" ;;
@@ -602,6 +602,22 @@ rt_heal() {
         ip route add default dev "$rh_dev" table "$rh_tab" 2>/dev/null &&
             logger -t ASNmanager "Routing: route of $rh_t (table $rh_tab, $rh_dev) was missing - VPN client restarted? Added again"
     done
+    # WAN2 (Dual-WAN): an own table with the gateway of the second WAN (the main table only knows the first one), and its
+    # reverse path filter loose - the answers come in on that interface while the main route points to WAN1
+    rh_i=$(get_target_info WAN2); rh_tab=${rh_i%% *}; rh_m=$(echo "$rh_i" | cut -d' ' -f2)
+    if echo "$rh_rules" | grep -q "fwmark ${rh_m}/${MARK_MASK} " && check_iface_up WAN2 >/dev/null 2>&1; then
+        rh_dev=$(nvram get wan1_gw_ifname 2>/dev/null); [ -n "$rh_dev" ] || rh_dev=$(nvram get wan1_ifname 2>/dev/null)
+        rh_gw=$(nvram get wan1_gateway 2>/dev/null)
+        case "$rh_gw" in ''|0.0.0.0) rh_want="default dev $rh_dev" ;; *) rh_want="default via $rh_gw dev $rh_dev" ;; esac
+        if [ -n "$rh_dev" ] && ! ip route show table "$rh_tab" 2>/dev/null | grep -q "^$rh_want"; then
+            ip route flush table "$rh_tab" 2>/dev/null
+            ip route add $rh_want table "$rh_tab" 2>/dev/null && logger -t ASNmanager "Routing: WAN2 table $rh_tab set to: $rh_want"
+        fi
+        rh_rp=/proc/sys/net/ipv4/conf/$rh_dev/rp_filter
+        if [ -n "$rh_dev" ] && [ "$(cat "$rh_rp" 2>/dev/null)" = "1" ]; then
+            echo 2 > "$rh_rp" 2>/dev/null && logger -t ASNmanager "Routing: reverse path filter of $rh_dev (WAN2) set to loose - answers of the WAN2 entries come in there"
+        fi
+    fi
     ks_sync
     ex_sync
 }
@@ -2074,7 +2090,7 @@ MARK_MASK=0xff00        # same as the main script: exact target value in the mar
 get_info() {
     case "$1" in
         WAN|WAN1) echo "254 0x8000 9990" ;;
-        WAN2)     echo "253 0x8500 9890" ;;
+        WAN2)     echo "216 0x7200 9890" ;;
         OVPN1)    echo "111 0x1000 9991" ;; OVPN2) echo "112 0x2000 9992" ;; OVPN3) echo "113 0x3000 9993" ;; OVPN4) echo "114 0x4000 9994" ;; OVPN5) echo "115 0x5000 9995" ;;
         WGC1)     echo "211 0x6100 9996" ;; WGC2) echo "212 0x6200 9997" ;; WGC3) echo "213 0x6300 9998" ;; WGC4) echo "214 0x6400 9999" ;; WGC5) echo "215 0x6500 10000" ;;
         *)        echo "" ;;
@@ -6266,7 +6282,7 @@ FO_SELF_PRIO=9870      # "iif lo fwmark X lookup main": the router itself is not
 
 fo_info() {   # table fwmark prio - same values as the worker
     case "$1" in
-        WAN|WAN1) echo "254 0x8000 9990" ;; WAN2) echo "253 0x8500 9890" ;;
+        WAN|WAN1) echo "254 0x8000 9990" ;; WAN2) echo "216 0x7200 9890" ;;
         OVPN1) echo "111 0x1000 9991" ;; OVPN2) echo "112 0x2000 9992" ;; OVPN3) echo "113 0x3000 9993" ;; OVPN4) echo "114 0x4000 9994" ;; OVPN5) echo "115 0x5000 9995" ;;
         WGC1) echo "211 0x6100 9996" ;; WGC2) echo "212 0x6200 9997" ;; WGC3) echo "213 0x6300 9998" ;; WGC4) echo "214 0x6400 9999" ;; WGC5) echo "215 0x6500 10000" ;;
     esac
@@ -6742,7 +6758,7 @@ RC_HEALF="/tmp/${WEBUI_NS}-check.heal"
 
 rc_info() {   # same fwmarks / tables as the worker
     case "$1" in
-        WAN|WAN1) echo "254 0x8000" ;; WAN2) echo "253 0x8500" ;;
+        WAN|WAN1) echo "254 0x8000" ;; WAN2) echo "216 0x7200" ;;
         OVPN1) echo "111 0x1000" ;; OVPN2) echo "112 0x2000" ;; OVPN3) echo "113 0x3000" ;; OVPN4) echo "114 0x4000" ;; OVPN5) echo "115 0x5000" ;;
         WGC1) echo "211 0x6100" ;; WGC2) echo "212 0x6200" ;; WGC3) echo "213 0x6300" ;; WGC4) echo "214 0x6400" ;; WGC5) echo "215 0x6500" ;;
     esac
@@ -6917,13 +6933,17 @@ ct_fix() {
 # Versions whose changes need the rules built again: the first run of the new script after an update (the update itself
 # is done by the old one - it starts "webui update" and "stats boot" of the new one; the check every 5 minutes as well)
 # rebuilds them once from the cache, in the background, with the new code (worker, marking rules, closing connections).
-REBUILD_VER="3.9.31"
+REBUILD_VER="3.9.32"
 upd_post() {
     [ "$(cat "$ADDON_DIR/rebuilt" 2>/dev/null)" = "$REBUILD_VER" ] && return 0
     sm_on && return 0
     mkdir -p "$ADDON_DIR"; echo "$REBUILD_VER" > "$ADDON_DIR/rebuilt"
     { [ -s "$ASN_FILE" ] || [ -s "$CUSTOM_FILE" ]; } || return 0
     logger -t ASNmanager "Update to v$SCRIPT_VERSION: rules are built again once (from the cache)"
+    # before 3.9.32 WAN2 used mark 0x8500 and table 253 (the load balancing rule of the firmware caught that mark)
+    while ip rule del fwmark 0x8500/0xff00 2>/dev/null; do :; done
+    iptables -t mangle -S PREROUTING 2>/dev/null | grep -- "--set-xmark 0x8500/0xff00" | sed 's/^-A /-D /' | while read -r up_r; do iptables -t mangle $up_r 2>/dev/null; done
+    iptables -t mangle -S OUTPUT 2>/dev/null | grep -- "--set-xmark 0x8500/0xff00" | sed 's/^-A /-D /' | while read -r up_r; do iptables -t mangle $up_r 2>/dev/null; done
     ( sleep 5; "$SCRIPT_PATH" apply cache ) </dev/null >/dev/null 2>&1 &
     return 0
 }
@@ -7843,7 +7863,7 @@ cli_main() {
                 *)         cli_usage; false ;;
             esac ;;
         stats)    ts_cli "$@" ;;
-        guard)    ep_show; ks_sync; ex_sync ;;
+        guard)    ep_show; nv_refresh; rt_heal ;;
         job)      cli_job "$1" ;;
         speedtest) st_cli "$1" ;;
         rulemode) rules_set_mode "$1" ;;

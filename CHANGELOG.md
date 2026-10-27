@@ -1,6 +1,8 @@
 ## v3.9.32
 
+- **WAN2 (Dual-WAN) fixed**: entries on WAN2 left over WAN1. Their routing table had no route (WAN2 now gets its own table 216 with the gateway of the second WAN), and in load balancing mode a rule of the firmware (fwmark 0x8000/0xf000 -> main) caught the WAN2 mark - it is 0x7200 now. The reverse path filter of the WAN2 interface is set to loose, so the answers are not dropped. The rules are built again once after the update
 - The built-in presets of the category "TV & media libraries" are removed - this category is for own presets now (presets.txt)
+- `explain` names failover, kill switch and a line that is down instead of "CHECK"; after a VPN restart the routes come back as soon as each tunnel is up (up to 2 minutes)
 
 ## v3.9.31
 
