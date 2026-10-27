@@ -9,7 +9,8 @@
 - A VPN client that starts again (provider reconnect, GUI) gets the route of its ASN Manager table back within seconds (before: at the next check, up to 5 minutes)
 - The routing check every 5 minutes repairs what it finds missing (routing rule of a line, marking rules of ASNs / domains / IPs - e.g. removed by another add-on) instead of only showing a warning; at most every 15 minutes, logged
 - **Excluded devices** (Settings > Rules): devices or networks ASN Manager leaves alone, e.g. the guest network (192.168.2.0/24) - none of its entries applies to them, they take their normal way. Command `exclude list | set <IP|net>,... | none`, shown in the device check, part of the backup
-- Settings tab in four parts: **Routing** (excluded devices, marking rules, refresh schedule), **DNS**, **General** (display, e-mail, statistics), **Backup & presets** - the last one used is remembered
+- Settings tab in four parts: **Routing** (excluded devices, marking rules, traffic statistics), **DNS**, **General** (display, e-mail, refresh schedule), **Backup & presets** - the last one used is remembered
+- Diagnostics tidier: domain / IP and device in one row, all checks as small buttons, the explanations and the contents of the diagnostic bundle fold out on demand
 
 ## v3.9.28
 

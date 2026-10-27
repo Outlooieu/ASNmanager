@@ -361,6 +361,11 @@
 .asnm-sg-none { margin-top: 6px; }
 .asnm-sg-amb { font-size: 11px; color: var(--warn); max-width: 120px; line-height: 1.35; margin-top: 2px; }
 .asnm-diag-sys { margin: 0 0 14px; padding: 0 0 10px; border-bottom: 1px solid var(--line); }
+.asnm-diag-tools { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.asnm-diag-q { display: flex; gap: 8px; flex-wrap: wrap; }
+.asnm-diag-q > input[type="text"] { flex: 1 1 220px; min-width: 0; }
+#asnm .asnm-diag-q .asnm-diag-dev { flex: 0 1 240px; width: auto; }
+.asnm-diag-btns { gap: 6px; flex-wrap: wrap; }
 .asnm-dp-full { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); cursor: pointer; }
 .asnm-sg-x { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 28px; margin-left: 3px; padding: 0;
     vertical-align: middle; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
@@ -586,7 +591,7 @@ var ASNM_I18N = {
     disp_title: 'Display', disp_sub: 'Applies to the whole page in this browser', disp_unit: 'Unit for data rates',
     disp_unit_desc: 'Used for the live throughput, the speed test and the summaries. 1 MB/s = 8 Mbit/s. Data amounts (for example 1.2 GB) are not affected.',
     disp_change: 'Change unit',
-    ss_routing: 'Routing', ss_dns: 'DNS', ss_general: 'General', ss_backup: 'Backup & presets', rules_title: 'Rules', rules_sub: 'Who the entries apply to and how they are built',
+    ss_routing: 'Routing', ss_dns: 'DNS', ss_general: 'General', ss_backup: 'Backup & presets', rules_title: 'Rules', rules_sub: 'Who the entries apply to, how they are built and counted',
     perf_title: 'Performance', perf_sub: 'Reduce the CPU load of the router',
     ex_title: 'Excluded devices', ex_desc: 'Devices or networks ASN Manager leaves alone - e.g. the guest network (192.168.2.0/24). None of its entries applies to them (also not those for single devices); they take their normal way (VPN Director / WAN). Several separated by commas.', ex_ph: 'e.g. 192.168.2.0/24, 192.168.1.50', ex_save: 'Save', ex_now: '{n} excluded', ex_none: 'None excluded - the entries apply to all devices.', ex_bad: '"{v}" is not an IP address or network (e.g. 192.168.2.0/24).',
     perf_rules: 'Marking rules', perf_rules_desc: 'Combined: all ASNs of a target share one set and one rule, so the router checks each packet only once per target (far less CPU with many ASNs). One per ASN: the old way, for comparison or if something behaves differently.',
@@ -628,6 +633,7 @@ var ASNM_I18N = {
     th_asn: 'ASN', th_src: 'Source device', th_subnets: 'Subnets', th_state: 'State', th_target: 'Target', th_device: 'Device', th_asns: 'ASNs',
     ifaces_title: 'Target interfaces', schedule_title: 'Auto-refresh schedule', refresh_every: 'Refresh every', days: 'day(s)', days_range: '(1-30)',
     at_time: 'At time', time_fmt: '(HH:MM, 24h)', btn_save_schedule: 'Save schedule',
+    diag_check: 'Domain / IP and device (optional)', diag_help: 'What do the buttons do?', dp_more: 'What is in it?',
     diag_title: 'Diagnostics', btn_test: 'Test route', btn_trace: 'Traceroute', router_checks: 'Router checks',
     btn_explain: 'Explain', explain_help: 'Explain: what DNS answers, which entries contain each address, which rule wins (for the device chosen below) and which interface the traffic leaves through.',
     diag_dev: 'Device', diag_dev_any: '- any device -', btn_device: 'Check device', a_dev: 'Please choose a device.',
@@ -743,7 +749,7 @@ var ASNM_I18N = {
     disp_title: 'Anzeige', disp_sub: 'Gilt für die ganze Seite in diesem Browser', disp_unit: 'Einheit für Datenraten',
     disp_unit_desc: 'Wird für den Live-Durchsatz, den Speedtest und die Zusammenfassungen verwendet. 1 MB/s = 8 Mbit/s. Datenmengen (zum Beispiel 1,2 GB) bleiben unverändert.',
     disp_change: 'Einheit ändern',
-    ss_routing: 'Routing', ss_dns: 'DNS', ss_general: 'Allgemein', ss_backup: 'Sicherung & Vorlagen', rules_title: 'Regeln', rules_sub: 'Für wen die Einträge gelten und wie sie gebaut werden',
+    ss_routing: 'Routing', ss_dns: 'DNS', ss_general: 'Allgemein', ss_backup: 'Sicherung & Vorlagen', rules_title: 'Regeln', rules_sub: 'Für wen die Einträge gelten, wie sie gebaut und gezählt werden',
     perf_title: 'Leistung', perf_sub: 'CPU-Last des Routers verringern',
     ex_title: 'Ausgenommene Geräte', ex_desc: 'Geräte oder Netze, die ASN Manager in Ruhe lässt - z. B. das Gast-Netz (192.168.2.0/24). Keiner seiner Einträge gilt für sie (auch nicht die für einzelne Geräte); sie nehmen ihren normalen Weg (VPN Director / WAN). Mehrere mit Komma trennen.', ex_ph: 'z. B. 192.168.2.0/24, 192.168.1.50', ex_save: 'Speichern', ex_now: '{n} ausgenommen', ex_none: 'Keine ausgenommen - die Einträge gelten für alle Geräte.', ex_bad: '"{v}" ist keine IP-Adresse und kein Netz (z. B. 192.168.2.0/24).',
     perf_rules: 'Marker-Regeln', perf_rules_desc: 'Zusammengefasst: Alle ASNs eines Ziels teilen sich eine Menge und eine Regel, der Router prüft jedes Paket nur einmal pro Ziel (mit vielen ASNs deutlich weniger CPU). Einzeln: eine Regel pro ASN wie früher, zum Vergleichen oder wenn sich etwas anders verhält.',
@@ -785,6 +791,7 @@ var ASNM_I18N = {
     th_asn: 'ASN', th_src: 'Quellgerät', th_subnets: 'Subnetze', th_state: 'Status', th_target: 'Ziel', th_device: 'Gerät', th_asns: 'ASNs',
     ifaces_title: 'Ziel-Interfaces', schedule_title: 'Zeitplan für Aktualisierung', refresh_every: 'Aktualisieren alle', days: 'Tag(e)', days_range: '(1-30)',
     at_time: 'Um', time_fmt: '(HH:MM, 24h)', btn_save_schedule: 'Zeitplan speichern',
+    diag_check: 'Domain / IP und Gerät (optional)', diag_help: 'Was machen die Knöpfe?', dp_more: 'Was steht drin?',
     diag_title: 'Diagnose', btn_test: 'Route testen', btn_trace: 'Traceroute', router_checks: 'Router-Prüfungen',
     btn_explain: 'Erklären', explain_help: 'Erklären: was DNS antwortet, welche Einträge jede Adresse enthalten, welche Regel gewinnt (für das unten gewählte Gerät) und über welches Interface der Verkehr hinausgeht.',
     diag_dev: 'Gerät', diag_dev_any: '- beliebiges Gerät -', btn_device: 'Gerät prüfen', a_dev: 'Bitte ein Gerät wählen.',
@@ -4018,32 +4025,32 @@ function initial() {
         <span class="asnm-link" style="margin-left: 8px;" data-i18n="rc_now" onclick="asnmRcCheck();"></span>
         <div id="asnm_rc_state_list" class="asnm-help" style="display:none;"></div></div>
     </div>
-    <div class="asnm-form">
-      <div class="asnm-field asnm-full"><span class="asnm-label" data-i18n="domain_ip"></span>
-        <div class="asnm-inline">
-          <input type="text" id="asnm_diag" maxlength="253" data-i18n-ph="ph_diag" autocomplete="off" onkeydown="if (event.keyCode === 13) { asnmExplain(); return false; }"/>
-          <input type="button" class="button_gen asnm-btn asnm-primary" data-i18n-value="btn_explain" onclick="asnmExplain();"/>
-          <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_test" onclick="asnmTool('test','asnm_diag');"/>
-          <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_trace" onclick="asnmTool('trace','asnm_diag');"/>
-        </div><span class="asnm-help" data-i18n="explain_help"></span></div>
-      <div class="asnm-field asnm-full"><span class="asnm-label" data-i18n="diag_dev"></span>
-        <div class="asnm-inline">
-          <select id="asnm_diag_dev" class="input_option asnm-diag-dev"></select>
-          <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_device" onclick="asnmDevCheck();"/>
-        </div><span class="asnm-help" data-i18n="diag_dev_help"></span></div>
-      <div class="asnm-field asnm-full"><span class="asnm-label" data-i18n="router_checks"></span>
-        <div class="asnm-row">
-          <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_dnschain" onclick="asnmTool('dnschain');"/>
-          <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_ipset" onclick="asnmTool('status');"/>
-          <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_pubip" onclick="asnmTool('ifaces');"/>
-          <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_devices" onclick="asnmTool('devices');"/>
-        </div></div>
+    <div class="asnm-diag-tools">
+      <span class="asnm-label" data-i18n="diag_check"></span>
+      <div class="asnm-diag-q">
+        <input type="text" id="asnm_diag" maxlength="253" data-i18n-ph="ph_diag" autocomplete="off" onkeydown="if (event.keyCode === 13) { asnmExplain(); return false; }"/>
+        <select id="asnm_diag_dev" class="input_option asnm-diag-dev"></select>
+      </div>
+      <div class="asnm-row asnm-diag-btns">
+        <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="btn_explain" onclick="asnmExplain();"/>
+        <input type="button" class="button_gen asnm-btn asnm-small-btn" data-i18n-value="btn_test" onclick="asnmTool('test','asnm_diag');"/>
+        <input type="button" class="button_gen asnm-btn asnm-small-btn" data-i18n-value="btn_trace" onclick="asnmTool('trace','asnm_diag');"/>
+        <input type="button" class="button_gen asnm-btn asnm-small-btn" data-i18n-value="btn_device" onclick="asnmDevCheck();"/>
+      </div>
+      <span class="asnm-label" data-i18n="router_checks" style="margin-top:12px;"></span>
+      <div class="asnm-row asnm-diag-btns">
+        <input type="button" class="button_gen asnm-btn asnm-small-btn" data-i18n-value="btn_dnschain" onclick="asnmTool('dnschain');"/>
+        <input type="button" class="button_gen asnm-btn asnm-small-btn" data-i18n-value="btn_ipset" onclick="asnmTool('status');"/>
+        <input type="button" class="button_gen asnm-btn asnm-small-btn" data-i18n-value="btn_pubip" onclick="asnmTool('ifaces');"/>
+        <input type="button" class="button_gen asnm-btn asnm-small-btn" data-i18n-value="btn_devices" onclick="asnmTool('devices');"/>
+      </div>
+      <details class="asnm-dw-more"><summary data-i18n="diag_help"></summary><ul><li data-i18n="explain_help"></li><li data-i18n="diag_dev_help"></li></ul></details>
     </div>
     <pre id="asnm_output" class="asnm-output" data-i18n="output_default"></pre>
   </div>
   <div class="asnm-card" id="asnm_dp_card">
     <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg><div class="asnm-card-titles"><h3 data-i18n="dp_title"></h3><div class="asnm-card-sub" data-i18n="dp_sub"></div></div></div>
-    <div class="asnm-dp-text" data-i18n="dp_text"></div>
+    <details class="asnm-dw-more" style="margin:0 0 12px;"><summary data-i18n="dp_more"></summary><div class="asnm-dp-text" style="margin:8px 0 0;" data-i18n="dp_text"></div></details>
     <div class="asnm-row asnm-dp-row">
       <input type="button" class="button_gen asnm-btn asnm-primary" data-i18n-value="btn_dp" onclick="asnmDiagPack();"/>
       <label class="asnm-dp-full"><input type="checkbox" id="asnm_dp_full"/><span data-i18n="dp_full"></span></label>
@@ -4071,16 +4078,10 @@ function initial() {
     <div class="asnm-field"><span class="asnm-label" data-i18n="perf_rules"></span><span class="asnm-help" data-i18n="perf_rules_desc"></span>
       <div class="asnm-row" style="margin-top:8px;"><div class="asnm-seg"><span id="asnm_rm_combined" onclick="asnmSetRules('combined');" data-i18n="perf_rules_comb"></span><span id="asnm_rm_single" onclick="asnmSetRules('single');" data-i18n="perf_rules_single"></span></div></div>
     </div>
-  </div>
-  <div class="asnm-card">
-    <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><div class="asnm-card-titles"><h3 data-i18n="schedule_title"></h3></div></div>
-    <div class="asnm-form">
-      <div class="asnm-field"><span class="asnm-label" data-i18n="refresh_every"></span>
-        <div class="asnm-inline"><input type="text" id="asnm_sched_int" class="asnm-w-sm" maxlength="2"/><span class="asnm-muted"><span data-i18n="days"></span> <span data-i18n="days_range"></span></span></div></div>
-      <div class="asnm-field"><span class="asnm-label" data-i18n="at_time"></span>
-        <input type="text" id="asnm_sched_time" class="asnm-w-md" maxlength="5" placeholder="04:30"/><span class="asnm-help" data-i18n="time_fmt"></span></div>
+    <div class="asnm-divider"></div>
+    <div class="asnm-field"><span class="asnm-label" data-i18n="perf_stats"></span><span class="asnm-help" data-i18n="perf_stats_desc"></span>
+      <div class="asnm-row" style="margin-top:8px;"><div class="asnm-seg"><span id="asnm_sm_asn" onclick="asnmSetStatsMode('asn');" data-i18n="perf_stats_asn"></span><span id="asnm_sm_iface" onclick="asnmSetStatsMode('iface');" data-i18n="perf_stats_iface"></span></div></div>
     </div>
-    <div class="asnm-row" style="margin-top:14px;"><input type="button" class="button_gen asnm-btn" data-i18n-value="btn_save_schedule" onclick="asnmSaveSchedule();"/></div>
   </div>
   </div>
   <div class="asnm-subpanel" id="asnm_ssub_dns" style="display:none;">
@@ -4130,11 +4131,15 @@ function initial() {
       <div class="asnm-help" id="asnm_mail_info" style="margin-top:8px;"></div>
     </div>
   </div>
-  <div class="asnm-card" id="asnm_perf_card">
-    <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><div class="asnm-card-titles"><h3 data-i18n="perf_title"></h3><div class="asnm-card-sub" data-i18n="perf_sub"></div></div></div>
-    <div class="asnm-field"><span class="asnm-label" data-i18n="perf_stats"></span><span class="asnm-help" data-i18n="perf_stats_desc"></span>
-      <div class="asnm-row" style="margin-top:8px;"><div class="asnm-seg"><span id="asnm_sm_asn" onclick="asnmSetStatsMode('asn');" data-i18n="perf_stats_asn"></span><span id="asnm_sm_iface" onclick="asnmSetStatsMode('iface');" data-i18n="perf_stats_iface"></span></div></div>
+  <div class="asnm-card">
+    <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><div class="asnm-card-titles"><h3 data-i18n="schedule_title"></h3></div></div>
+    <div class="asnm-form">
+      <div class="asnm-field"><span class="asnm-label" data-i18n="refresh_every"></span>
+        <div class="asnm-inline"><input type="text" id="asnm_sched_int" class="asnm-w-sm" maxlength="2"/><span class="asnm-muted"><span data-i18n="days"></span> <span data-i18n="days_range"></span></span></div></div>
+      <div class="asnm-field"><span class="asnm-label" data-i18n="at_time"></span>
+        <input type="text" id="asnm_sched_time" class="asnm-w-md" maxlength="5" placeholder="04:30"/><span class="asnm-help" data-i18n="time_fmt"></span></div>
     </div>
+    <div class="asnm-row" style="margin-top:14px;"><input type="button" class="button_gen asnm-btn" data-i18n-value="btn_save_schedule" onclick="asnmSaveSchedule();"/></div>
   </div>
   </div>
   <div class="asnm-subpanel" id="asnm_ssub_backup" style="display:none;">
