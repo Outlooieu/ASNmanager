@@ -6341,12 +6341,40 @@ ks_sync() {
 KS_HOOK="ASNmanager-Routes"
 ks_hook_sync() {
     if echo "$ks_rules" | grep -qE "fwmark 0x[1-6][0-9a-f]00/${MARK_MASK} " && [ -f "$SCRIPT_PATH" ]; then
-        grep -q "# ${KS_HOOK}\$" "$SERVICE_EVENT" 2>/dev/null && return 0
+        grep "# ${KS_HOOK}\$" "$SERVICE_EVENT" 2>/dev/null | grep -q 'routes wait' && return 0
         ensure_script "$SERVICE_EVENT"
-        echo 'case "$2" in wgc*|vpnclient*|wireguard*) (sleep 6; '"$SCRIPT_PATH"' routes heal; sleep 14; '"$SCRIPT_PATH"' routes heal) </dev/null >/dev/null 2>&1 & ;; esac # '"${KS_HOOK}" >> "$SERVICE_EVENT"
+        sed -i "/# ${KS_HOOK}\$/d" "$SERVICE_EVENT" 2>/dev/null                      # an older form of the line
+        echo 'case "$2" in wgc*|vpnclient*|wireguard*) '"$SCRIPT_PATH"' routes wait </dev/null >/dev/null 2>&1 & ;; esac # '"${KS_HOOK}" >> "$SERVICE_EVENT"
     elif [ -f "$SERVICE_EVENT" ] && grep -q "# ${KS_HOOK}\$" "$SERVICE_EVENT"; then
         sed -i "/# ${KS_HOOK}\$/d" "$SERVICE_EVENT"
     fi
+}
+# after a VPN client was started again (the firmware restarts ALL WireGuard clients when one is switched in the GUI, one
+# after the other - that can take a minute): put the route of every ASN Manager table back as soon as its tunnel is up,
+# every 4 s, up to 2 minutes, until no line that is switched on is missing its route. One waiter at a time.
+rt_heal_wait() {
+    sm_on && return 0
+    rw_l=/tmp/${WEBUI_NS}-routes.wait
+    rw_o=$(cat "$rw_l" 2>/dev/null); [ -n "$rw_o" ] && [ "$rw_o" != "$$" ] && [ -d "/proc/$rw_o" ] && return 0
+    echo $$ > "$rw_l"
+    sleep 3
+    rw_i=0
+    while [ $rw_i -lt 30 ]; do
+        nv_refresh; rt_heal
+        rw_miss=""; rw_rules=$(ip rule show 2>/dev/null)
+        for rw_t in OVPN1 OVPN2 OVPN3 OVPN4 OVPN5 WGC1 WGC2 WGC3 WGC4 WGC5; do
+            rw_i2=$(get_target_info "$rw_t"); rw_tab=${rw_i2%% *}; rw_m=$(echo "$rw_i2" | cut -d' ' -f2)
+            echo "$rw_rules" | grep -q "fwmark ${rw_m}/${MARK_MASK} " || continue
+            case "$rw_t" in WGC*) [ "$(nvram get "wgc${rw_t#WGC}_enable" 2>/dev/null)" = "1" ] || continue ;;
+                            OVPN*) [ "$(nvram get "vpn_client${rw_t#OVPN}_state" 2>/dev/null)" = "0" ] && continue ;; esac
+            ip route show table "$rw_tab" 2>/dev/null | grep -q '^default' || rw_miss="$rw_miss $rw_t"
+        done
+        [ -z "$rw_miss" ] && break
+        rw_i=$((rw_i + 1)); sleep 4
+    done
+    [ -n "$rw_miss" ] && logger -t ASNmanager "Routing: after a VPN restart still no tunnel for$rw_miss after 2 minutes - the check every 5 minutes keeps trying"
+    rm -f "$rw_l"
+    return 0
 }
 ks_clear() {
     [ -f "$SERVICE_EVENT" ] && sed -i "/# ${KS_HOOK}\$/d" "$SERVICE_EVENT"
@@ -7913,7 +7941,7 @@ cli_main() {
                       none|clear) ex_set none ;;
                       *)       echo "Usage: exclude list | set <IP|network>[,...] | none"; false ;;
                   esac ;;
-        routes)   case "$1" in heal) sm_on || { nv_refresh; rt_heal; } ;; *) echo "Usage: routes heal"; false ;; esac ;;
+        routes)   case "$1" in heal) sm_on || { nv_refresh; rt_heal; } ;; wait) rt_heal_wait ;; *) echo "Usage: routes heal | wait"; false ;; esac ;;
         help|-h|--help) cli_usage ;;
         *)        cli_usage; false ;;
     esac
