@@ -1,16 +1,17 @@
+## v3.9.30
+
+- **Excluded devices** (Settings > Routing): devices or networks ASN Manager leaves alone, e.g. the guest network - none of its entries applies to them, they take their normal way. Command `exclude list | set <IP|net>,... | none`, part of the backup
+- Settings in four parts (Routing, DNS, General, Backup & presets); Diagnostics tidier (one input row, explanations fold out)
+- Theme **Default** in the colours of the router pages replaces "Dark"; Light and Blue stay
+- Device names: user names of the WireGuard server clients (device check, device list, AdGuard Home)
+- Device list / check: connections per destination; connections over WAN to the network in front of the router (e.g. Fritz!Box) shown apart as "WAN1-lan"
+- Minor improvements: optional kill switch per VPN line (`failover killswitch on|off`), the route of a restarted VPN client is back within seconds, the routing check repairs missing rules by itself, `safemode status` shows what the self-test waits for
+
 ## v3.9.29
 
 - **Safemode with self-test**: after a reboot, an Apply or a change of the DNS / failover settings ASN Manager watches the router for 2 minutes, counted from when it is fully up (WAN connected, time set, dnsmasq / AdGuard Home running, rules built). If the router itself reaches the internet over WAN but DNS gives no answers, dnsmasq is gone or the LAN is routed wrongly, all rules of ASN Manager are taken out (lists and settings stay). If it is still broken without them, the cause is elsewhere and the rules are put back. An outage of the internet line never counts; at most one rollback per boot
 - After a reboot ASN Manager starts normally once more and tests itself again; red banner on the page with "Turn rules on again", e-mail if e-mail notices are on, command `safemode status | on | off | test`
 - Device check / device list: a device that gets its own DNS by DHCP - from its DHCP reservation (LAN > DHCP server) or its guest network (YazFi, Guest Network Pro), e.g. 8.8.8.8 - is shown with that DNS ("directly, not via the router", with YazFi Force DNS) and the real resolver behind it - before it wrongly showed the DNS of the router
-- Devices connected through the WireGuard server of the router show their user name (VPN server > WireGuard) instead of the bare address - in the device check, the device list and in AdGuard Home ("Vivo (ASNM WGC1)")
-- Themes: **Default** in the colours of the router pages (grey-green, yellow titles) replaces "Dark"; Light and Blue stay. Who had "Dark" gets Default
-- **Kill switch for VPN lines** (option, Targets & failover): a VPN line is down and no fallback works - its entries are blocked instead of taking the normal way (WAN / VPN Director). Command `failover killswitch on|off`, part of the backup
-- A VPN client that starts again (provider reconnect, GUI) gets the route of its ASN Manager table back within seconds (before: at the next check, up to 5 minutes)
-- The routing check every 5 minutes repairs what it finds missing (routing rule of a line, marking rules of ASNs / domains / IPs - e.g. removed by another add-on) instead of only showing a warning; at most every 15 minutes, logged
-- **Excluded devices** (Settings > Rules): devices or networks ASN Manager leaves alone, e.g. the guest network (192.168.2.0/24) - none of its entries applies to them, they take their normal way. Command `exclude list | set <IP|net>,... | none`, shown in the device check, part of the backup
-- Settings tab in four parts: **Routing** (excluded devices, marking rules, traffic statistics), **DNS**, **General** (display, e-mail, refresh schedule), **Backup & presets** - the last one used is remembered
-- Diagnostics tidier: domain / IP and device in one row, all checks as small buttons, the explanations and the contents of the diagnostic bundle fold out on demand
 
 ## v3.9.28
 
