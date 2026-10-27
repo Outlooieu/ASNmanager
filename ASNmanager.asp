@@ -586,6 +586,7 @@ var ASNM_I18N = {
     disp_title: 'Display', disp_sub: 'Applies to the whole page in this browser', disp_unit: 'Unit for data rates',
     disp_unit_desc: 'Used for the live throughput, the speed test and the summaries. 1 MB/s = 8 Mbit/s. Data amounts (for example 1.2 GB) are not affected.',
     disp_change: 'Change unit',
+    ss_routing: 'Routing', ss_dns: 'DNS', ss_general: 'General', ss_backup: 'Backup & presets', rules_title: 'Rules', rules_sub: 'Who the entries apply to and how they are built',
     perf_title: 'Performance', perf_sub: 'Reduce the CPU load of the router',
     ex_title: 'Excluded devices', ex_desc: 'Devices or networks ASN Manager leaves alone - e.g. the guest network (192.168.2.0/24). None of its entries applies to them (also not those for single devices); they take their normal way (VPN Director / WAN). Several separated by commas.', ex_ph: 'e.g. 192.168.2.0/24, 192.168.1.50', ex_save: 'Save', ex_now: '{n} excluded', ex_none: 'None excluded - the entries apply to all devices.', ex_bad: '"{v}" is not an IP address or network (e.g. 192.168.2.0/24).',
     perf_rules: 'Marking rules', perf_rules_desc: 'Combined: all ASNs of a target share one set and one rule, so the router checks each packet only once per target (far less CPU with many ASNs). One per ASN: the old way, for comparison or if something behaves differently.',
@@ -742,6 +743,7 @@ var ASNM_I18N = {
     disp_title: 'Anzeige', disp_sub: 'Gilt für die ganze Seite in diesem Browser', disp_unit: 'Einheit für Datenraten',
     disp_unit_desc: 'Wird für den Live-Durchsatz, den Speedtest und die Zusammenfassungen verwendet. 1 MB/s = 8 Mbit/s. Datenmengen (zum Beispiel 1,2 GB) bleiben unverändert.',
     disp_change: 'Einheit ändern',
+    ss_routing: 'Routing', ss_dns: 'DNS', ss_general: 'Allgemein', ss_backup: 'Sicherung & Vorlagen', rules_title: 'Regeln', rules_sub: 'Für wen die Einträge gelten und wie sie gebaut werden',
     perf_title: 'Leistung', perf_sub: 'CPU-Last des Routers verringern',
     ex_title: 'Ausgenommene Geräte', ex_desc: 'Geräte oder Netze, die ASN Manager in Ruhe lässt - z. B. das Gast-Netz (192.168.2.0/24). Keiner seiner Einträge gilt für sie (auch nicht die für einzelne Geräte); sie nehmen ihren normalen Weg (VPN Director / WAN). Mehrere mit Komma trennen.', ex_ph: 'z. B. 192.168.2.0/24, 192.168.1.50', ex_save: 'Speichern', ex_now: '{n} ausgenommen', ex_none: 'Keine ausgenommen - die Einträge gelten für alle Geräte.', ex_bad: '"{v}" ist keine IP-Adresse und kein Netz (z. B. 192.168.2.0/24).',
     perf_rules: 'Marker-Regeln', perf_rules_desc: 'Zusammengefasst: Alle ASNs eines Ziels teilen sich eine Menge und eine Regel, der Router prüft jedes Paket nur einmal pro Ziel (mit vielen ASNs deutlich weniger CPU). Einzeln: eine Regel pro ASN wie früher, zum Vergleichen oder wenn sich etwas anders verhält.',
@@ -3709,6 +3711,18 @@ function asnmUpdate() {
     asnmSend('update', []);
 }
 
+/* settings: four parts (routing, DNS, general, backup) */
+function asnmSetSub(id) {
+    var ids = ['routing', 'dns', 'general', 'backup'];
+    if (ids.indexOf(id) < 0) id = 'routing';
+    for (var i = 0; i < ids.length; i++) {
+        var on = ids[i] === id;
+        document.getElementById('asnm_ssub_' + ids[i]).style.display = on ? 'block' : 'none';
+        document.getElementById('asnm_ssbtn_' + ids[i]).className = 'asnm-subtab' + (on ? ' on' : '');
+    }
+    try { localStorage.setItem('asnm_setsub', id); } catch (e) {}
+}
+
 /* ============================ tabs ============================ */
 var ASNM_TABS = ['asns', 'traffic', 'targets', 'diag', 'settings'];
 
@@ -3774,6 +3788,9 @@ function initial() {
     asnmUpdLoad(true);
     asnmSpLoad();
     asnmAdoptJob();
+    var setStart = 'routing';
+    try { setStart = localStorage.getItem('asnm_setsub') || 'routing'; } catch (e) {}
+    asnmSetSub(setStart);
     var subStart = 'manual';
     try { subStart = localStorage.getItem('asnm_subtab') || 'manual'; } catch (e) {}
     asnmSubTab(subStart);
@@ -4036,36 +4053,37 @@ function initial() {
   </div>
   </div>
   <div class="asnm-tabpanel" id="asnm_tab_settings" role="tabpanel" style="display:none;">
-  <div class="asnm-card" id="asnm_display_card">
-    <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg><div class="asnm-card-titles"><h3 data-i18n="disp_title"></h3><div class="asnm-card-sub" data-i18n="disp_sub"></div></div></div>
-    <div class="asnm-field"><span class="asnm-label" data-i18n="disp_unit"></span><span class="asnm-help" data-i18n="disp_unit_desc"></span>
-      <div class="asnm-row" style="margin-top:8px;"><div class="asnm-seg" id="asnm_unit_seg"><span id="asnm_unit_mbit" onclick="asnmSetUnit('mbit');">Mbit/s</span><span id="asnm_unit_mbyte" onclick="asnmSetUnit('mbyte');">MB/s</span></div></div>
-    </div>
+  <div class="asnm-subtabs" role="tablist">
+    <button type="button" class="asnm-subtab" id="asnm_ssbtn_routing" onclick="asnmSetSub('routing');" data-i18n="ss_routing"></button>
+    <button type="button" class="asnm-subtab" id="asnm_ssbtn_dns" onclick="asnmSetSub('dns');" data-i18n="ss_dns"></button>
+    <button type="button" class="asnm-subtab" id="asnm_ssbtn_general" onclick="asnmSetSub('general');" data-i18n="ss_general"></button>
+    <button type="button" class="asnm-subtab" id="asnm_ssbtn_backup" onclick="asnmSetSub('backup');" data-i18n="ss_backup"></button>
   </div>
-  <div class="asnm-card" id="asnm_mail_card">
-    <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><div class="asnm-card-titles"><h3 data-i18n="mail_title"></h3><div class="asnm-card-sub" data-i18n="mail_sub"></div></div></div>
-    <div class="asnm-field"><span class="asnm-help" data-i18n="mail_desc"></span>
-      <div class="asnm-row" style="margin-top:8px;"><div class="asnm-seg"><span id="asnm_mail_off" onclick="asnmMailSet('off');" data-i18n="mail_off"></span><span id="asnm_mail_daily" onclick="asnmMailSet('daily');" data-i18n="mail_daily"></span><span id="asnm_mail_weekly" onclick="asnmMailSet('weekly');" data-i18n="mail_weekly"></span></div>
-        <span class="asnm-link" id="asnm_mail_testbtn" style="margin-left:12px;" data-i18n="mail_test" onclick="asnmMailTest();"></span></div>
-      <div class="asnm-help" id="asnm_mail_info" style="margin-top:8px;"></div>
-    </div>
-  </div>
-  <div class="asnm-card" id="asnm_perf_card">
-    <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><div class="asnm-card-titles"><h3 data-i18n="perf_title"></h3><div class="asnm-card-sub" data-i18n="perf_sub"></div></div></div>
-    <div class="asnm-field"><span class="asnm-label" data-i18n="perf_rules"></span><span class="asnm-help" data-i18n="perf_rules_desc"></span>
-      <div class="asnm-row" style="margin-top:8px;"><div class="asnm-seg"><span id="asnm_rm_combined" onclick="asnmSetRules('combined');" data-i18n="perf_rules_comb"></span><span id="asnm_rm_single" onclick="asnmSetRules('single');" data-i18n="perf_rules_single"></span></div></div>
-    </div>
-    <div class="asnm-divider"></div>
+  <div class="asnm-subpanel" id="asnm_ssub_routing">
+  <div class="asnm-card" id="asnm_rules_card">
+    <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M6 12h12M10 18h4"/></svg><div class="asnm-card-titles"><h3 data-i18n="rules_title"></h3><div class="asnm-card-sub" data-i18n="rules_sub"></div></div></div>
     <div class="asnm-field"><span class="asnm-label" data-i18n="ex_title"></span><span class="asnm-help" data-i18n="ex_desc"></span>
       <div class="asnm-dw-ed" style="margin-top:8px;"><input type="text" id="asnm_ex_in" maxlength="400" autocomplete="off" spellcheck="false" data-i18n-ph="ex_ph" style="flex:1;min-width:220px;"/>
         <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="ex_save" onclick="asnmExSave();"/></div>
       <div class="asnm-help" id="asnm_ex_info" style="margin-top:6px;"></div>
     </div>
     <div class="asnm-divider"></div>
-    <div class="asnm-field"><span class="asnm-label" data-i18n="perf_stats"></span><span class="asnm-help" data-i18n="perf_stats_desc"></span>
-      <div class="asnm-row" style="margin-top:8px;"><div class="asnm-seg"><span id="asnm_sm_asn" onclick="asnmSetStatsMode('asn');" data-i18n="perf_stats_asn"></span><span id="asnm_sm_iface" onclick="asnmSetStatsMode('iface');" data-i18n="perf_stats_iface"></span></div></div>
+    <div class="asnm-field"><span class="asnm-label" data-i18n="perf_rules"></span><span class="asnm-help" data-i18n="perf_rules_desc"></span>
+      <div class="asnm-row" style="margin-top:8px;"><div class="asnm-seg"><span id="asnm_rm_combined" onclick="asnmSetRules('combined');" data-i18n="perf_rules_comb"></span><span id="asnm_rm_single" onclick="asnmSetRules('single');" data-i18n="perf_rules_single"></span></div></div>
     </div>
   </div>
+  <div class="asnm-card">
+    <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><div class="asnm-card-titles"><h3 data-i18n="schedule_title"></h3></div></div>
+    <div class="asnm-form">
+      <div class="asnm-field"><span class="asnm-label" data-i18n="refresh_every"></span>
+        <div class="asnm-inline"><input type="text" id="asnm_sched_int" class="asnm-w-sm" maxlength="2"/><span class="asnm-muted"><span data-i18n="days"></span> <span data-i18n="days_range"></span></span></div></div>
+      <div class="asnm-field"><span class="asnm-label" data-i18n="at_time"></span>
+        <input type="text" id="asnm_sched_time" class="asnm-w-md" maxlength="5" placeholder="04:30"/><span class="asnm-help" data-i18n="time_fmt"></span></div>
+    </div>
+    <div class="asnm-row" style="margin-top:14px;"><input type="button" class="button_gen asnm-btn" data-i18n-value="btn_save_schedule" onclick="asnmSaveSchedule();"/></div>
+  </div>
+  </div>
+  <div class="asnm-subpanel" id="asnm_ssub_dns" style="display:none;">
   <div class="asnm-card" id="asnm_dnsf_card">
     <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><div class="asnm-card-titles"><h3 data-i18n="dw_title"></h3><div class="asnm-card-sub" data-i18n="dw_sub"></div></div></div>
     <div class="asnm-help" id="asnm_dw_intro"></div>
@@ -4096,63 +4114,76 @@ function initial() {
     <div id="asnm_dw_now"></div>
     <details class="asnm-dw-more"><summary data-i18n="dw_more"></summary><ul id="asnm_dw_more_list"></ul></details>
   </div>
-  <div class="asnm-grid2">
-    <div class="asnm-card">
-      <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><div class="asnm-card-titles"><h3 data-i18n="schedule_title"></h3></div></div>
-      <div class="asnm-form">
-        <div class="asnm-field"><span class="asnm-label" data-i18n="refresh_every"></span>
-          <div class="asnm-inline"><input type="text" id="asnm_sched_int" class="asnm-w-sm" maxlength="2"/><span class="asnm-muted"><span data-i18n="days"></span> <span data-i18n="days_range"></span></span></div></div>
-        <div class="asnm-field"><span class="asnm-label" data-i18n="at_time"></span>
-          <input type="text" id="asnm_sched_time" class="asnm-w-md" maxlength="5" placeholder="04:30"/><span class="asnm-help" data-i18n="time_fmt"></span></div>
-      </div>
-      <div class="asnm-row" style="margin-top:14px;"><input type="button" class="button_gen asnm-btn" data-i18n-value="btn_save_schedule" onclick="asnmSaveSchedule();"/></div>
+  </div>
+  <div class="asnm-subpanel" id="asnm_ssub_general" style="display:none;">
+  <div class="asnm-card" id="asnm_display_card">
+    <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg><div class="asnm-card-titles"><h3 data-i18n="disp_title"></h3><div class="asnm-card-sub" data-i18n="disp_sub"></div></div></div>
+    <div class="asnm-field"><span class="asnm-label" data-i18n="disp_unit"></span><span class="asnm-help" data-i18n="disp_unit_desc"></span>
+      <div class="asnm-row" style="margin-top:8px;"><div class="asnm-seg" id="asnm_unit_seg"><span id="asnm_unit_mbit" onclick="asnmSetUnit('mbit');">Mbit/s</span><span id="asnm_unit_mbyte" onclick="asnmSetUnit('mbyte');">MB/s</span></div></div>
     </div>
-    <div class="asnm-card">
-      <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg><div class="asnm-card-titles"><h3 data-i18n="backup_title"></h3></div></div>
-      <div class="asnm-field"><span class="asnm-label" data-i18n="backup_export"></span><span class="asnm-help" data-i18n="backup_export_desc"></span>
-        <div class="asnm-row" style="margin-top:4px;"><input type="button" class="button_gen asnm-btn" data-i18n-value="btn_export" onclick="asnmExport();"/></div></div>
-      <div class="asnm-divider"></div>
-      <div class="asnm-field"><span class="asnm-label" data-i18n="backup_import"></span><span class="asnm-help" data-i18n="backup_import_desc"></span>
-        <input type="file" id="asnm_import_file" accept=".conf,.txt" style="display:none;" onchange="asnmImportFile(this);"/>
-        <div class="asnm-row" style="margin-top:4px;"><input type="button" class="button_gen asnm-btn" data-i18n-value="btn_import" onclick="document.getElementById('asnm_import_file').click();"/></div></div>
-      <div id="asnm_import_panel">
-        <div id="asnm_import_info"></div>
-        <div id="asnm_import_btns" class="asnm-row" style="margin-top:10px;">
-          <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="rs_run" onclick="asnmImportRun();"/>
-          <input type="button" class="button_gen asnm-ghost asnm-small-btn" data-i18n-value="btn_cancel" onclick="asnmImportCancel();"/>
-        </div>
+  </div>
+  <div class="asnm-card" id="asnm_mail_card">
+    <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><div class="asnm-card-titles"><h3 data-i18n="mail_title"></h3><div class="asnm-card-sub" data-i18n="mail_sub"></div></div></div>
+    <div class="asnm-field"><span class="asnm-help" data-i18n="mail_desc"></span>
+      <div class="asnm-row" style="margin-top:8px;"><div class="asnm-seg"><span id="asnm_mail_off" onclick="asnmMailSet('off');" data-i18n="mail_off"></span><span id="asnm_mail_daily" onclick="asnmMailSet('daily');" data-i18n="mail_daily"></span><span id="asnm_mail_weekly" onclick="asnmMailSet('weekly');" data-i18n="mail_weekly"></span></div>
+        <span class="asnm-link" id="asnm_mail_testbtn" style="margin-left:12px;" data-i18n="mail_test" onclick="asnmMailTest();"></span></div>
+      <div class="asnm-help" id="asnm_mail_info" style="margin-top:8px;"></div>
+    </div>
+  </div>
+  <div class="asnm-card" id="asnm_perf_card">
+    <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><div class="asnm-card-titles"><h3 data-i18n="perf_title"></h3><div class="asnm-card-sub" data-i18n="perf_sub"></div></div></div>
+    <div class="asnm-field"><span class="asnm-label" data-i18n="perf_stats"></span><span class="asnm-help" data-i18n="perf_stats_desc"></span>
+      <div class="asnm-row" style="margin-top:8px;"><div class="asnm-seg"><span id="asnm_sm_asn" onclick="asnmSetStatsMode('asn');" data-i18n="perf_stats_asn"></span><span id="asnm_sm_iface" onclick="asnmSetStatsMode('iface');" data-i18n="perf_stats_iface"></span></div></div>
+    </div>
+  </div>
+  </div>
+  <div class="asnm-subpanel" id="asnm_ssub_backup" style="display:none;">
+  <div class="asnm-card">
+    <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg><div class="asnm-card-titles"><h3 data-i18n="backup_title"></h3></div></div>
+    <div class="asnm-field"><span class="asnm-label" data-i18n="backup_export"></span><span class="asnm-help" data-i18n="backup_export_desc"></span>
+      <div class="asnm-row" style="margin-top:4px;"><input type="button" class="button_gen asnm-btn" data-i18n-value="btn_export" onclick="asnmExport();"/></div></div>
+    <div class="asnm-divider"></div>
+    <div class="asnm-field"><span class="asnm-label" data-i18n="backup_import"></span><span class="asnm-help" data-i18n="backup_import_desc"></span>
+      <input type="file" id="asnm_import_file" accept=".conf,.txt" style="display:none;" onchange="asnmImportFile(this);"/>
+      <div class="asnm-row" style="margin-top:4px;"><input type="button" class="button_gen asnm-btn" data-i18n-value="btn_import" onclick="document.getElementById('asnm_import_file').click();"/></div></div>
+    <div id="asnm_import_panel">
+      <div id="asnm_import_info"></div>
+      <div id="asnm_import_btns" class="asnm-row" style="margin-top:10px;">
+        <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="rs_run" onclick="asnmImportRun();"/>
+        <input type="button" class="button_gen asnm-ghost asnm-small-btn" data-i18n-value="btn_cancel" onclick="asnmImportCancel();"/>
       </div>
-      <div class="asnm-divider"></div>
-      <div class="asnm-field" id="asnm_own_card"><span class="asnm-label" data-i18n="own_title"></span><span class="asnm-help"><span id="asnm_own_info"></span> <span data-i18n="own_sub"></span></span>
-        <input type="file" id="asnm_own_file" accept=".txt,text/plain" style="display:none;" onchange="asnmOwnFile(this);"/>
-        <div class="asnm-row" style="margin-top:4px;">
-          <input type="button" class="button_gen asnm-btn" data-i18n-value="own_dl" onclick="asnmOwnDownload();"/>
-          <input type="button" class="button_gen asnm-btn" data-i18n-value="own_add" data-i18n-title="own_help" onclick="document.getElementById('asnm_own_file').click();"/>
-          <label class="asnm-help"><input type="checkbox" id="asnm_own_replace"/> <span data-i18n="own_replace"></span></label>
-        </div>
-        <div class="asnm-row" style="margin-top:6px;">
-          <input type="button" class="button_gen asnm-btn" data-i18n-value="oe_open" onclick="asnmOeToggle();"/>
-        </div>
-        <div id="asnm_oe" style="display:none;margin-top:10px;">
-          <div id="asnm_oe_list"></div>
-          <div id="asnm_oe_form" style="display:none;">
-            <div class="asnm-oe-grid">
-              <label><span class="asnm-label" data-i18n="oe_name"></span><input type="text" id="asnm_oe_name" maxlength="60"/></label>
-              <label><span class="asnm-label" data-i18n="preset_cat"></span><select id="asnm_oe_cat"></select></label>
-            </div>
-            <label><span class="asnm-label" data-i18n="oe_items"></span><span class="asnm-help" data-i18n="oe_items_help"></span>
-              <textarea id="asnm_oe_items" class="asnm-oe-ta" rows="5" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></label>
-            <div class="asnm-oe-grid">
-              <label id="asnm_oe_file_w"><span class="asnm-label" data-i18n="oe_file"></span><select id="asnm_oe_file"></select></label>
-              <label class="asnm-help" style="align-self:end;padding-bottom:8px;display:flex;gap:6px;align-items:center;"><input type="checkbox" id="asnm_oe_wide"/> <span data-i18n="oe_wide"></span></label>
-            </div>
-            <div class="asnm-row" style="margin-top:8px;">
-              <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="oe_save" onclick="asnmOeSave();"/>
-              <input type="button" class="button_gen asnm-ghost asnm-small-btn" data-i18n-value="btn_cancel" onclick="asnmOeEdit(-2);"/>
-            </div>
+    </div>
+    <div class="asnm-divider"></div>
+    <div class="asnm-field" id="asnm_own_card"><span class="asnm-label" data-i18n="own_title"></span><span class="asnm-help"><span id="asnm_own_info"></span> <span data-i18n="own_sub"></span></span>
+      <input type="file" id="asnm_own_file" accept=".txt,text/plain" style="display:none;" onchange="asnmOwnFile(this);"/>
+      <div class="asnm-row" style="margin-top:4px;">
+        <input type="button" class="button_gen asnm-btn" data-i18n-value="own_dl" onclick="asnmOwnDownload();"/>
+        <input type="button" class="button_gen asnm-btn" data-i18n-value="own_add" data-i18n-title="own_help" onclick="document.getElementById('asnm_own_file').click();"/>
+        <label class="asnm-help"><input type="checkbox" id="asnm_own_replace"/> <span data-i18n="own_replace"></span></label>
+      </div>
+      <div class="asnm-row" style="margin-top:6px;">
+        <input type="button" class="button_gen asnm-btn" data-i18n-value="oe_open" onclick="asnmOeToggle();"/>
+      </div>
+      <div id="asnm_oe" style="display:none;margin-top:10px;">
+        <div id="asnm_oe_list"></div>
+        <div id="asnm_oe_form" style="display:none;">
+          <div class="asnm-oe-grid">
+            <label><span class="asnm-label" data-i18n="oe_name"></span><input type="text" id="asnm_oe_name" maxlength="60"/></label>
+            <label><span class="asnm-label" data-i18n="preset_cat"></span><select id="asnm_oe_cat"></select></label>
           </div>
-        </div></div>
-    </div>
+          <label><span class="asnm-label" data-i18n="oe_items"></span><span class="asnm-help" data-i18n="oe_items_help"></span>
+            <textarea id="asnm_oe_items" class="asnm-oe-ta" rows="5" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></label>
+          <div class="asnm-oe-grid">
+            <label id="asnm_oe_file_w"><span class="asnm-label" data-i18n="oe_file"></span><select id="asnm_oe_file"></select></label>
+            <label class="asnm-help" style="align-self:end;padding-bottom:8px;display:flex;gap:6px;align-items:center;"><input type="checkbox" id="asnm_oe_wide"/> <span data-i18n="oe_wide"></span></label>
+          </div>
+          <div class="asnm-row" style="margin-top:8px;">
+            <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="oe_save" onclick="asnmOeSave();"/>
+            <input type="button" class="button_gen asnm-ghost asnm-small-btn" data-i18n-value="btn_cancel" onclick="asnmOeEdit(-2);"/>
+          </div>
+        </div>
+      </div></div>
+  </div>
   </div>
   </div>
   <div class="asnm-footer" data-i18n="footer"></div>
