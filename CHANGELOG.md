@@ -1,3 +1,7 @@
+## v3.9.33
+
+- WebUI: an entry for several devices (e.g. 192.168.1.10,192.168.1.11) was shown as "all devices" - the device list was dropped when the page data was written
+
 ## v3.9.32
 
 - **WAN2 (Dual-WAN) fixed**: entries on WAN2 left over WAN1. Their routing table had no route (WAN2 now gets its own table 216 with the gateway of the second WAN), and in load balancing mode a rule of the firmware (fwmark 0x8000/0xf000 -> main) caught the WAN2 mark - it is 0x7200 now. The reverse path filter of the WAN2 interface is set to loose, so the answers are not dropped. The rules are built again once after the update

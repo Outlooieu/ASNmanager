@@ -3317,7 +3317,7 @@ web_export() {
                 asn = $1; dest = $2; src = $3
                 if (asn !~ /^[0-9]+$/ || length(asn) > 10) next
                 if (dest !~ /^(WAN|WAN1|WAN2|OVPN[1-5]|WGC[1-5])$/) next
-                if (src !~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) src = ""
+                if (src !~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(,[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)*$/) src = ""      # one device or several (comma list)
                 k = asn ":" dest
                 c = (k in cnt) ? cnt[k] + 0 : -1
                 l = (("ASN_" dest "_" asn) in sets) ? 1 : 0
