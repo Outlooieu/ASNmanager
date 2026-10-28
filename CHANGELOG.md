@@ -1,3 +1,10 @@
+## v3.9.37
+
+- Fixed: the traffic statistics of an entry for several devices (for example one ASN for 192.168.1.10 and 192.168.1.11) doubled with every rebuild of the counting rules - and they are rebuilt whenever the list of devices on the network changes. Such an entry has one counting rule per device but one key, and every rule got the whole old value. After about 60 rebuilds the numbers passed 2^64 and the Traffic page showed values like "5,200,936,960 TB". Now the old value goes to one rule only
+- Impossible values (above 1e15 bytes or packets) are never added up, banked, saved or read from the kernel. The ones left by older versions are removed when the counting loop starts (one line in the system log), and the counting rules are built once at the start, so the kernel counters start clean as well
+- The counting loop writes its error messages to `/tmp/asnmanager-stats/loop.err` (before: /dev/null). When it ends without being stopped (a shell error, a signal) it writes the time, the exit code and the step it was in to the system log and to `/tmp/asnmanager-stats/loop.end`; `stats diag` shows both. A dead loop is started again by the routing check (every 5 minutes), not only when the page is opened
+- AdGuard Home: after every dnsmasq restart of ASN Manager (domain entries, suggestions by domain, DNS follows the route, safe mode) a watcher checks in the background that AdGuard Home comes back. Its installer restarts AdGuard Home after a dnsmasq restart, and when the two service requests collide that start can get lost. If AdGuard Home is not running and its start script has been silent for 90 seconds, ASN Manager removes what was left behind (monitor-start process, hand-off marker, start traps, lock), starts it once and writes it to the system log. Nothing is touched when AdGuard Home was not running before or is not installed
+
 ## v3.9.34
 
 - After every update the rules are built again once by themselves (in the background, from the cache) - before only for versions that needed it

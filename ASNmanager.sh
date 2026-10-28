@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.9.34
+version=3.9.37
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -12,7 +12,7 @@ case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
 export PATH
 
-SCRIPT_VERSION="3.9.34"
+SCRIPT_VERSION="3.9.37"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -761,7 +761,7 @@ cu_dnsmasq_write() {
     fi
     if [ -s "$cdw_new" ]; then mkdir -p "$(dirname "$DNSMASQ_ADD")" && cp "$cdw_new" "$DNSMASQ_ADD"; else rm -f "$DNSMASQ_ADD"; fi
     rm -f "$cdw_new"
-    service restart_dnsmasq >/dev/null 2>&1
+    dnsmasq_restart
     logger -t ASNmanager "Domain routing: dnsmasq configuration changed, dnsmasq restarted"
 }
 
@@ -3786,14 +3786,14 @@ ts_live() {
             sub(/\/32$/, "", ip)
             if (n == 3 && tgt ~ /^ASC_[UD]_/) { m = split(tgt, q, "_"); if (m == 4) printf "%s|%s|%s|\t%s\t%s\n", p[2], p[3], q[4], c[1], c[2] }
             else if (n == 4 && ip != "") printf "%s|%s|%s|%s\t%s\t%s\n", p[2], p[3], p[4], ip, c[1], c[2]
-        }' | awk -F'\t' '{ if (!($1 in pk)) o[++n] = $1; pk[$1] += $2; by[$1] += $3 } END { for (i = 1; i <= n; i++) printf "%s\t%.0f\t%.0f\n", o[i], pk[o[i]], by[o[i]] }'
+        }' | awk -F'\t' '{ if (!($1 in pk)) o[++n] = $1; pk[$1] += $2; by[$1] += $3 } END { for (i = 1; i <= n; i++) if (pk[o[i]] < 1e15 && by[o[i]] < 1e15) printf "%s\t%.0f\t%.0f\n", o[i], pk[o[i]], by[o[i]] }'
 }
 
 # sums counter lines by key; zero lines of clients are dropped, rows ("...|") stay so every ASN is listed
-ts_sum() { cat "$@" 2>/dev/null | awk -F'\t' 'NF == 3 { p[$1] += $2; b[$1] += $3 } END { for (k in p) if (p[k] > 0 || b[k] > 0 || k ~ /\|$/) printf "%s\t%.0f\t%.0f\n", k, p[k], b[k] }'; }
+ts_sum() { cat "$@" 2>/dev/null | awk -F'\t' 'NF == 3 && $2 < 1e15 && $3 < 1e15 { p[$1] += $2; b[$1] += $3 } END { for (k in p) if (p[k] > 0 || b[k] > 0 || k ~ /\|$/) printf "%s\t%.0f\t%.0f\n", k, p[k], b[k] }'; }
 
 ts_bank() { # add counter lines from stdin to the working base file (zero lines are not stored)
-    awk -F'\t' 'NF == 3 && ($2 > 0 || $3 > 0)' > "$TS_RT/bank.tmp"
+    awk -F'\t' 'NF == 3 && ($2 > 0 || $3 > 0) && $2 < 1e15 && $3 < 1e15' > "$TS_RT/bank.tmp"
     [ -s "$TS_RT/bank.tmp" ] || { rm -f "$TS_RT/bank.tmp"; return 0; }
     ts_sum "$TS_RT/base.txt" "$TS_RT/bank.tmp" > "$TS_RT/base.new" && mv -f "$TS_RT/base.new" "$TS_RT/base.txt"
     rm -f "$TS_RT/bank.tmp"
@@ -3892,7 +3892,7 @@ ts_sync() {
     {
         echo "*mangle"
         awk '!s[$0]++ { print ":" $0 " - [0:0]" }' "$TS_RT/plan.chains"
-        awk -F'\t' 'FILENAME == ARGV[1] { c[$1] = "[" $2 ":" $3 "]"; next } { k = $1; print ((k in c) ? c[k] : "[0:0]") " " $2 }' \
+        awk -F'\t' 'FILENAME == ARGV[1] { c[$1] = "[" $2 ":" $3 "]"; next } { k = $1; if (k in c) { print c[k] " " $2; delete c[k] } else print "[0:0] " $2 }' \
             "$TS_RT/live.txt" "$TS_RT/plan.rules"
         echo "COMMIT"
     } > "$TS_RT/restore.txt"
@@ -4004,6 +4004,7 @@ ts_ensure_loop() {
     el_now=$(date +%s); el_t=$(cat "$TS_RT/loop.try" 2>/dev/null)
     [ -n "$el_t" ] && [ $((el_now - el_t)) -lt 20 ] && return 0
     echo "$el_now" > "$TS_RT/loop.try"
+    [ -n "$p" ] && logger -t ASNmanager "Counting loop (pid $p) was not running although the statistics are on - started again"
     ts_start_loop
 }
 
@@ -4293,7 +4294,7 @@ sgd_write() {
     if cmp -s "$sgw_new" "$sgw_cur"; then rm -f "$sgw_new"; return 0; fi
     if [ -s "$sgw_new" ]; then mkdir -p "$(dirname "$DNSMASQ_ADD")" && cp "$sgw_new" "$DNSMASQ_ADD"; else rm -f "$DNSMASQ_ADD"; fi
     rm -f "$sgw_new"
-    service restart_dnsmasq >/dev/null 2>&1
+    dnsmasq_restart
     logger -t ASNmanager "Suggestions by domain: dnsmasq lookup log $(sgd_on && echo 'turned on' || echo 'turned off'), dnsmasq restarted"
 }
 
@@ -4621,7 +4622,7 @@ dnsf_conf_write() {
     if cmp -s "$dw_new" "$dw_cur"; then rm -f "$dw_new"; return 1; fi
     if [ -s "$dw_new" ]; then mkdir -p "$(dirname "$DNSMASQ_ADD")" && cp "$dw_new" "$DNSMASQ_ADD"; else rm -f "$DNSMASQ_ADD"; fi
     rm -f "$dw_new"
-    service restart_dnsmasq >/dev/null 2>&1
+    dnsmasq_restart
     logger -t ASNmanager "DNS follows the route: dnsmasq configuration changed, dnsmasq restarted"
     return 0
 }
@@ -4962,6 +4963,58 @@ agh_settle() {
         ase_l=$ase_n
     done
     return 1
+}
+
+# ---------- dnsmasq restart with AdGuard Home installed ----------
+# The installer of AdGuard Home restarts AdGuard Home by itself about a second after every dnsmasq restart (it copies the ipset= lines).
+# Two service requests within that second can collide: AdGuard Home was stopped, its start never came, a "monitor-start" process
+# and its lock stay behind and DNS runs without AdGuard Home. After OUR dnsmasq restart a watcher (in the background, one at a time)
+# checks that AdGuard Home comes back; if it is not running and its start script has been silent for 90 seconds it cleans up
+# (the steps of "kill the monitor-start processes, remove the hand-off and the lock, start") once and writes it to the system log.
+AGH_GUARD_PID=/tmp/asnmanager-aghguard.pid
+agh_unstick() {
+    logger -t ASNmanager "AdGuard Home: not running and its start script has been silent for ${AGH_GUARD_SILENT:-90}s after the dnsmasq restart - removing what it left behind (start monitor, hand-off, lock) and starting it"
+    for au_p in $(ps w 2>/dev/null | grep '[S]99AdGuardHome monitor-start' | awk '{ print $1 }'); do kill -9 "$au_p" 2>/dev/null; done
+    rm -rf /tmp/AdGuardHome.dns-handoff /tmp/AdGuardHome-start-traps.* "$AGH_LOCK"
+    "$AGH_INIT" start >/dev/null 2>&1
+    au_i=0
+    while [ $au_i -lt 120 ]; do
+        sleep 3; au_i=$((au_i + 3))
+        if pidof AdGuardHome >/dev/null 2>&1 && ! agh_busy && agh_up; then
+            logger -t ASNmanager "AdGuard Home: running again (clean-up done, $au_i seconds)"; return 0
+        fi
+    done
+    logger -t ASNmanager "AdGuard Home: still not running after the clean-up - start it by hand (kill the monitor-start processes, then $AGH_INIT start) or restart the router"
+    return 1
+}
+agh_guard_run() {
+    sleep "${AGH_GUARD_DELAY:-15}"
+    ag_i=0; ag_q=0; ag_ok=0; ag_l=$(agh_log_n 'S99AdGuardHome')
+    while [ $ag_i -lt "${AGH_GUARD_MAX:-300}" ]; do
+        sleep 5; ag_i=$((ag_i + 5))
+        ag_n=$(agh_log_n 'S99AdGuardHome')
+        if [ "$ag_n" = "$ag_l" ]; then ag_q=$((ag_q + 5)); else ag_q=0; ag_l=$ag_n; fi
+        if pidof AdGuardHome >/dev/null 2>&1 && ! agh_busy && agh_up; then
+            ag_ok=$((ag_ok + 1)); [ $ag_ok -ge 3 ] && return 0             # it runs and nothing is happening any more
+        else ag_ok=0; fi
+        if ! pidof AdGuardHome >/dev/null 2>&1 && [ $ag_q -ge "${AGH_GUARD_SILENT:-90}" ]; then agh_unstick; return $?; fi
+    done
+    pidof AdGuardHome >/dev/null 2>&1 || logger -t ASNmanager "AdGuard Home: not running ${AGH_GUARD_MAX:-300}s after the dnsmasq restart (its start script is still writing - ASN Manager does not wait any longer)"
+    return 1
+}
+agh_guard_start() {
+    ags_p=$(cat "$AGH_GUARD_PID" 2>/dev/null)
+    [ -n "$ags_p" ] && [ -d "/proc/$ags_p" ] && return 0                   # one watcher is enough
+    ( agh_guard_run ) </dev/null >/dev/null 2>&1 &
+    echo $! > "$AGH_GUARD_PID"
+}
+# every restart of dnsmasq by ASN Manager goes through here
+dnsmasq_restart() {
+    dr_up=0
+    [ -x "$AGH_INIT" ] && pidof AdGuardHome >/dev/null 2>&1 && dr_up=1     # only when AdGuard Home was running
+    service restart_dnsmasq >/dev/null 2>&1
+    [ "$dr_up" = "1" ] && agh_guard_start
+    return 0
 }
 agh_stop_wait() {
     asw_n0=$(agh_log_n 'action=stop_adguardhome.*result=completed')
@@ -5572,6 +5625,16 @@ ts_rates() {
 ts_rates_clear() { rm -f "$TS_RT/rates.txt" "$TS_RT/rates.new" "$TS_RT/rate_prev.txt" "$TS_RT/rate_prev.ts"; }
 
 # ---------- background loop: follows ASN / client / interface changes, refreshes stats.js, saves hourly ----------
+# the loop ended and nobody asked for it (the statistics are still on, its own pid is still in loop.pid): write down when, how and in
+# which step - a shell error or a signal used to end it without a trace. A kill -9 cannot be caught: then only this line is missing.
+ts_loop_exit() {
+    le_rc=$1
+    [ "$(ts_state)" = "enabled" ] && [ "$(cat "$TS_RT/loop.pid" 2>/dev/null)" = "$$" ] || return 0
+    le_msg="Counting loop (pid $$) ended without being stopped: exit code $le_rc, last step: ${LP_STEP:-?}"
+    echo "$(date '+%F %T') $le_msg" > "$TS_RT/loop.end" 2>/dev/null
+    logger -t ASNmanager "$le_msg - the next routing check starts it again"
+}
+
 ts_loop() {
     mkdir -p "$TS_RT"
     ts_rates_clear
@@ -5579,27 +5642,38 @@ ts_loop() {
     [ -s "$TS_RT/sg_since" ] || date +%s > "$TS_RT/sg_since"
     last_sg=0
     echo $$ > "$TS_RT/loop.pid"
+    rm -f "$TS_RT/loop.end"; LP_STEP=start
+    if [ -s "$TS_RT/base.txt" ]; then
+        tc_n=$(awk -F'\t' 'NF == 3 && ($2 >= 1e15 || $3 >= 1e15) { n++ } END { print n + 0 }' "$TS_RT/base.txt")
+        if [ "${tc_n:-0}" -gt 0 ]; then
+            ts_sum "$TS_RT/base.txt" > "$TS_RT/base.new" && mv -f "$TS_RT/base.new" "$TS_RT/base.txt"
+            logger -t ASNmanager "Traffic statistics: $tc_n impossible counter value(s) removed (before v3.9.37 an entry for several devices doubled its numbers with every rebuild of the counting rules)"
+        fi
+    fi
+    rm -f "$TS_RT/sig"                                      # build the counting rules once at the start
+    trap 'exit 143' TERM; trap 'exit 130' INT; trap 'exit 131' QUIT
+    trap 'ts_loop_exit $?' EXIT
     # first save 5 minutes after the start (an update or repair starts the loop again - the hour would start over every time)
     last_save=$(( $(date +%s) - TS_SAVE_EVERY + 300 ))
     while [ "$(ts_state)" = "enabled" ] && [ "$(cat "$TS_RT/loop.pid" 2>/dev/null)" = "$$" ]; do
-        nvc=$((nvc + 1)); [ $((nvc % 6)) -eq 1 ] && nv_refresh        # the WAN values: now and then a minute (they hardly ever change)
-        sig=$(ts_signature)
+        LP_STEP=nvram; nvc=$((nvc + 1)); [ $((nvc % 6)) -eq 1 ] && nv_refresh        # the WAN values: now and then a minute (they hardly ever change)
+        LP_STEP=signature; sig=$(ts_signature)
         if [ "$sig" != "$(cat "$TS_RT/sig" 2>/dev/null)" ]; then
-            ts_lock; ts_sync >/dev/null 2>&1 && echo "$sig" > "$TS_RT/sig"; ts_unlock
+            LP_STEP=sync; ts_lock; ts_sync >/dev/null 2>&1 && echo "$sig" > "$TS_RT/sig"; ts_unlock
         else
-            ts_live > "$TS_RT/last_live.txt"
+            LP_STEP=live; ts_live > "$TS_RT/last_live.txt"
         fi
-        ts_rates
-        ts_export reuse
-        cu_learned_js >/dev/null 2>&1
+        LP_STEP=rates; ts_rates
+        LP_STEP=export; ts_export reuse
+        LP_STEP=learned; cu_learned_js >/dev/null 2>&1
         now=$(date +%s)
-        if [ $((now - last_save)) -ge "$TS_SAVE_EVERY" ]; then ts_save; last_save=$now; fi
+        if [ $((now - last_save)) -ge "$TS_SAVE_EVERY" ]; then LP_STEP=save; ts_save; last_save=$now; fi
         if [ $((now - last_sg)) -ge "$SG_EVERY" ]; then
-            sg_sample; sgd_collect; sg_export
+            LP_STEP=suggestions; sg_sample; sgd_collect; sg_export
             ( sg_resolve ) >/dev/null 2>&1 &
             last_sg=$now
         fi
-        sleep "$TS_INTERVAL"
+        LP_STEP=sleep; sleep "$TS_INTERVAL" & wait $!       # "wait" ends at once when a signal arrives (a plain sleep would hold the trap back)
     done
 }
 
@@ -5610,7 +5684,7 @@ ts_stop_loop() {
 }
 
 # The loop must survive the end of an SSH session (terminal hangup sends SIGHUP to the whole process group)
-ts_start_loop() { ts_stop_loop; ( trap '' HUP; exec "$SCRIPT_PATH" stats loop </dev/null >/dev/null 2>&1 ) & }
+ts_start_loop() { ts_stop_loop; mkdir -p "$TS_RT"; ( trap '' HUP; exec "$SCRIPT_PATH" stats loop </dev/null >/dev/null 2>"$TS_RT/loop.err" ) & }
 
 # ---------- actions ----------
 ts_enable() {
@@ -5713,6 +5787,8 @@ ts_diag() {
     if ts_pid_alive "$td_lp"; then echo "[OK]   counting loop:    running (pid $td_lp)"
     elif [ "$(ts_state)" = "enabled" ]; then echo "[WARN] counting loop:    NOT running although the statistics are on (try: stats repair)"
     else echo "[INFO] counting loop:    not running (statistics are off)"; fi
+    if ! ts_pid_alive "$td_lp" && [ -s "$TS_RT/loop.end" ]; then echo "[INFO] last loop end:     $(cat "$TS_RT/loop.end")"; fi
+    if [ -s "$TS_RT/loop.err" ]; then echo "[WARN] loop errors:       (last lines of $TS_RT/loop.err)"; tail -n 5 "$TS_RT/loop.err" | cut -c1-160 | sed 's/^/                        /'; fi
     if [ -d "$TS_RT/lock" ]; then
         td_lo=$(cat "$TS_RT/lock/pid" 2>/dev/null)
         if ts_pid_alive "$td_lo"; then echo "[WARN] lock:             held by process $td_lo (running) - a step may be stuck: $(tr '\0' ' ' < /proc/$td_lo/cmdline 2>/dev/null | cut -c1-80)"
@@ -7656,7 +7732,7 @@ sm_disable() {
     if [ -f "$DNSMASQ_ADD" ] && grep -q '^# ASNmanager ' "$DNSMASQ_ADD"; then
         awk '/^# ASNmanager [a-z]* begin$/ { s = 1; next } s && /^# ASNmanager [a-z]* end$/ { s = 0; next } !s' "$DNSMASQ_ADD" > "$DNSMASQ_ADD.asnm"
         if [ -s "$DNSMASQ_ADD.asnm" ]; then mv -f "$DNSMASQ_ADD.asnm" "$DNSMASQ_ADD"; else rm -f "$DNSMASQ_ADD.asnm" "$DNSMASQ_ADD"; fi
-        service restart_dnsmasq >/dev/null 2>&1
+        dnsmasq_restart
     fi
     # DNS per line / per device: rules, stand-in addresses, Unbound, AdGuard Home clients (sm_on: everything out)
     dnsf_sync >/dev/null 2>&1
@@ -7920,7 +7996,7 @@ cli_main() {
             esac ;;
         check)
             case "$1" in
-                run) proc_reap; sm_hook_sync; cu_learned_save >/dev/null 2>&1; dns_export >/dev/null 2>&1; sgd_trim; rc_run_once
+                run) proc_reap; ts_ensure_loop >/dev/null 2>&1; sm_hook_sync; cu_learned_save >/dev/null 2>&1; dns_export >/dev/null 2>&1; sgd_trim; rc_run_once
                      { dnsf_on || dnsd_on; } && dnsf_sync >/dev/null 2>&1
                      # new ASN names: write the page data again so they show up without a manual refresh
                      nm_before=$(md5sum "$NAMES_FILE" 2>/dev/null | cut -c1-32)
