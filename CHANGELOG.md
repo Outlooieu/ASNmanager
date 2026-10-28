@@ -1,3 +1,7 @@
+## v3.9.34
+
+- After every update the rules are built again once by themselves (in the background, from the cache) - before only for versions that needed it
+
 ## v3.9.33
 
 - WebUI: an entry for several devices (e.g. 192.168.1.10,192.168.1.11) was shown as "all devices" - the device list was dropped when the page data was written
