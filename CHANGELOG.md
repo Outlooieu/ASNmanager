@@ -4,18 +4,21 @@
 - Impossible values (above 1e15 bytes or packets) are never added up, banked, saved or read from the kernel. The ones left by older versions are removed when the counting loop starts (one line in the system log), and the counting rules are built once at the start, so the kernel counters start clean as well
 - The counting loop writes its error messages to `/tmp/asnmanager-stats/loop.err` (before: /dev/null). When it ends without being stopped (a shell error, a signal) it writes the time, the exit code and the step it was in to the system log and to `/tmp/asnmanager-stats/loop.end`; `stats diag` shows both. A dead loop is started again by the routing check (every 5 minutes), not only when the page is opened
 - AdGuard Home: after every dnsmasq restart of ASN Manager (domain entries, suggestions by domain, DNS follows the route, safe mode) a watcher checks in the background that AdGuard Home comes back. Its installer restarts AdGuard Home after a dnsmasq restart, and when the two service requests collide that start can get lost. If AdGuard Home is not running and its start script has been silent for 90 seconds, ASN Manager removes what was left behind (monitor-start process, hand-off marker, start traps, lock), starts it once and writes it to the system log. Nothing is touched when AdGuard Home was not running before or is not installed
+- Thanks to [AvalonOC](https://github.com/AvalonOC) for the detailed reports and the patient testing on an RT-BE88U ([#5](https://github.com/Outlooieu/ASNmanager/issues/5)) - the doubling of the counters and the silent end of the counting loop were found with them
 
 ## v3.9.34
 
 - After every update the rules are built again once by themselves (in the background, from the cache) - before only for versions that needed it
+- Thanks to [KingGLEB](https://github.com/KingGLEB) ([#4](https://github.com/Outlooieu/ASNmanager/issues/4)): after the WAN2 fix the old rules had to be removed and built again by hand
 
 ## v3.9.33
 
 - WebUI: an entry for several devices (e.g. 192.168.1.10,192.168.1.11) was shown as "all devices" - the device list was dropped when the page data was written
+- Reported by [AvalonOC](https://github.com/AvalonOC) ([#5](https://github.com/Outlooieu/ASNmanager/issues/5))
 
 ## v3.9.32
 
-- **WAN2 (Dual-WAN) fixed**: entries on WAN2 left over WAN1. Their routing table had no route (WAN2 now gets its own table 216 with the gateway of the second WAN), and in load balancing mode a rule of the firmware (fwmark 0x8000/0xf000 -> main) caught the WAN2 mark - it is 0x7200 now. The reverse path filter of the WAN2 interface is set to loose, so the answers are not dropped. The rules are built again once after the update
+- **WAN2 (Dual-WAN) fixed** (reported and tested by [KingGLEB](https://github.com/KingGLEB), [#4](https://github.com/Outlooieu/ASNmanager/issues/4)): entries on WAN2 left over WAN1. Their routing table had no route (WAN2 now gets its own table 216 with the gateway of the second WAN), and in load balancing mode a rule of the firmware (fwmark 0x8000/0xf000 -> main) caught the WAN2 mark - it is 0x7200 now. The reverse path filter of the WAN2 interface is set to loose, so the answers are not dropped. The rules are built again once after the update
 - The built-in presets of the category "TV & media libraries" are removed - this category is for own presets now (presets.txt)
 - `explain` names failover, kill switch and a line that is down instead of "CHECK"; after a VPN restart the routes come back as soon as each tunnel is up (up to 2 minutes)
 
