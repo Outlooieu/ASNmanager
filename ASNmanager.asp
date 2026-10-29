@@ -411,6 +411,9 @@
 .asnm-ms-pop { display: none; position: absolute; right: 0; top: calc(100% + 4px); z-index: 60; min-width: 250px; max-height: 300px; overflow-y: auto;
                background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 6px; }
 .asnm-ms.open .asnm-ms-pop { display: block; }
+.asnm-devkind { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; border: 1px solid var(--line); color: var(--text2); background: var(--card2); white-space: nowrap; }
+.asnm-devkind-guest { border-color: rgba(251,191,36,.5); color: var(--warn); }
+.asnm-devkind-wg, .asnm-devkind-ovpn { border-color: var(--accent-ring); color: var(--accent2); }
 .asnm-ms-item { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; font-size: 12px; cursor: pointer; white-space: nowrap; color: var(--text); }
 .asnm-ms-item:hover { background: var(--row-hover); }
 .asnm-ms-all { font-weight: 600; border-bottom: 1px solid var(--line); border-radius: 6px 6px 0 0; margin-bottom: 2px; }
@@ -537,7 +540,7 @@ var ASNM_I18N = {
     tr_repair: 'Repair', tr_repairing: 'Repairing - the numbers are kept...',
     tr_save_off: 'Saving to the USB device is turned off - the numbers are only kept in RAM and start over after a reboot.', tr_save_turn_off: 'Turn saving off', tr_save_turn_on: 'Turn saving on',
     tr_save_confirm: 'Turn off saving to the USB device?\nThe numbers are then only kept in RAM and start over after a reboot. Nothing is written to the USB device any more.', net_lan: 'LAN / Wi-Fi', net_g24: 'Guest 2.4 GHz', net_g5: 'Guest 5 GHz', net_g6: 'Guest 6 GHz', net_wgs: 'WireGuard server', net_ovs: 'OpenVPN server', tr_timeout: 'No answer from the statistics module. If this repeats, run "/jffs/scripts/ASNmanager.sh stats diag" on the router (SSH).',
-    dev_lan: 'LAN / Wi-Fi devices', dev_wg: 'WireGuard server peers', dev_ovpn: 'OpenVPN server clients', wg_peer: 'WireGuard peer', ovpn_client: 'OpenVPN client',
+    dev_lan: 'LAN / Wi-Fi devices', dev_guest: 'Guest Wi-Fi / other network {n}', dev_wg: 'WireGuard server peers', dev_ovpn: 'OpenVPN server clients', wg_peer: 'WireGuard peer', ovpn_client: 'OpenVPN client',
     upd_label: 'Update', upd_check: 'Check for updates', upd_checking: 'Checking GitHub...', upd_current: 'Up to date (v{v})', upd_checked: 'checked {t}',
     upd_available: 'v{r} available', upd_error: 'GitHub not reachable', upd_install: 'Update now', upd_notes: 'What is new?', upd_running: 'Updating - please wait, the page reloads afterwards...',
     banner_update: 'A new version is available: ASN Manager v{r} (installed: v{l}).',
@@ -602,7 +605,7 @@ var ASNM_I18N = {
     ss_routing_h: 'Exclusions, device lines, rules', ss_dns_h: 'DNS fitting the line, per device', ss_general_h: 'Display, schedule, e-mail', ss_backup_h: 'Backup, restore, own presets', rules_title: 'Rules', rules_sub: 'Who the entries apply to, how they are built and counted',
     perf_title: 'Performance', perf_sub: 'Reduce the CPU load of the router',
     ex_title: 'Excluded devices', ex_desc: 'Devices or networks ASN Manager leaves alone - e.g. the guest network (192.168.2.0/24). None of its entries applies to them (also not those for single devices); they take their normal way (VPN Director / WAN). Several separated by commas.', ex_ph: 'or a network: 192.168.2.0/24', ex_save: 'Save', ex_add: 'Add', ex_pick: 'Choose a device', ex_net: 'Network', ex_holds: 'holds {n} known device(s)', ex_holds_none: 'no known device in it right now', ex_need: 'Choose a device or type a network first.', ex_confirm: 'Remove {d} from the excluded devices?', ex_now: '{n} excluded', ex_none: 'None excluded - the entries apply to all devices.', ex_bad: '"{v}" is not an IP address or network (e.g. 192.168.2.0/24).',
-    dl_title: 'Device lines', dl_desc: 'Send all traffic of one device over a line of your choice - for example a PC over WAN2 or the TV over a VPN. Your entries still come first: with an entry "google.de -> WAN1", the device reaches google.de over WAN1 and everything else over its device line. The device line takes precedence over the VPN Director rule of the device, and with DNS per device its lookups follow it. If the line fails, its failover chain or kill switch applies; without either, the device takes its normal way (VPN Director / WAN).', dl_add: 'Set', dl_del: 'Remove', dl_none: 'No device lines - every device takes its normal way.', dl_pick: 'Choose a device', dl_st_active: 'active', dl_st_down: 'line down - normal way', dl_st_excluded: 'excluded', dl_st_off: 'safemode', dl_confirm: 'Remove the device line of {d}?', dl_need: 'Choose a device and a line first.',
+    dl_title: 'Device lines', dl_desc: 'Send all traffic of one device over a line of your choice - for example a PC over WAN2 or the TV over a VPN. Your entries still come first: with an entry "google.de -> WAN1", the device reaches google.de over WAN1 and everything else over its device line. The device line takes precedence over the VPN Director rule of the device, and with DNS per device its lookups follow it. If the line fails, its failover chain or kill switch applies; without either, the device takes its normal way (VPN Director / WAN).', dl_add: 'Set', dl_del: 'Remove', dl_none: 'No device lines - every device takes its normal way.', dl_pick: 'Choose device(s)', dl_st_active: 'active', dl_st_down: 'line down - normal way', dl_st_excluded: 'excluded', dl_st_off: 'safemode', dl_confirm: 'Remove the device line of {d}?', dl_need: 'Choose at least one device and a line first.',
     perf_rules: 'Marking rules', perf_rules_desc: 'Combined: all ASNs of a target share one set and one rule, so the router checks each packet only once per target (far less CPU with many ASNs). One per ASN: the old way, for comparison or if something behaves differently.',
     perf_rules_comb: 'Combined (fast)', perf_rules_single: 'One per ASN',
     perf_rules_confirm: 'Switch the marking rules to "{m}" and rebuild the rules now? (a few seconds, the saved ASN lists are used)',
@@ -697,7 +700,7 @@ var ASNM_I18N = {
     tr_repair: 'Reparieren', tr_repairing: 'Reparatur läuft - die Zahlen bleiben erhalten...',
     tr_save_off: 'Die Sicherung auf dem USB-Gerät ist ausgeschaltet - die Zahlen liegen nur im Arbeitsspeicher und beginnen nach einem Neustart von vorn.', tr_save_turn_off: 'Sicherung ausschalten', tr_save_turn_on: 'Sicherung einschalten',
     tr_save_confirm: 'Sicherung auf dem USB-Gerät ausschalten?\nDie Zahlen liegen dann nur im Arbeitsspeicher und beginnen nach einem Neustart von vorn. Auf das USB-Gerät wird nichts mehr geschrieben.', net_lan: 'LAN / WLAN', net_g24: 'Gast 2,4 GHz', net_g5: 'Gast 5 GHz', net_g6: 'Gast 6 GHz', net_wgs: 'WireGuard-Server', net_ovs: 'OpenVPN-Server', tr_timeout: 'Keine Antwort vom Statistik-Modul. Wenn das wiederholt auftritt: auf dem Router per SSH "/jffs/scripts/ASNmanager.sh stats diag" ausführen.',
-    dev_lan: 'LAN- / WLAN-Geräte', dev_wg: 'WireGuard-Server-Peers', dev_ovpn: 'OpenVPN-Server-Clients', wg_peer: 'WireGuard-Peer', ovpn_client: 'OpenVPN-Client',
+    dev_lan: 'LAN- / WLAN-Geräte', dev_guest: 'Gast-WLAN / weiteres Netz {n}', dev_wg: 'WireGuard-Server-Peers', dev_ovpn: 'OpenVPN-Server-Clients', wg_peer: 'WireGuard-Peer', ovpn_client: 'OpenVPN-Client',
     upd_label: 'Update', upd_check: 'Nach Updates suchen', upd_checking: 'GitHub wird geprüft...', upd_current: 'Aktuell (v{v})', upd_checked: 'geprüft {t}',
     upd_available: 'v{r} verfügbar', upd_error: 'GitHub nicht erreichbar', upd_install: 'Jetzt aktualisieren', upd_notes: 'Was ist neu?', upd_running: 'Update läuft - bitte warten, danach lädt die Seite neu...',
     banner_update: 'Neue Version verfügbar: ASN Manager v{r} (installiert: v{l}).',
@@ -762,7 +765,7 @@ var ASNM_I18N = {
     ss_routing_h: 'Ausnahmen, Geräte-Leitungen, Regeln', ss_dns_h: 'DNS passend zur Leitung, pro Gerät', ss_general_h: 'Anzeige, Zeitplan, E-Mail', ss_backup_h: 'Sicherung, Wiederherstellung, Vorlagen', rules_title: 'Regeln', rules_sub: 'Für wen die Einträge gelten, wie sie gebaut und gezählt werden',
     perf_title: 'Leistung', perf_sub: 'CPU-Last des Routers verringern',
     ex_title: 'Ausgenommene Geräte', ex_desc: 'Geräte oder Netze, die ASN Manager in Ruhe lässt - z. B. das Gast-Netz (192.168.2.0/24). Keiner seiner Einträge gilt für sie (auch nicht die für einzelne Geräte); sie nehmen ihren normalen Weg (VPN Director / WAN). Mehrere mit Komma trennen.', ex_ph: 'oder ein Netz: 192.168.2.0/24', ex_save: 'Speichern', ex_add: 'Hinzufügen', ex_pick: 'Gerät wählen', ex_net: 'Netz', ex_holds: 'enthält {n} bekannte(s) Gerät(e)', ex_holds_none: 'gerade kein bekanntes Gerät darin', ex_need: 'Bitte zuerst ein Gerät wählen oder ein Netz eintippen.', ex_confirm: '{d} aus den ausgenommenen Geräten entfernen?', ex_now: '{n} ausgenommen', ex_none: 'Keine ausgenommen - die Einträge gelten für alle Geräte.', ex_bad: '"{v}" ist keine IP-Adresse und kein Netz (z. B. 192.168.2.0/24).',
-    dl_title: 'Leitung pro Gerät', dl_desc: 'Den ganzen Verkehr eines Geräts über eine Leitung deiner Wahl schicken - zum Beispiel einen PC über WAN2 oder den Fernseher über ein VPN. Deine Einträge haben weiter Vorrang: Mit einem Eintrag "google.de -> WAN1" erreicht das Gerät google.de über WAN1, alles andere über seine Geräte-Leitung. Die Geräte-Leitung hat Vorrang vor der VPN-Director-Regel des Geräts, und mit DNS pro Gerät folgen ihr auch seine DNS-Abfragen. Fällt die Leitung aus, greifen ihre Failover-Kette oder der Kill Switch; ohne beides nimmt das Gerät seinen normalen Weg (VPN Director / WAN).', dl_add: 'Festlegen', dl_del: 'Entfernen', dl_none: 'Keine Geräte-Leitungen - jedes Gerät nimmt seinen normalen Weg.', dl_pick: 'Gerät wählen', dl_st_active: 'aktiv', dl_st_down: 'Leitung aus - normaler Weg', dl_st_excluded: 'ausgenommen', dl_st_off: 'Sicherheitsmodus', dl_confirm: 'Geräte-Leitung von {d} entfernen?', dl_need: 'Bitte zuerst Gerät und Leitung wählen.',
+    dl_title: 'Leitung pro Gerät', dl_desc: 'Den ganzen Verkehr eines Geräts über eine Leitung deiner Wahl schicken - zum Beispiel einen PC über WAN2 oder den Fernseher über ein VPN. Deine Einträge haben weiter Vorrang: Mit einem Eintrag "google.de -> WAN1" erreicht das Gerät google.de über WAN1, alles andere über seine Geräte-Leitung. Die Geräte-Leitung hat Vorrang vor der VPN-Director-Regel des Geräts, und mit DNS pro Gerät folgen ihr auch seine DNS-Abfragen. Fällt die Leitung aus, greifen ihre Failover-Kette oder der Kill Switch; ohne beides nimmt das Gerät seinen normalen Weg (VPN Director / WAN).', dl_add: 'Festlegen', dl_del: 'Entfernen', dl_none: 'Keine Geräte-Leitungen - jedes Gerät nimmt seinen normalen Weg.', dl_pick: 'Gerät(e) wählen', dl_st_active: 'aktiv', dl_st_down: 'Leitung aus - normaler Weg', dl_st_excluded: 'ausgenommen', dl_st_off: 'Sicherheitsmodus', dl_confirm: 'Geräte-Leitung von {d} entfernen?', dl_need: 'Bitte zuerst mindestens ein Gerät und eine Leitung wählen.',
     perf_rules: 'Marker-Regeln', perf_rules_desc: 'Zusammengefasst: Alle ASNs eines Ziels teilen sich eine Menge und eine Regel, der Router prüft jedes Paket nur einmal pro Ziel (mit vielen ASNs deutlich weniger CPU). Einzeln: eine Regel pro ASN wie früher, zum Vergleichen oder wenn sich etwas anders verhält.',
     perf_rules_comb: 'Zusammengefasst (schnell)', perf_rules_single: 'Einzeln pro ASN',
     perf_rules_confirm: 'Marker-Regeln auf "{m}" umstellen und die Regeln jetzt neu aufbauen? (einige Sekunden, die gespeicherten ASN-Listen werden genutzt)',
@@ -1124,19 +1127,55 @@ function asnmFillTargets(sel) {
     if (keep) sel.value = keep;
 }
 
+// devices in groups, so the kind of a device is clear at once: LAN / Wi-Fi (the router's own network), each guest or
+// other network of its own (guest Wi-Fi, YazFi, Guest Network Pro), WireGuard server peers, OpenVPN server clients
+function asnmMaskBits(m) {
+    var p = String(m || '').split('.'), b = 0;
+    if (p.length !== 4) return 24;
+    for (var i = 0; i < 4; i++) { var x = +p[i]; while (x & 128) { b++; x = (x << 1) & 255; } }
+    return b || 24;
+}
+function asnmDevGroups(skip) {
+    var d = ASNM.data || {}, devs = d.devices || [], lan = d.lanip ? d.lanip + '/' + asnmMaskBits(d.lanmask) : '';
+    var g = { lan: [], wg: [], ovpn: [] }, guest = {}, gk = [], out = [], i;
+    for (i = 0; i < devs.length; i++) {
+        var dv = devs[i], k = dv.kind || 'lan';
+        if (!dv.ip || (skip && skip[dv.ip])) continue;
+        if (k === 'lan' && lan && /^\d+\.\d+\.\d+\.\d+$/.test(dv.ip) && !asnmInNet(dv.ip, lan)) {
+            var net = dv.ip.split('.').slice(0, 3).join('.');
+            if (!guest[net]) { guest[net] = []; gk.push(net); }
+            guest[net].push(dv);
+        } else if (g[k]) g[k].push(dv);
+    }
+    gk.sort(function (a, b) { return asnmIp2n(a + '.0') - asnmIp2n(b + '.0'); });
+    if (g.lan.length) out.push({ k: 'lan', label: t('dev_lan'), devs: g.lan });
+    for (i = 0; i < gk.length; i++) out.push({ k: 'guest', label: t('dev_guest', { n: gk[i] + '.x' }), devs: guest[gk[i]] });
+    if (g.wg.length) out.push({ k: 'wg', label: t('dev_wg'), devs: g.wg });
+    if (g.ovpn.length) out.push({ k: 'ovpn', label: t('dev_ovpn'), devs: g.ovpn });
+    return out;
+}
+// short kind of a device or network for lists ("LAN / Wi-Fi", "Guest 192.168.2.x", "WireGuard")
+function asnmDevKind(ip) {
+    var grs = asnmDevGroups(), a = String(ip).replace(/\/.*$/, '');
+    for (var g = 0; g < grs.length; g++) for (var i = 0; i < grs[g].devs.length; i++) if (grs[g].devs[i].ip === a) return grs[g];
+    var d = ASNM.data || {};
+    if (d.lanip && /^\d+\.\d+\.\d+\.\d+$/.test(a) && !asnmInNet(a, d.lanip + '/' + asnmMaskBits(d.lanmask))) return { k: 'guest', label: t('dev_guest', { n: a.split('.').slice(0, 3).join('.') + '.x' }) };
+    return { k: 'lan', label: t('dev_lan') };
+}
+function asnmDevKindTag(ip) {
+    var k = asnmDevKind(ip);
+    return '<span class="asnm-devkind asnm-devkind-' + k.k + '">' + asnmEsc(k.label) + '</span>';
+}
 function asnmDeviceOptions(selectedIp) {
-    var html = '<option value="">' + asnmEsc(t('pick_device')) + '</option>';
-    var groups = [['lan', t('dev_lan')], ['wg', t('dev_wg')], ['ovpn', t('dev_ovpn')]];
-    for (var g = 0; g < groups.length; g++) {
+    var html = '<option value="">' + asnmEsc(t('pick_device')) + '</option>', grs = asnmDevGroups();
+    for (var g = 0; g < grs.length; g++) {
         var part = '';
-        for (var i = 0; i < ASNM.data.devices.length; i++) {
-            var dv = ASNM.data.devices[i];
-            if ((dv.kind || 'lan') !== groups[g][0]) continue;
-            var nm = asnmDevLabel(dv);
+        for (var i = 0; i < grs[g].devs.length; i++) {
+            var dv = grs[g].devs[i], nm = asnmDevLabel(dv);
             part += '<option value="' + asnmEsc(dv.ip) + '"' + (dv.ip === selectedIp ? ' selected="selected"' : '') + '>' +
                     asnmEsc((nm ? nm + ' - ' : '') + dv.ip) + '</option>';
         }
-        if (part) html += '<optgroup label="' + asnmEsc(groups[g][1]) + '">' + part + '</optgroup>';
+        html += '<optgroup label="' + asnmEsc(grs[g].label) + '">' + part + '</optgroup>';
     }
     return html;
 }
@@ -1153,16 +1192,19 @@ function asnmDevMsIps(inputId) {
     return v ? v.split(',') : [];
 }
 
-function asnmDevMsLabel(inputId) {
-    var s = asnmDevMsIps(inputId);
-    if (!s.length) return t('sg_all');
+var ASNM_MSOPT = {};          // per picker: { empty: label when nothing is chosen, noAll: no "all devices" item }
+function asnmDevMsLabel(inputId, boxId) {
+    var s = asnmDevMsIps(inputId), o = ASNM_MSOPT[boxId] || {};
+    if (!s.length) return o.empty || t('sg_all');
     if (s.length === 1) return asnmDeviceName(s[0]) || s[0];
     return t('sg_n_dev', { n: s.length });
 }
 
-function asnmDevMsRender(boxId, inputId) {
+function asnmDevMsRender(boxId, inputId, opts) {
     var box = document.getElementById(boxId);
     if (!box || !ASNM.data) return;
+    if (opts) ASNM_MSOPT[boxId] = opts;
+    var o = ASNM_MSOPT[boxId] || {};
     var wasOpen = / open/.test(' ' + box.className), pop = box.querySelector('.asnm-ms-pop'), top = pop ? pop.scrollTop : 0;
     var s = asnmDevMsIps(inputId), on = {}, i, h, args = "'" + boxId + "','" + inputId + "'";
     for (i = 0; i < s.length; i++) on[s[i]] = 1;
@@ -1170,18 +1212,17 @@ function asnmDevMsRender(boxId, inputId) {
         return '<label class="asnm-ms-item"><input type="checkbox" value="' + asnmEsc(ip) + '"' + (on[ip] ? ' checked="checked"' : '') +
                ' onchange="asnmDevMsChange(this, ' + args + ');"/>' + asnmEsc(label) + '</label>';
     }
-    h = '<button type="button" class="asnm-ms-btn" onclick="asnmDevMsToggle(event, \'' + boxId + '\');"><span>' + asnmEsc(asnmDevMsLabel(inputId)) + '</span><i></i></button>' +
+    h = '<button type="button" class="asnm-ms-btn" onclick="asnmDevMsToggle(event, \'' + boxId + '\');"><span>' + asnmEsc(asnmDevMsLabel(inputId, boxId)) + '</span><i></i></button>' +
         '<div class="asnm-ms-pop" onclick="event.stopPropagation();">' +
-        '<label class="asnm-ms-item asnm-ms-all"><input type="checkbox"' + (s.length ? '' : ' checked="checked"') + ' onchange="asnmDevMsAll(' + args + ');"/>' + asnmEsc(t('sg_all')) + '</label>';
-    var devs = ASNM.data.devices || [], groups = [['lan', t('dev_lan')], ['wg', t('dev_wg')], ['ovpn', t('dev_ovpn')]];
-    for (var g = 0; g < groups.length; g++) {
+        (o.noAll ? '' : '<label class="asnm-ms-item asnm-ms-all"><input type="checkbox"' + (s.length ? '' : ' checked="checked"') + ' onchange="asnmDevMsAll(' + args + ');"/>' + asnmEsc(t('sg_all')) + '</label>');
+    var grs = asnmDevGroups();
+    for (var g = 0; g < grs.length; g++) {
         var part = '';
-        for (i = 0; i < devs.length; i++) {
-            if ((devs[i].kind || 'lan') !== groups[g][0]) continue;
-            var nm = asnmDevLabel(devs[i]);
-            part += item(devs[i].ip, (nm ? nm + ' - ' : '') + devs[i].ip);
+        for (i = 0; i < grs[g].devs.length; i++) {
+            var nm = asnmDevLabel(grs[g].devs[i]);
+            part += item(grs[g].devs[i].ip, (nm ? nm + ' - ' : '') + grs[g].devs[i].ip);
         }
-        if (part) h += '<div class="asnm-ms-grp">' + asnmEsc(groups[g][1]) + '</div>' + part;
+        h += '<div class="asnm-ms-grp">' + asnmEsc(grs[g].label) + '</div>' + part;
     }
     box.innerHTML = h + '</div>';
     box.className = 'asnm-ms' + (wasOpen ? ' open' : '');
@@ -1934,12 +1975,8 @@ function asnmDevCheck() {
 function asnmDiagDevFill() {
     var sel = document.getElementById('asnm_diag_dev');
     if (!sel) return;
-    var cur = sel.value, devs = (ASNM.data && ASNM.data.devices) || [], h = '<option value="">' + asnmEsc(t('diag_dev_any')) + '</option>';
-    for (var i = 0; i < devs.length; i++) {
-        var n = asnmDevLabel(devs[i]);
-        h += '<option value="' + asnmEsc(devs[i].ip) + '"' + (devs[i].ip === cur ? ' selected="selected"' : '') + '>' + asnmEsc((n ? n + ' - ' : '') + devs[i].ip) + '</option>';
-    }
-    sel.innerHTML = h;
+    var cur = sel.value;
+    sel.innerHTML = asnmDeviceOptions(cur).replace(asnmEsc(t('pick_device')), asnmEsc(t('diag_dev_any')));
 }
 function asnmDiagPackReady() {
     var d = new Date(), z = function (x) { return (x < 10 ? '0' : '') + x; };
@@ -2736,7 +2773,7 @@ function asnmExRender() {
             var nm = asnmDeviceName(ip); lbl = (nm ? nm + ' - ' : '') + ip;
         }
         h += '<div class="asnm-row" style="align-items:flex-start;gap:8px;margin:6px 0;flex-wrap:wrap;">' +
-             '<div style="flex:1;min-width:220px;"><div>' + asnmEsc(lbl) + '</div>' +
+             '<div style="flex:1;min-width:220px;"><div>' + asnmDevKindTag(a) + ' ' + asnmEsc(lbl) + '</div>' +
              (sub ? '<div class="asnm-help" style="margin-top:2px;">' + asnmEsc(sub) + '</div>' : '') + '</div>' +
              '<input type="button" class="button_gen asnm-btn asnm-small-btn" value="' + asnmEsc(t('dl_del')) + '" onclick="asnmExDel(\'' + asnmEsc(a) + '\');"/></div>';
     }
@@ -2763,11 +2800,11 @@ function asnmExDel(a) {
 
 // device lines (v3.10.0): a whole device over one line; the list is sent complete as "ip=TARGET,..."
 function asnmDlRender() {
-    var box = document.getElementById('asnm_dl_list'), sd = document.getElementById('asnm_dl_dev'), st = document.getElementById('asnm_dl_tgt');
+    var box = document.getElementById('asnm_dl_list'), ms = document.getElementById('asnm_dl_ms'), st = document.getElementById('asnm_dl_tgt');
     if (!box || !ASNM.data) return;
     if (!ASNM.data.devices) ASNM.data.devices = [];
     if (!ASNM.data.ifaces) ASNM.data.ifaces = [];
-    if (document.activeElement !== sd) { var kd = sd.value; sd.innerHTML = asnmDeviceOptions(kd).replace(asnmEsc(t('pick_device')), asnmEsc(t('dl_pick'))); }
+    if (!/ open/.test(' ' + ms.className)) asnmDevMsRender('asnm_dl_ms', 'asnm_dl_ips', { empty: t('dl_pick'), noAll: true });
     if (document.activeElement !== st) asnmFillTargets(st);
     var dl = ASNM.data.devlines || [];
     if (!dl.length) { box.innerHTML = '<div class="asnm-help">' + asnmEsc(t('dl_none')) + '</div>'; return; }
@@ -2775,7 +2812,7 @@ function asnmDlRender() {
     for (var i = 0; i < dl.length; i++) {
         var d = dl[i], nm = d.a.indexOf('/') < 0 ? asnmDeviceName(d.a) : '';
         h += '<div class="asnm-row" style="align-items:center;gap:8px;margin:4px 0;flex-wrap:wrap;">' +
-             '<span style="min-width:220px;">' + asnmEsc((nm ? nm + ' - ' : '') + d.a) + '</span>' +
+             asnmDevKindTag(d.a) + '<span style="min-width:200px;">' + asnmEsc((nm ? nm + ' - ' : '') + d.a) + '</span>' +
              '<span>&rarr; ' + asnmEsc(asnmDestLabel(d.t)) + '</span>' +
              '<span class="asnm-badge ' + (cls[d.s] || 'asnm-warn') + '">' + asnmEsc(t('dl_st_' + d.s)) + '</span>' +
              '<input type="button" class="button_gen asnm-btn asnm-small-btn" value="' + asnmEsc(t('dl_del')) + '" onclick="asnmDlDel(\'' + asnmEsc(d.a) + '\');"/></div>';
@@ -2788,11 +2825,13 @@ function asnmDlSend(list) {
     asnmSend('setting', ['DEVLINES', p.length ? p.join(',') : 'none']);
 }
 function asnmDlAdd() {
-    var a = document.getElementById('asnm_dl_dev').value, tg = document.getElementById('asnm_dl_tgt').value;
-    if (!a || !tg) { alert(t('dl_need')); return; }
+    var ips = asnmDevMsIps('asnm_dl_ips'), tg = document.getElementById('asnm_dl_tgt').value;
+    if (!ips.length || !tg) { alert(t('dl_need')); return; }
     if (ASNM.busy) return;
-    var dl = ((ASNM.data && ASNM.data.devlines) || []).filter(function (d) { return d.a !== a; });
-    dl.push({ a: a, t: asnmNormDest(tg) });
+    var dl = ((ASNM.data && ASNM.data.devlines) || []).filter(function (d) { return ips.indexOf(d.a) < 0; });
+    for (var i = 0; i < ips.length; i++) dl.push({ a: ips[i], t: asnmNormDest(tg) });
+    document.getElementById('asnm_dl_ips').value = '';
+    asnmDevMsRender('asnm_dl_ms', 'asnm_dl_ips');
     asnmDlSend(dl);
 }
 function asnmDlDel(a) {
@@ -3197,16 +3236,14 @@ function asnmMsHtml(r) {
         h += '<div class="asnm-ms-grp">' + asnmEsc(t('sg_grp_used')) + '</div>';
         for (i = 0; i < r.cl.length; i++) { used[r.cl[i][0]] = 1; h += item(r.cl[i][0], asnmSgDevLabel(r.cl[i][0]), asnmFmtBytes(r.cl[i][1])); }
     }
-    var devs = (ASNM.data && ASNM.data.devices) || [], groups = [['lan', t('dev_lan')], ['wg', t('dev_wg')], ['ovpn', t('dev_ovpn')]];
-    for (var g = 0; g < groups.length; g++) {
+    var grs = asnmDevGroups(used);
+    for (var g = 0; g < grs.length; g++) {
         var part = '';
-        for (i = 0; i < devs.length; i++) {
-            var dv = devs[i];
-            if ((dv.kind || 'lan') !== groups[g][0] || used[dv.ip]) continue;
-            var dn = asnmDevLabel(dv);
-            part += item(dv.ip, (dn ? dn + ' - ' : '') + dv.ip, '');
+        for (i = 0; i < grs[g].devs.length; i++) {
+            var dn = asnmDevLabel(grs[g].devs[i]);
+            part += item(grs[g].devs[i].ip, (dn ? dn + ' - ' : '') + grs[g].devs[i].ip, '');
         }
-        if (part) h += '<div class="asnm-ms-grp">' + asnmEsc(groups[g][1]) + '</div>' + part;
+        h += '<div class="asnm-ms-grp">' + asnmEsc(grs[g].label) + '</div>' + part;
     }
     return h + '</div></div>';
 }
@@ -4165,7 +4202,7 @@ function initial() {
     </div>
     <div class="asnm-divider"></div>
     <div class="asnm-field"><span class="asnm-label" data-i18n="dl_title"></span><span class="asnm-help" data-i18n="dl_desc"></span>
-      <div class="asnm-dw-ed" style="margin-top:8px;flex-wrap:wrap;gap:8px;"><select id="asnm_dl_dev" class="input_option" style="flex:1;min-width:200px;"></select>
+      <div class="asnm-dw-ed" style="margin-top:8px;flex-wrap:wrap;gap:8px;"><div class="asnm-ms" id="asnm_dl_ms" style="flex:1;min-width:200px;"></div><input type="hidden" id="asnm_dl_ips" value=""/>
         <select id="asnm_dl_tgt" class="input_option" style="min-width:170px;"></select>
         <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="dl_add" onclick="asnmDlAdd();"/></div>
       <div id="asnm_dl_list" style="margin-top:8px;"></div>

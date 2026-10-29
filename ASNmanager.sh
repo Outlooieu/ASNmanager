@@ -3618,6 +3618,7 @@ web_export() {
         done
         printf '],'
 
+        printf '"lanip":"%s","lanmask":"%s",' "$(nvram get lan_ipaddr 2>/dev/null)" "$(nvram get lan_netmask 2>/dev/null)"
         printf '"devices":['
         export_devices
         printf '],'
