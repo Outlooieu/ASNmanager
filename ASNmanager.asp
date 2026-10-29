@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.9.37 -->
+<!-- ASNmanager-WebUI v3.10.0 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -476,10 +476,17 @@
 .asnm-tab-badge.ok { background: #16a34a; color: #fff; }
 .asnm-tab-badge.warn { background: var(--warn); color: #1b1b1b; border-color: transparent; }
 .asnm-tab-badge.ok { background: var(--ok); color: #fff; border-color: transparent; }
-.asnm-subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 16px; }
-.asnm-subtab { padding: 6px 13px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--text2); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
-.asnm-subtab:hover { border-color: var(--accent); color: var(--text); }
-.asnm-subtab.on { border-color: var(--accent); background: var(--accent-ring); color: var(--accent2); }
+.asnm-subtabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0 0 18px; padding: 6px; background: var(--card2); border: 1px solid var(--line); border-radius: 12px; }
+@media (max-width: 760px) { .asnm-subtabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.asnm-subtab { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 12px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--accent2); font: inherit; text-align: left; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.asnm-subtab svg { width: 22px; height: 22px; flex: 0 0 auto; }
+.asnm-subtab .asnm-st-t { min-width: 0; display: block; }
+.asnm-subtab .asnm-st-l { display: block; font-size: 14px; font-weight: 700; line-height: 18px; color: var(--text); }
+.asnm-subtab .asnm-st-h { display: block; margin-top: 2px; font-size: 11px; font-weight: 500; line-height: 14px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asnm-subtab:hover { background: var(--row-hover); border-color: var(--line); }
+.asnm-subtab.on { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.18); }
+.asnm-subtab.on .asnm-st-l, .asnm-subtab.on .asnm-st-h { color: #fff; }
+.asnm-subtab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .asnm-sp-res { margin-top: 5px; font-size: 11px; line-height: 1.45; color: var(--text2); font-variant-numeric: tabular-nums; }
 .asnm-sp { white-space: nowrap; }
 .asnm-rs-title { font-weight: 700; margin: 0 0 4px; color: var(--strong); }
@@ -507,7 +514,7 @@ var ASNM_NS = 'asnmanager';
 // the settings of ALL add-ons: the firmware writes custom_settings.txt anew from what a page sends - so every command
 // sends them back along with its own (taken when the page loads, refreshed from the router after each job)
 var ASNM_CS = <% get_custom_settings(); %>;
-var ASNM_PAGE_VER = '3.9.37';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.10.0';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -591,9 +598,11 @@ var ASNM_I18N = {
     disp_title: 'Display', disp_sub: 'Applies to the whole page in this browser', disp_unit: 'Unit for data rates',
     disp_unit_desc: 'Used for the live throughput, the speed test and the summaries. 1 MB/s = 8 Mbit/s. Data amounts (for example 1.2 GB) are not affected.',
     disp_change: 'Change unit',
-    ss_routing: 'Routing', ss_dns: 'DNS', ss_general: 'General', ss_backup: 'Backup & presets', rules_title: 'Rules', rules_sub: 'Who the entries apply to, how they are built and counted',
+    ss_routing: 'Routing', ss_dns: 'DNS', ss_general: 'General', ss_backup: 'Backup & presets',
+    ss_routing_h: 'Exclusions, device lines, rules', ss_dns_h: 'DNS fitting the line, per device', ss_general_h: 'Display, schedule, e-mail', ss_backup_h: 'Backup, restore, own presets', rules_title: 'Rules', rules_sub: 'Who the entries apply to, how they are built and counted',
     perf_title: 'Performance', perf_sub: 'Reduce the CPU load of the router',
-    ex_title: 'Excluded devices', ex_desc: 'Devices or networks ASN Manager leaves alone - e.g. the guest network (192.168.2.0/24). None of its entries applies to them (also not those for single devices); they take their normal way (VPN Director / WAN). Several separated by commas.', ex_ph: 'e.g. 192.168.2.0/24, 192.168.1.50', ex_save: 'Save', ex_now: '{n} excluded', ex_none: 'None excluded - the entries apply to all devices.', ex_bad: '"{v}" is not an IP address or network (e.g. 192.168.2.0/24).',
+    ex_title: 'Excluded devices', ex_desc: 'Devices or networks ASN Manager leaves alone - e.g. the guest network (192.168.2.0/24). None of its entries applies to them (also not those for single devices); they take their normal way (VPN Director / WAN). Several separated by commas.', ex_ph: 'or a network: 192.168.2.0/24', ex_save: 'Save', ex_add: 'Add', ex_pick: 'Choose a device', ex_net: 'Network', ex_holds: 'holds {n} known device(s)', ex_holds_none: 'no known device in it right now', ex_need: 'Choose a device or type a network first.', ex_confirm: 'Remove {d} from the excluded devices?', ex_now: '{n} excluded', ex_none: 'None excluded - the entries apply to all devices.', ex_bad: '"{v}" is not an IP address or network (e.g. 192.168.2.0/24).',
+    dl_title: 'Device lines', dl_desc: 'Send a whole device over one line - e.g. a PC over WAN2 or the TV over a VPN. Its entries still win: an entry "bank -> WAN1" keeps applying to the device, everything else goes over the chosen line. Failover and kill switch of the line apply. Is the line down without a failover, the device takes its normal way (VPN Director / WAN). A device line wins over the VPN Director rule of the device, and DNS per device follows it.', dl_add: 'Set', dl_del: 'Remove', dl_none: 'No device lines - every device takes its normal way.', dl_pick: 'Choose a device', dl_st_active: 'active', dl_st_down: 'line down - normal way', dl_st_excluded: 'excluded', dl_st_off: 'safemode', dl_confirm: 'Remove the device line of {d}?', dl_need: 'Choose a device and a line first.',
     perf_rules: 'Marking rules', perf_rules_desc: 'Combined: all ASNs of a target share one set and one rule, so the router checks each packet only once per target (far less CPU with many ASNs). One per ASN: the old way, for comparison or if something behaves differently.',
     perf_rules_comb: 'Combined (fast)', perf_rules_single: 'One per ASN',
     perf_rules_confirm: 'Switch the marking rules to "{m}" and rebuild the rules now? (a few seconds, the saved ASN lists are used)',
@@ -749,9 +758,11 @@ var ASNM_I18N = {
     disp_title: 'Anzeige', disp_sub: 'Gilt für die ganze Seite in diesem Browser', disp_unit: 'Einheit für Datenraten',
     disp_unit_desc: 'Wird für den Live-Durchsatz, den Speedtest und die Zusammenfassungen verwendet. 1 MB/s = 8 Mbit/s. Datenmengen (zum Beispiel 1,2 GB) bleiben unverändert.',
     disp_change: 'Einheit ändern',
-    ss_routing: 'Routing', ss_dns: 'DNS', ss_general: 'Allgemein', ss_backup: 'Sicherung & Vorlagen', rules_title: 'Regeln', rules_sub: 'Für wen die Einträge gelten, wie sie gebaut und gezählt werden',
+    ss_routing: 'Routing', ss_dns: 'DNS', ss_general: 'Allgemein', ss_backup: 'Sicherung & Vorlagen',
+    ss_routing_h: 'Ausnahmen, Geräte-Leitungen, Regeln', ss_dns_h: 'DNS passend zur Leitung, pro Gerät', ss_general_h: 'Anzeige, Zeitplan, E-Mail', ss_backup_h: 'Sicherung, Wiederherstellung, Vorlagen', rules_title: 'Regeln', rules_sub: 'Für wen die Einträge gelten, wie sie gebaut und gezählt werden',
     perf_title: 'Leistung', perf_sub: 'CPU-Last des Routers verringern',
-    ex_title: 'Ausgenommene Geräte', ex_desc: 'Geräte oder Netze, die ASN Manager in Ruhe lässt - z. B. das Gast-Netz (192.168.2.0/24). Keiner seiner Einträge gilt für sie (auch nicht die für einzelne Geräte); sie nehmen ihren normalen Weg (VPN Director / WAN). Mehrere mit Komma trennen.', ex_ph: 'z. B. 192.168.2.0/24, 192.168.1.50', ex_save: 'Speichern', ex_now: '{n} ausgenommen', ex_none: 'Keine ausgenommen - die Einträge gelten für alle Geräte.', ex_bad: '"{v}" ist keine IP-Adresse und kein Netz (z. B. 192.168.2.0/24).',
+    ex_title: 'Ausgenommene Geräte', ex_desc: 'Geräte oder Netze, die ASN Manager in Ruhe lässt - z. B. das Gast-Netz (192.168.2.0/24). Keiner seiner Einträge gilt für sie (auch nicht die für einzelne Geräte); sie nehmen ihren normalen Weg (VPN Director / WAN). Mehrere mit Komma trennen.', ex_ph: 'oder ein Netz: 192.168.2.0/24', ex_save: 'Speichern', ex_add: 'Hinzufügen', ex_pick: 'Gerät wählen', ex_net: 'Netz', ex_holds: 'enthält {n} bekannte(s) Gerät(e)', ex_holds_none: 'gerade kein bekanntes Gerät darin', ex_need: 'Bitte zuerst ein Gerät wählen oder ein Netz eintippen.', ex_confirm: '{d} aus den ausgenommenen Geräten entfernen?', ex_now: '{n} ausgenommen', ex_none: 'Keine ausgenommen - die Einträge gelten für alle Geräte.', ex_bad: '"{v}" ist keine IP-Adresse und kein Netz (z. B. 192.168.2.0/24).',
+    dl_title: 'Leitung pro Gerät', dl_desc: 'Ein ganzes Gerät über eine Leitung schicken - z. B. einen PC über WAN2 oder den Fernseher über ein VPN. Seine Einträge haben weiter Vorrang: Ein Eintrag "Bank -> WAN1" gilt für das Gerät weiter, alles andere geht über die gewählte Leitung. Failover und Kill-Switch der Leitung gelten. Ist die Leitung ohne Failover ausgefallen, nimmt das Gerät seinen normalen Weg (VPN Director / WAN). Eine Geräte-Leitung hat Vorrang vor der VPN-Director-Regel des Geräts, und DNS pro Gerät folgt ihr.', dl_add: 'Festlegen', dl_del: 'Entfernen', dl_none: 'Keine Geräte-Leitungen - jedes Gerät nimmt seinen normalen Weg.', dl_pick: 'Gerät wählen', dl_st_active: 'aktiv', dl_st_down: 'Leitung aus - normaler Weg', dl_st_excluded: 'ausgenommen', dl_st_off: 'Sicherheitsmodus', dl_confirm: 'Geräte-Leitung von {d} entfernen?', dl_need: 'Bitte zuerst Gerät und Leitung wählen.',
     perf_rules: 'Marker-Regeln', perf_rules_desc: 'Zusammengefasst: Alle ASNs eines Ziels teilen sich eine Menge und eine Regel, der Router prüft jedes Paket nur einmal pro Ziel (mit vielen ASNs deutlich weniger CPU). Einzeln: eine Regel pro ASN wie früher, zum Vergleichen oder wenn sich etwas anders verhält.',
     perf_rules_comb: 'Zusammengefasst (schnell)', perf_rules_single: 'Einzeln pro ASN',
     perf_rules_confirm: 'Marker-Regeln auf "{m}" umstellen und die Regeln jetzt neu aufbauen? (einige Sekunden, die gespeicherten ASN-Listen werden genutzt)',
@@ -2211,7 +2222,7 @@ function asnmExportDone(txt, note) {
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.parentNode.removeChild(a); }, 1000);
 }
-var ASNM_SET_OK = { MAIL_NOTIFY: /^(off|daily|weekly)$/, STATS: /^(enabled|disabled)$/, STATS_SAVING: /^(on|off)$/, STATS_MODE: /^(asn|iface)$/, RULES_MODE: /^(combined|single)$/, WEBUI_LOCATION: /^(vpn|addons)$/, SG_DOMAINS: /^(on|off)$/, DNS_FOLLOW: /^(on|off)$/, DNS_DEVICE: /^(on|off)$/, DNS_TLS: /^(on|off)$/, FO_VPND: /^(on|off)$/, FO_KS: /^(on|off)$/, EXCLUDE: /^(none|[0-9.\/,]+)$/ };
+var ASNM_SET_OK = { MAIL_NOTIFY: /^(off|daily|weekly)$/, STATS: /^(enabled|disabled)$/, STATS_SAVING: /^(on|off)$/, STATS_MODE: /^(asn|iface)$/, RULES_MODE: /^(combined|single)$/, WEBUI_LOCATION: /^(vpn|addons)$/, SG_DOMAINS: /^(on|off)$/, DNS_FOLLOW: /^(on|off)$/, DNS_DEVICE: /^(on|off)$/, DNS_TLS: /^(on|off)$/, FO_VPND: /^(on|off)$/, FO_KS: /^(on|off)$/, EXCLUDE: /^(none|[0-9.\/,]+)$/, DEVLINES: /^(none|[0-9.\/]+=[A-Z0-9]+(,[0-9.\/]+=[A-Z0-9]+)*)$/, LANGUARD: /^(on|off)$/, VPNWATCH: /^(on|off)$/ };
 
 function asnmParseBackup(txt) {
     var lines = txt.replace(/\r/g, '').split('\n'), section = null, hasSections = /^\[(ASN_LIST|CUSTOM)\]/m.test(txt);
@@ -2357,7 +2368,7 @@ function asnmImportRun() {
     }
     if (chk('asnm_rs_set')) {
         // all settings in one job: the router syncs DNS once at the end (one restart of dnsmasq / AdGuard Home instead of one per setting)
-        var order = ['STATS_SAVING', 'STATS_MODE', 'RULES_MODE', 'WEBUI_LOCATION', 'SG_DOMAINS', 'DNS_FOLLOW', 'DNS_DEVICE', 'DNS_TLS', 'MAIL_NOTIFY', 'FO_VPND', 'FO_KS', 'EXCLUDE', 'STATS'], kv = [];
+        var order = ['STATS_SAVING', 'STATS_MODE', 'RULES_MODE', 'WEBUI_LOCATION', 'SG_DOMAINS', 'DNS_FOLLOW', 'DNS_DEVICE', 'DNS_TLS', 'MAIL_NOTIFY', 'FO_VPND', 'FO_KS', 'EXCLUDE', 'DEVLINES', 'LANGUARD', 'VPNWATCH', 'STATS'], kv = [];
         for (i = 0; i < order.length; i++) if (r.settings[order[i]]) kv.push(order[i] + '=' + r.settings[order[i]]);
         for (i = 0; i < r.dnssrv.length; i++) kv.push('DNS_SERVER_' + r.dnssrv[i][0] + '=' + r.dnssrv[i][1]);     // DNS of the VPN provider per line
         if (kv.length) jobs.push(['rsset', [kv.join(';')]]);
@@ -2560,6 +2571,7 @@ function asnmPerfMark() {
     var m = { asnm_rm_combined: rm !== 'single', asnm_rm_single: rm === 'single', asnm_sm_asn: sm !== 'iface', asnm_sm_iface: sm === 'iface' };
     for (var id in m) { var e = document.getElementById(id); if (e) e.className = m[id] ? 'asnm-on' : ''; }
     asnmExRender();
+    asnmDlRender();
     asnmDnsfRender();
     asnmMailRender();
 }
@@ -2698,22 +2710,96 @@ function asnmSetRules(m) {
     asnmSendQueue([['setting', ['RULES_MODE', m]], ['retry', []]]);
 }
 
-// excluded devices / networks: shown as a comma list (not while the user types in it)
-function asnmExRender() {
-    var inp = document.getElementById('asnm_ex_in'), info = document.getElementById('asnm_ex_info');
-    if (!inp) return;
-    var ex = (ASNM.data && ASNM.data.exclude) || [];
-    if (document.activeElement !== inp && !inp.getAttribute('data-dirty')) inp.value = ex.join(', ');
-    info.textContent = ex.length ? t('ex_now', { n: ex.length }) : t('ex_none');
-    inp.oninput = function () { inp.setAttribute('data-dirty', '1'); };
+// excluded devices / networks (v3.10.0): a list with names; a network shows the known devices in it; remove per row
+function asnmIp2n(ip) { var a = String(ip).split('.'); return (((+a[0]) * 256 + (+a[1])) * 256 + (+a[2])) * 256 + (+a[3]); }
+function asnmInNet(ip, net) {
+    var p = String(net).split('/'), l = p.length > 1 ? +p[1] : 32, z = Math.pow(2, 32 - l);
+    return Math.floor(asnmIp2n(ip) / z) === Math.floor(asnmIp2n(p[0]) / z);
 }
-function asnmExSave() {
-    var inp = document.getElementById('asnm_ex_in'), v = inp.value.replace(/[\s;]+/g, ',').replace(/^,+|,+$/g, '').replace(/,+/g, ',');
-    var parts = v ? v.split(',') : [];
-    for (var i = 0; i < parts.length; i++) if (!/^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(parts[i])) { alert(t('ex_bad', { v: parts[i] })); return; }
+function asnmExRender() {
+    var box = document.getElementById('asnm_ex_list'), info = document.getElementById('asnm_ex_info'), sd = document.getElementById('asnm_ex_dev');
+    if (!box || !ASNM.data) return;
+    if (!ASNM.data.devices) ASNM.data.devices = [];
+    if (document.activeElement !== sd) { var kd = sd.value; sd.innerHTML = asnmDeviceOptions(kd).replace(asnmEsc(t('pick_device')), asnmEsc(t('ex_pick'))); }
+    var ex = ASNM.data.exclude || [], devs = ASNM.data.devices, h = '';
+    info.textContent = ex.length ? t('ex_now', { n: ex.length }) : t('ex_none');
+    for (var i = 0; i < ex.length; i++) {
+        var a = ex[i], isNet = a.indexOf('/') >= 0 && !/\/32$/.test(a), ip = a.replace(/\/32$/, ''), lbl, sub = '';
+        if (isNet) {
+            var inn = [];
+            for (var k = 0; k < devs.length; k++) if (devs[k].ip && /^\d+\.\d+\.\d+\.\d+$/.test(devs[k].ip) && asnmInNet(devs[k].ip, a)) {
+                var dn = asnmDevLabel(devs[k]); inn.push((dn ? dn + ' ' : '') + devs[k].ip);
+            }
+            lbl = t('ex_net') + ' ' + a;
+            sub = inn.length ? t('ex_holds', { n: inn.length }) + ': ' + inn.join(', ') : t('ex_holds_none');
+        } else {
+            var nm = asnmDeviceName(ip); lbl = (nm ? nm + ' - ' : '') + ip;
+        }
+        h += '<div class="asnm-row" style="align-items:flex-start;gap:8px;margin:6px 0;flex-wrap:wrap;">' +
+             '<div style="flex:1;min-width:220px;"><div>' + asnmEsc(lbl) + '</div>' +
+             (sub ? '<div class="asnm-help" style="margin-top:2px;">' + asnmEsc(sub) + '</div>' : '') + '</div>' +
+             '<input type="button" class="button_gen asnm-btn asnm-small-btn" value="' + asnmEsc(t('dl_del')) + '" onclick="asnmExDel(\'' + asnmEsc(a) + '\');"/></div>';
+    }
+    box.innerHTML = h;
+}
+function asnmExSend(list) {
     if (ASNM.busy) return;
-    inp.removeAttribute('data-dirty');
-    asnmSend('setting', ['EXCLUDE', v || 'none']);
+    asnmSend('setting', ['EXCLUDE', list.length ? list.join(',') : 'none']);
+}
+function asnmExAdd() {
+    var inp = document.getElementById('asnm_ex_in'), v = (inp.value || '').replace(/\s+/g, '') || document.getElementById('asnm_ex_dev').value;
+    if (!v) { alert(t('ex_need')); return; }
+    if (!/^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(v)) { alert(t('ex_bad', { v: v })); return; }
+    var ex = ((ASNM.data && ASNM.data.exclude) || []).slice();
+    if (ex.indexOf(v) < 0) ex.push(v);
+    inp.value = '';
+    asnmExSend(ex);
+}
+function asnmExDel(a) {
+    var nm = a.indexOf('/') < 0 ? asnmDeviceName(a) : '';
+    if (!confirm(t('ex_confirm', { d: (nm ? nm + ' - ' : '') + a }))) return;
+    asnmExSend(((ASNM.data && ASNM.data.exclude) || []).filter(function (x) { return x !== a; }));
+}
+
+// device lines (v3.10.0): a whole device over one line; the list is sent complete as "ip=TARGET,..."
+function asnmDlRender() {
+    var box = document.getElementById('asnm_dl_list'), sd = document.getElementById('asnm_dl_dev'), st = document.getElementById('asnm_dl_tgt');
+    if (!box || !ASNM.data) return;
+    if (!ASNM.data.devices) ASNM.data.devices = [];
+    if (!ASNM.data.ifaces) ASNM.data.ifaces = [];
+    if (document.activeElement !== sd) { var kd = sd.value; sd.innerHTML = asnmDeviceOptions(kd).replace(asnmEsc(t('pick_device')), asnmEsc(t('dl_pick'))); }
+    if (document.activeElement !== st) asnmFillTargets(st);
+    var dl = ASNM.data.devlines || [];
+    if (!dl.length) { box.innerHTML = '<div class="asnm-help">' + asnmEsc(t('dl_none')) + '</div>'; return; }
+    var cls = { active: 'asnm-ok', down: 'asnm-warn', excluded: 'asnm-warn', off: 'asnm-bad' }, h = '';
+    for (var i = 0; i < dl.length; i++) {
+        var d = dl[i], nm = d.a.indexOf('/') < 0 ? asnmDeviceName(d.a) : '';
+        h += '<div class="asnm-row" style="align-items:center;gap:8px;margin:4px 0;flex-wrap:wrap;">' +
+             '<span style="min-width:220px;">' + asnmEsc((nm ? nm + ' - ' : '') + d.a) + '</span>' +
+             '<span>&rarr; ' + asnmEsc(asnmDestLabel(d.t)) + '</span>' +
+             '<span class="asnm-badge ' + (cls[d.s] || 'asnm-warn') + '">' + asnmEsc(t('dl_st_' + d.s)) + '</span>' +
+             '<input type="button" class="button_gen asnm-btn asnm-small-btn" value="' + asnmEsc(t('dl_del')) + '" onclick="asnmDlDel(\'' + asnmEsc(d.a) + '\');"/></div>';
+    }
+    box.innerHTML = h;
+}
+function asnmDlSend(list) {
+    var p = [];
+    for (var i = 0; i < list.length; i++) p.push(list[i].a + '=' + list[i].t);
+    asnmSend('setting', ['DEVLINES', p.length ? p.join(',') : 'none']);
+}
+function asnmDlAdd() {
+    var a = document.getElementById('asnm_dl_dev').value, tg = document.getElementById('asnm_dl_tgt').value;
+    if (!a || !tg) { alert(t('dl_need')); return; }
+    if (ASNM.busy) return;
+    var dl = ((ASNM.data && ASNM.data.devlines) || []).filter(function (d) { return d.a !== a; });
+    dl.push({ a: a, t: asnmNormDest(tg) });
+    asnmDlSend(dl);
+}
+function asnmDlDel(a) {
+    if (ASNM.busy) return;
+    var nm = asnmDeviceName(a);
+    if (!confirm(t('dl_confirm', { d: (nm ? nm + ' - ' : '') + a }))) return;
+    asnmDlSend(((ASNM.data && ASNM.data.devlines) || []).filter(function (d) { return d.a !== a; }));
 }
 
 function asnmSetStatsMode(m) {
@@ -3725,7 +3811,8 @@ function asnmSetSub(id) {
     for (var i = 0; i < ids.length; i++) {
         var on = ids[i] === id;
         document.getElementById('asnm_ssub_' + ids[i]).style.display = on ? 'block' : 'none';
-        document.getElementById('asnm_ssbtn_' + ids[i]).className = 'asnm-subtab' + (on ? ' on' : '');
+        var sb = document.getElementById('asnm_ssbtn_' + ids[i]);
+        sb.className = 'asnm-subtab' + (on ? ' on' : ''); sb.setAttribute('aria-selected', on ? 'true' : 'false');
     }
     try { localStorage.setItem('asnm_setsub', id); } catch (e) {}
 }
@@ -4061,18 +4148,27 @@ function initial() {
   </div>
   <div class="asnm-tabpanel" id="asnm_tab_settings" role="tabpanel" style="display:none;">
   <div class="asnm-subtabs" role="tablist">
-    <button type="button" class="asnm-subtab" id="asnm_ssbtn_routing" onclick="asnmSetSub('routing');" data-i18n="ss_routing"></button>
-    <button type="button" class="asnm-subtab" id="asnm_ssbtn_dns" onclick="asnmSetSub('dns');" data-i18n="ss_dns"></button>
-    <button type="button" class="asnm-subtab" id="asnm_ssbtn_general" onclick="asnmSetSub('general');" data-i18n="ss_general"></button>
-    <button type="button" class="asnm-subtab" id="asnm_ssbtn_backup" onclick="asnmSetSub('backup');" data-i18n="ss_backup"></button>
+    <button type="button" class="asnm-subtab" id="asnm_ssbtn_routing" role="tab" onclick="asnmSetSub('routing');"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg><span class="asnm-st-t"><span class="asnm-st-l" data-i18n="ss_routing"></span><span class="asnm-st-h" data-i18n="ss_routing_h"></span></span></button>
+    <button type="button" class="asnm-subtab" id="asnm_ssbtn_dns" role="tab" onclick="asnmSetSub('dns');"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span class="asnm-st-t"><span class="asnm-st-l" data-i18n="ss_dns"></span><span class="asnm-st-h" data-i18n="ss_dns_h"></span></span></button>
+    <button type="button" class="asnm-subtab" id="asnm_ssbtn_general" role="tab" onclick="asnmSetSub('general');"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg><span class="asnm-st-t"><span class="asnm-st-l" data-i18n="ss_general"></span><span class="asnm-st-h" data-i18n="ss_general_h"></span></span></button>
+    <button type="button" class="asnm-subtab" id="asnm_ssbtn_backup" role="tab" onclick="asnmSetSub('backup');"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg><span class="asnm-st-t"><span class="asnm-st-l" data-i18n="ss_backup"></span><span class="asnm-st-h" data-i18n="ss_backup_h"></span></span></button>
   </div>
   <div class="asnm-subpanel" id="asnm_ssub_routing">
   <div class="asnm-card" id="asnm_rules_card">
     <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M6 12h12M10 18h4"/></svg><div class="asnm-card-titles"><h3 data-i18n="rules_title"></h3><div class="asnm-card-sub" data-i18n="rules_sub"></div></div></div>
     <div class="asnm-field"><span class="asnm-label" data-i18n="ex_title"></span><span class="asnm-help" data-i18n="ex_desc"></span>
-      <div class="asnm-dw-ed" style="margin-top:8px;"><input type="text" id="asnm_ex_in" maxlength="400" autocomplete="off" spellcheck="false" data-i18n-ph="ex_ph" style="flex:1;min-width:220px;"/>
-        <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="ex_save" onclick="asnmExSave();"/></div>
+      <div class="asnm-dw-ed" style="margin-top:8px;flex-wrap:wrap;gap:8px;"><select id="asnm_ex_dev" class="input_option" style="flex:1;min-width:200px;"></select>
+        <input type="text" id="asnm_ex_in" maxlength="18" autocomplete="off" spellcheck="false" data-i18n-ph="ex_ph" style="width:170px;"/>
+        <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="ex_add" onclick="asnmExAdd();"/></div>
       <div class="asnm-help" id="asnm_ex_info" style="margin-top:6px;"></div>
+      <div id="asnm_ex_list" style="margin-top:4px;"></div>
+    </div>
+    <div class="asnm-divider"></div>
+    <div class="asnm-field"><span class="asnm-label" data-i18n="dl_title"></span><span class="asnm-help" data-i18n="dl_desc"></span>
+      <div class="asnm-dw-ed" style="margin-top:8px;flex-wrap:wrap;gap:8px;"><select id="asnm_dl_dev" class="input_option" style="flex:1;min-width:200px;"></select>
+        <select id="asnm_dl_tgt" class="input_option" style="min-width:170px;"></select>
+        <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="dl_add" onclick="asnmDlAdd();"/></div>
+      <div id="asnm_dl_list" style="margin-top:8px;"></div>
     </div>
     <div class="asnm-divider"></div>
     <div class="asnm-field"><span class="asnm-label" data-i18n="perf_rules"></span><span class="asnm-help" data-i18n="perf_rules_desc"></span>

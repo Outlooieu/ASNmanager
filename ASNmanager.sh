@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.9.37
+version=3.10.0
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -12,7 +12,7 @@ case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
 export PATH
 
-SCRIPT_VERSION="3.9.37"
+SCRIPT_VERSION="3.10.0"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -422,6 +422,9 @@ run_to() {
     return $rt_r
 }
 nsl() { run_to 6 nslookup "$@"; }
+# IPv4 addresses of an nslookup answer: only the address field of the "Address" lines after "Name:". Busybox prints
+# "Address 1: 34.160.111.145 145.111.160.34.bc.googleusercontent.com" - the reverse name behind it is no address (v3.10.0)
+nsl_v4() { awk '/^Name:/ { f = 1; next } f && /^Address/ { a = ($2 ~ /:$/) ? $3 : $2; if (a ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) print a }'; }
 
 # nvram is read ONCE per run: every "nvram get" is a process of its own and takes long on a busy router, the routing check used to ask for the
 # WAN interface for every ASN (hundreds of calls per run). get_ifname / check_iface_up use these values when they are set.
@@ -602,24 +605,34 @@ rt_heal() {
         ip route add default dev "$rh_dev" table "$rh_tab" 2>/dev/null &&
             logger -t ASNmanager "Routing: route of $rh_t (table $rh_tab, $rh_dev) was missing - VPN client restarted? Added again"
     done
-    # WAN2 (Dual-WAN): an own table with the gateway of the second WAN (the main table only knows the first one), and its
-    # reverse path filter loose - the answers come in on that interface while the main route points to WAN1
-    rh_i=$(get_target_info WAN2); rh_tab=${rh_i%% *}; rh_m=$(echo "$rh_i" | cut -d' ' -f2)
-    if echo "$rh_rules" | grep -q "fwmark ${rh_m}/${MARK_MASK} " && check_iface_up WAN2 >/dev/null 2>&1; then
-        rh_dev=$(nvram get wan1_gw_ifname 2>/dev/null); [ -n "$rh_dev" ] || rh_dev=$(nvram get wan1_ifname 2>/dev/null)
-        rh_gw=$(nvram get wan1_gateway 2>/dev/null)
-        case "$rh_gw" in ''|0.0.0.0) rh_want="default dev $rh_dev" ;; *) rh_want="default via $rh_gw dev $rh_dev" ;; esac
-        if [ -n "$rh_dev" ] && ! ip route show table "$rh_tab" 2>/dev/null | grep -q "^$rh_want"; then
-            ip route flush table "$rh_tab" 2>/dev/null
-            ip route add $rh_want table "$rh_tab" 2>/dev/null && logger -t ASNmanager "Routing: WAN2 table $rh_tab set to: $rh_want"
-        fi
-        rh_rp=/proc/sys/net/ipv4/conf/$rh_dev/rp_filter
-        if [ -n "$rh_dev" ] && [ "$(cat "$rh_rp" 2>/dev/null)" = "1" ]; then
-            echo 2 > "$rh_rp" 2>/dev/null && logger -t ASNmanager "Routing: reverse path filter of $rh_dev (WAN2) set to loose - answers of the WAN2 entries come in there"
-        fi
-    fi
+    rt_wan2_table "$rh_rules"
     ks_sync
     ex_sync
+    dl_sync
+    lg_sync
+    vw_hook_sync
+}
+
+# WAN2 (Dual-WAN): an own table with the gateway of the second WAN (the main table only knows the first one), and its
+# reverse path filter loose - the answers come in on that interface while the main route points to WAN1
+# Only when a routing rule uses the mark of WAN2 (an entry or a device line) and WAN2 is up. $1 = ip rule list (optional)
+rt_wan2_table() {
+    w2_rules=${1:-$(ip rule show 2>/dev/null)}
+    w2_i=$(get_target_info WAN2); w2_tab=${w2_i%% *}; w2_m=$(echo "$w2_i" | cut -d' ' -f2)
+    if echo "$w2_rules" | grep -q "fwmark ${w2_m}/${MARK_MASK} " && check_iface_up WAN2 >/dev/null 2>&1; then
+        w2_dev=$(nvram get wan1_gw_ifname 2>/dev/null); [ -n "$w2_dev" ] || w2_dev=$(nvram get wan1_ifname 2>/dev/null)
+        w2_gw=$(nvram get wan1_gateway 2>/dev/null)
+        case "$w2_gw" in ''|0.0.0.0) w2_want="default dev $w2_dev" ;; *) w2_want="default via $w2_gw dev $w2_dev" ;; esac
+        if [ -n "$w2_dev" ] && ! ip route show table "$w2_tab" 2>/dev/null | grep -q "^$w2_want"; then
+            ip route flush table "$w2_tab" 2>/dev/null
+            ip route add $w2_want table "$w2_tab" 2>/dev/null && logger -t ASNmanager "Routing: WAN2 table $w2_tab set to: $w2_want"
+        fi
+        w2_rp=/proc/sys/net/ipv4/conf/$w2_dev/rp_filter
+        if [ -n "$w2_dev" ] && [ "$(cat "$w2_rp" 2>/dev/null)" = "1" ]; then
+            echo 2 > "$w2_rp" 2>/dev/null && logger -t ASNmanager "Routing: reverse path filter of $w2_dev (WAN2) set to loose - answers of the WAN2 entries come in there"
+        fi
+    fi
+    return 0
 }
 
 cu_usable() {
@@ -676,6 +689,251 @@ ex_set() {
     if [ -n "$ex_new" ]; then echo "Excluded devices / networks:$ex_new - ASN Manager leaves them alone."
     else echo "No excluded devices."; fi
     return 0
+}
+# ---------- device lines (v3.10.0) ----------
+# The whole traffic of a device that no entry catches leaves via one chosen line (e.g. a PC via WAN2, a TV via a VPN).
+# One rule per device at the END of mangle PREROUTING: the entries (IP / domain / ASN) sit above it and still win, an
+# excluded device (top) is not touched. It sets the mark of the line, so the routing rule of the line, its failover chain
+# and the kill switch apply to it like to an entry. Its routing rule comes before the VPN Director: it wins over its rule.
+# DNS per device follows an active device line (its lookups take the way of its traffic).
+# (shell variables are global: every function here uses its own prefix - dlm_ dls_ dly_ dlc_ dlk_ dlx_ dlv_ dlj_)
+DL_FILE="/jffs/addons/asnmanager/devlines"      # "<IP|network> <TARGET>" per line
+dl_list() { awk 'NF == 2 && $1 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(\/[0-9]+)?$/ && $2 ~ /^(WAN1|WAN2|OVPN[1-5]|WGC[1-5])$/' "$DL_FILE" 2>/dev/null; }
+# device IP -> "<line address> <TARGET>" of the most exact line that holds it (a single device before a network)
+dl_of() {
+    dl_list | awk -v i="$1" '
+        function n(s,  a) { split(s, a, "."); return ((a[1] * 256 + a[2]) * 256 + a[3]) * 256 + a[4] }
+        { split($1, p, "/"); l = (p[2] == "") ? 32 : p[2] + 0; z = 2 ^ (32 - l); if (int(n(p[1]) / z) == int(n(i) / z) && l > bl) { bl = l; b = $0 } }
+        END { if (b != "") print b }'
+}
+dl_target_of() { dl_of "$1" | awk '{ print $2 }'; }
+# the mark of the device line of a device, only while its rule is in place (empty = no line / not active)
+dl_mark_of() {
+    dlm_l=$(dl_of "$1"); [ -n "$dlm_l" ] || return 0
+    dlm_a=${dlm_l%% *}; case "$dlm_a" in */*) ;; *) dlm_a="$dlm_a/32" ;; esac
+    dl_rules_now | awk -v a="$dlm_a" '{ for (i = 1; i <= NF; i++) { if ($i == "-s") s = $(i + 1); if ($i == "--set-xmark") m = $(i + 1) } if (s == a) { sub(/\/.*/, "", m); print m; exit } }'
+}
+# the device-line rules in mangle PREROUTING (iptables -S form): a source, no set, the mark of a target
+dl_rules_now() {
+    iptables -t mangle -S PREROUTING 2>/dev/null | awk '/ -s / && / --mark 0x0\/0xff00 / && / --set-xmark 0x[0-9a-f]+00\/0xff00/ && !/match-set/ && !/--set-xmark 0xf00\//'
+}
+# state: active (rule in place) | down (line down, no failover / kill switch: normal way) | excluded | off (safemode)
+dl_state() {
+    sm_on && { echo off; return 0; }
+    ex_has "${1%%/*}" >/dev/null && { echo excluded; return 0; }
+    dls_a=$1; case "$dls_a" in */*) ;; *) dls_a="$dls_a/32" ;; esac
+    dl_rules_now | grep -q -- "-s $dls_a " && { echo active; return 0; }
+    echo down
+}
+# VPN Director: the line of the first enabled rule that holds the device (empty = none)
+dl_vd_of() {
+    cat /jffs/openvpn/vpndirector_rulelist 2>/dev/null | tr '<' '\n' | awk -F'>' -v ip="$1" '
+        function n(s,  a) { split(s, a, "."); return ((a[1] * 256 + a[2]) * 256 + a[3]) * 256 + a[4] }
+        function inc(c,  p, len, sz, b) { split(c, p, "/"); len = (p[2] == "" ? 32 : p[2]); sz = 2 ^ (32 - len); b = int(n(p[1]) / sz) * sz; return n(ip) >= b && n(ip) < b + sz }
+        NF >= 5 && $1 == "1" && $3 != "" && inc($3) { print toupper($5); exit }'
+}
+dl_sync() {
+    dly_w=/tmp/asnmanager-dl.want; dly_chg=""
+    if sm_on; then : > "$dly_w"
+    else
+        # the most exact address first (the first rule that matches wins)
+        dl_list | awk '{ split($1, p, "/"); print ((p[2] == "") ? 32 : p[2]), $0 }' | sort -k1,1nr | cut -d' ' -f2- | while read -r dly_a dly_t; do
+            ex_has "${dly_a%%/*}" >/dev/null && continue        # excluded: ASN Manager leaves it alone
+            cu_usable "$dly_t" || continue                      # line down, no failover / kill switch: normal way
+            dly_m=$(get_target_info "$dly_t" | cut -d' ' -f2); [ -n "$dly_m" ] || continue
+            case "$dly_a" in */*) ;; *) dly_a="$dly_a/32" ;; esac
+            echo "-A PREROUTING -s $dly_a -m mark --mark 0x0/0xff00 -j MARK --set-xmark $dly_m/0xff00"
+        done > "$dly_w"
+    fi
+    dly_cur=$(dl_rules_now); dly_n=$(grep -c . "$dly_w")
+    # in place: exactly these rules, in this order, at the end of the chain
+    if [ "$dly_cur" = "$(cat "$dly_w")" ] && { [ "$dly_n" -eq 0 ] || [ "$(iptables -t mangle -S PREROUTING 2>/dev/null | tail -n "$dly_n")" = "$(cat "$dly_w")" ]; }; then
+        :
+    else
+        [ "$dly_cur" = "$(cat "$dly_w")" ] || dly_chg=1
+        dl_clear
+        while read -r dly_r; do iptables -t mangle $dly_r 2>/dev/null; done < "$dly_w"
+    fi
+    # routing rule (and route) of every line in use - like for an entry
+    for dly_m in $(sed -n 's/.* --set-xmark \(0x[0-9a-f]*\)\/0xff00$/\1/p' "$dly_w" | sort -u); do
+        dly_tt=$(dg_target_of_mark "$dly_m")
+        cu_route "$dly_tt"
+        [ "$dly_tt" = "WAN2" ] && rt_wan2_table
+    done
+    rm -f "$dly_w"
+    # the lines changed: DNS per device follows them
+    if [ -n "$dly_chg" ] && dnsd_on && [ -z "$DL_NODNS" ]; then DL_NODNS=1; dnsf_sync >/dev/null 2>&1; DL_NODNS=""; DL_DNS_DONE=1; fi
+    return 0
+}
+dl_clear() {
+    dl_rules_now | sed 's/^-A /-D /' | while read -r dlc_r; do iptables -t mangle $dlc_r 2>/dev/null; done
+}
+# open connections of a device to the internet: closed, so it opens them again on its new line at once. The ones to the
+# router and the LAN (SSH, this page) stay.
+dl_ct_close() {
+    dlk_ct=""; for dlk_x in /usr/sbin/conntrack /sbin/conntrack /usr/bin/conntrack /opt/sbin/conntrack; do [ -x "$dlk_x" ] && { dlk_ct=$dlk_x; break; }; done
+    [ -n "$dlk_ct" ] && [ -r "${DL_CT:-/proc/net/nf_conntrack}" ] || return 0
+    case "$1" in */*) return 0 ;; esac                  # a whole network: its devices switch with their next connections
+    dlk_c=0
+    for dlk_d in $(awk -v ip="$1" '{ s = ""; d = ""
+            for (i = 1; i <= NF; i++) { if ($i ~ /^src=/ && s == "") s = substr($i, 5); else if ($i ~ /^dst=/ && d == "") d = substr($i, 5) }
+            if (s == ip && d !~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|127\.|169\.254\.|22[4-9]\.|2[3-5][0-9]\.|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.)/) print d }' \
+            "${DL_CT:-/proc/net/nf_conntrack}" 2>/dev/null | sort -u | head -n 300); do
+        dlk_r=$("$dlk_ct" -D -s "$1" -d "$dlk_d" 2>&1 | sed -n 's/.* \([0-9][0-9]*\) flow entries have been deleted.*/\1/p')
+        dlk_c=$((dlk_c + ${dlk_r:-0}))
+    done
+    [ "$dlk_c" -gt 0 ] && echo "   $1: $dlk_c open connection(s) to the internet closed - the device opens them again on its new line (the ones to the router stay)."
+    return 0
+}
+# $1 = "IP=TARGET,network=TARGET,..." or "none"
+dl_set() {
+    dlx_new=/tmp/asnmanager-dl.new; : > "$dlx_new"; dlx_bad=""
+    for dlx_p in $(echo "$1" | tr ',; ' '   '); do
+        [ "$dlx_p" = "none" ] && continue
+        dlx_a=${dlx_p%%=*}; dlx_t=${dlx_p#*=}
+        if [ "$dlx_p" != "$dlx_a" ] && { is_valid_ip "$dlx_a" || cu_is_cidr "$dlx_a"; } && dlx_t=$(norm_dest "$dlx_t"); then
+            echo "$dlx_a $dlx_t" >> "$dlx_new"
+        else dlx_bad="$dlx_bad $dlx_p"; fi
+    done
+    if [ -n "$dlx_bad" ]; then
+        echo "Not \"device=line\":$dlx_bad   (lines: $VALID_DESTS) - nothing changed."
+        rm -f "$dlx_new"; return 1
+    fi
+    # one line per device - the last one given wins
+    awk '{ a[$1] = $2; if (!($1 in o)) { o[$1] = ++n; k[n] = $1 } } END { for (i = 1; i <= n; i++) print k[i], a[k[i]] }' "$dlx_new" > "$dlx_new.u"
+    dlx_old=/tmp/asnmanager-dl.old; dl_list > "$dlx_old"
+    mkdir -p "$ADDON_DIR"
+    if [ -s "$dlx_new.u" ]; then cp "$dlx_new.u" "$DL_FILE" || { echo "Could not write $DL_FILE - nothing changed."; rm -f "$dlx_new" "$dlx_new.u" "$dlx_old"; return 1; }
+    else rm -f "$DL_FILE"; fi
+    nv_refresh
+    DL_DNS_DONE=""
+    dl_sync
+    if [ -s "$DL_FILE" ]; then
+        echo "Device lines - the traffic of these devices that no entry catches leaves via:"
+        dl_list | while read -r dlx_a dlx_t; do
+            dlx_s=$(dl_state "$dlx_a"); dlx_nm=$(dg_devname "${dlx_a%%/*}")
+            case "$dlx_s" in
+                active)   dlx_x="" ;;
+                excluded) dlx_x="   [excluded - ASN Manager leaves it alone]" ;;
+                off)      dlx_x="   [safemode - rules are out]" ;;
+                *)        dlx_x="   [$dlx_t is down - normal way until it is up; a fallback: failover set $dlx_t <line>]" ;;
+            esac
+            echo "   $dlx_a${dlx_nm:+ ($dlx_nm)} -> $dlx_t$dlx_x"
+            dlx_vd=$(dl_vd_of "${dlx_a%%/*}")
+            [ -n "$dlx_vd" ] && [ "$dlx_vd" != "$dlx_t" ] && echo "      it is in the VPN Director (-> $dlx_vd): the device line wins; its VPN Director rule applies again when the line is removed."
+        done
+    else echo "No device lines - every device takes its normal way (VPN Director / WAN)."; fi
+    [ -n "$DL_DNS_DONE" ] && echo "DNS per device follows the device lines (AdGuard Home clients updated)."
+    # devices whose line changed: their open connections to the internet are closed
+    dl_list > "$dlx_new"
+    awk 'FILENAME == ARGV[1] { o[$1] = $2; next } { n[$1] = $2 } END { for (a in o) if (o[a] != n[a]) print a; for (a in n) if (!(a in o)) print a }' "$dlx_old" "$dlx_new" | sort -u |
+        while read -r dlx_c; do dl_ct_close "$dlx_c"; done
+    rm -f "$dlx_new" "$dlx_new.u" "$dlx_old"
+    return 0
+}
+# devline list | set <IP|network> <TARGET> | del <IP|network> | none
+cli_devline() {
+    case "$1" in
+        ""|list)
+            if dl_list | grep -q .; then
+                nv_refresh
+                dl_list | while read -r dlv_a dlv_t; do
+                    dlv_s=$(dl_state "$dlv_a"); dlv_n=$(dg_devname "${dlv_a%%/*}")
+                    printf '%-18s %-20s -> %-6s [%s]\n' "$dlv_a" "$(echo "${dlv_n:--}" | cut -c1-20)" "$dlv_t" "$dlv_s"
+                done
+            else echo "No device lines."; fi ;;
+        set)
+            [ -n "$2" ] && [ -n "$3" ] || { echo "Usage: devline set <IP|network> <TARGET>"; return 1; }
+            dl_set "$(dl_list | awk -v a="$2" '$1 != a { printf "%s=%s,", $1, $2 }')$2=$3" ;;
+        del|remove)
+            [ -n "$2" ] || { echo "Usage: devline del <IP|network>"; return 1; }
+            dl_list | awk -v a="$2" '$1 == a { f = 1 } END { exit !f }' || { echo "No device line for $2."; return 1; }
+            dlv_l=$(dl_list | awk -v a="$2" '$1 != a { printf "%s%s=%s", (n++ ? "," : ""), $1, $2 }')
+            dl_set "${dlv_l:-none}" ;;
+        none|clear) dl_set none ;;
+        *) echo "Usage: devline list | set <IP|network> <TARGET> | del <IP|network> | none"; return 1 ;;
+    esac
+}
+dl_json() {
+    dl_list | while read -r dlj_a dlj_t; do printf '{"a":"%s","t":"%s","s":"%s"}\n' "$dlj_a" "$dlj_t" "$(dl_state "$dlj_a")"; done | awk '{ printf "%s%s", (NR > 1 ? "," : ""), $0 }'
+}
+
+# ---------- LAN guard (v3.10.0) ----------
+# The router always reaches its own networks (LAN, guest networks, VPN server) through the main table: one routing rule
+# per network at prio 89, before the marks of ASN Manager, the VPN Director and its kill switch. A VPN client that is
+# down (kill switch) or the router in the VPN Director can then never lock the router out of its LAN. Only added, never
+# removed (rules the user set the same way stay as they are). "languard off" stops adding them.
+LG_PRIO=89
+LG_OFF="/jffs/addons/asnmanager/languard_off"
+lg_on() { [ ! -f "$LG_OFF" ]; }
+lg_nets() {
+    ip -4 route show table main 2>/dev/null | awk '$1 ~ /^[0-9.]+\/[0-9]+$/ && $2 == "dev" && $3 ~ /^(br[0-9]+|wl[0-9]+\.[0-9]+|wgs[0-9]+|tun2[0-9])$/ && / scope link/ { print $1 }' | sort -u
+}
+lg_sync() {
+    lg_on || return 0
+    lg_have=$(ip rule show 2>/dev/null | awk -v p="${LG_PRIO}:" '$1 == p')
+    for lg_n in $(lg_nets); do
+        echo "$lg_have" | grep -q "to $lg_n lookup main" || ip rule add to "$lg_n" lookup main prio "$LG_PRIO" 2>/dev/null
+    done
+    return 0
+}
+cli_languard() {
+    case "$1" in
+        on)  rm -f "$LG_OFF"; lg_sync; echo "LAN guard: on - the router always reaches its own networks (rules at prio $LG_PRIO): $(lg_nets | tr '\n' ' ')" ;;
+        off) mkdir -p "$ADDON_DIR"; : > "$LG_OFF"; echo "LAN guard: off - no new rules are added (the ones in place stay until the next reboot)." ;;
+        ""|status) echo "LAN guard: $(lg_on && echo on || echo off)   networks: $(lg_nets | tr '\n' ' ')"
+             echo "rules at prio $LG_PRIO: $(ip rule show 2>/dev/null | awk -v p="${LG_PRIO}:" '$1 == p' | grep -c .)" ;;
+        *)   echo "Usage: languard on | off | status"; return 1 ;;
+    esac
+}
+
+# ---------- VPN watcher after WAN events (v3.10.0) ----------
+# The firmware (388.12_2 and 388.13 alpha1, dual WAN load balance) stops the WireGuard clients when a WAN restarts and
+# does not start them again - with the kill switch every device in the VPN Director stays offline. After a WAN event
+# (wan-event: connected / disconnected / stopped) ASN Manager waits 45 s, starts the clients that are switched on but not
+# running (service restart_wgc), then checks its routes, device lines and the LAN guard. One watcher per burst of events.
+VW_HOOK="ASNmanager-WANwatch"
+VW_OFF="/jffs/addons/asnmanager/vpnwatch_off"
+WAN_EVENT="/jffs/scripts/wan-event"
+vw_on() { [ ! -f "$VW_OFF" ]; }
+vw_hook_sync() {
+    [ -f "$SCRIPT_PATH" ] || return 0
+    grep -q "# ${VW_HOOK}\$" "$WAN_EVENT" 2>/dev/null && return 0
+    ensure_script "$WAN_EVENT"
+    echo "$SCRIPT_PATH wanwatch \"\$1\" \"\$2\" </dev/null >/dev/null 2>&1 & # ${VW_HOOK}" >> "$WAN_EVENT"
+}
+vw_hook_del() { [ -f "$WAN_EVENT" ] && sed -i "/# ${VW_HOOK}\$/d" "$WAN_EVENT"; return 0; }
+cli_wanwatch() {
+    case "$2" in connected|disconnected|stopped) ;; *) return 0 ;; esac
+    sm_on && return 0
+    vw_l=/tmp/asnmanager-wanwatch.lock
+    if [ -d "$vw_l" ] && [ $(( $(date +%s) - $(date -r "$vw_l" +%s 2>/dev/null || echo 0) )) -gt 300 ]; then rmdir "$vw_l" 2>/dev/null; fi
+    mkdir "$vw_l" 2>/dev/null || return 0                # a watcher of the same burst is already waiting
+    sleep "${VW_WAIT:-45}"
+    nv_refresh
+    if vw_on; then
+        vw_miss=""
+        for vw_n in 1 2 3 4 5; do
+            [ "$(nvram get "wgc${vw_n}_enable" 2>/dev/null)" = "1" ] || continue
+            ip link show "wgc$vw_n" >/dev/null 2>&1 || vw_miss="$vw_miss wgc$vw_n"
+        done
+        if [ -n "$vw_miss" ] && { check_iface_up WAN1 >/dev/null 2>&1 || check_iface_up WAN2 >/dev/null 2>&1; }; then
+            logger -t ASNmanager "WAN event (unit $1 $2): WireGuard client(s)$vw_miss switched on but not running - started again (service restart_wgc)"
+            service restart_wgc >/dev/null 2>&1
+            sleep 20; nv_refresh
+        fi
+    fi
+    rt_heal
+    rmdir "$vw_l" 2>/dev/null
+    return 0
+}
+cli_vpnwatch() {
+    case "$1" in
+        on)  rm -f "$VW_OFF"; vw_hook_sync; echo "VPN watcher: on - after a WAN event WireGuard clients that are switched on but not running are started again." ;;
+        off) mkdir -p "$ADDON_DIR"; : > "$VW_OFF"; echo "VPN watcher: off - after a WAN event only the routes are checked." ;;
+        ""|status) echo "VPN watcher: $(vw_on && echo on || echo off)   hook in $WAN_EVENT: $(grep -q "# ${VW_HOOK}\$" "$WAN_EVENT" 2>/dev/null && echo yes || echo no)" ;;
+        *)   echo "Usage: vpnwatch on | off | status"; return 1 ;;
+    esac
 }
 cu_route() {
     cr_info=$(get_target_info "$1"); [ -n "$cr_info" ] || return 1
@@ -857,6 +1115,7 @@ cu_apply_dom() {
     cu_apply_dom_run "$@"; cl_rc=$?
     rmdir "$CU_LOCK" 2>/dev/null
     ex_sync
+    dl_sync
     return $cl_rc
 }
 cu_apply_dom_run() {
@@ -1031,7 +1290,7 @@ cu_learned_js() {
     } > "$WEB_DIR/learned.js.tmp" 2>/dev/null && mv -f "$WEB_DIR/learned.js.tmp" "$WEB_DIR/learned.js"
 }
 
-cu_apply() { sm_on && return 0; cu_apply_body "$@"; cab_r=$?; ex_sync; return $cab_r; }
+cu_apply() { sm_on && return 0; cu_apply_body "$@"; cab_r=$?; ex_sync; dl_sync; return $cab_r; }
 cu_apply_body() {
     : > "$CU_STATUS"
     cu_apply_ip
@@ -1436,6 +1695,9 @@ backup_text() {
     echo "FO_VPND=$(fo_vpnd_on && echo on || echo off)"
     echo "FO_KS=$(ks_on && echo on || echo off)"
     echo "EXCLUDE=$(ex_list | tr '\n' ',' | sed 's/,$//; s/^$/none/')"
+    echo "DEVLINES=$(dl_list | awk '{ printf "%s%s=%s", (NR > 1 ? "," : ""), $1, $2 }' | sed 's/^$/none/')"
+    echo "LANGUARD=$(lg_on && echo on || echo off)"
+    echo "VPNWATCH=$(vw_on && echo on || echo off)"
     # DNS of the VPN provider per line ("DNS fitting the line")
     [ -s "$DNSF_CONF" ] && awk -F= '$1 ~ /^(OVPN|WGC)[1-5]$/ && $2 != "" { v = $2; gsub(/ +/, ",", v); print "DNS_SERVER_" $1 "=" v }' "$DNSF_CONF"
     # own presets - from the router and from a USB device (restored to the router)
@@ -1517,6 +1779,9 @@ rs_setting() {
         FO_VPND:on|FO_VPND:off)        fo_vpnd_set "$2" ;;
         FO_KS:on|FO_KS:off)            ks_set "$2" ;;
         EXCLUDE:*)                     ex_set "$2"; return 0 ;;
+        DEVLINES:*)                    dl_set "$2"; return 0 ;;
+        LANGUARD:on|LANGUARD:off)      cli_languard "$2"; return 0 ;;
+        VPNWATCH:on|VPNWATCH:off)      cli_vpnwatch "$2"; return 0 ;;
         DNS_SERVER_OVPN[1-5]:*|DNS_SERVER_WGC[1-5]:*)
                                        dnsf_server_set "${1#DNS_SERVER_}" $(echo "$2" | tr ',' ' '); return $? ;;
         FO_VPND:*|FO_KS:*|STATS:*|STATS_SAVING:*|STATS_MODE:*|RULES_MODE:*|WEBUI_LOCATION:*|SG_DOMAINS:*|DNS_FOLLOW:*|DNS_DEVICE:*|DNS_TLS:*|MAIL_NOTIFY:*)   echo "Invalid value '$2' for $1 skipped."; return 0 ;;
@@ -1726,6 +1991,7 @@ uninstall_menu() {
             rm -f "$ADDON_DIR/sg_domains"; sgd_write >/dev/null 2>&1; rm -f "$SGD_LOG"; rm -f "$DNSF_FLAG" "$DNSD_FLAG" "$DNSF_TLS_FLAG"; dnsf_sync >/dev/null 2>&1
             cu_purge >/dev/null 2>&1
             ex_clear; rm -f "$EX_FILE"
+            dl_clear; rm -f "$DL_FILE" "$LG_OFF" "$VW_OFF"; vw_hook_del
             rm -f /tmp/asn_groups.txt
             # safemode: self-test, flags, boot hook
             sm_p=$(cat "$SM_PID" 2>/dev/null); [ -n "$sm_p" ] && kill "$sm_p" 2>/dev/null
@@ -2345,7 +2611,7 @@ route_test() {
     if is_valid_ip "$target"; then
         ips="$target"
     else
-        ips=$(nsl "$target" 2>/dev/null | grep -A 20 "Name:" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}')
+        ips=$(nsl "$target" 2>/dev/null | nsl_v4)
         [ -z "$ips" ] && { echo -e "${RED}Could not resolve ${target}${NC}"; return 1; }
     fi
     for test_ip in $ips; do
@@ -2487,7 +2753,7 @@ cli_explain() {
     else
         cu_norm_domain "$ex_t" >/dev/null || { echo "Not a domain or IPv4 address."; return 1; }
         # the router's own DNS (port 53): the same way a device asks - this lookup also teaches the domain entries
-        ex_ips=$(nsl "$ex_t" 127.0.0.1 2>/dev/null | awk '/^Name:/ { f = 1; next } f' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | sort -u | head -n 6)
+        ex_ips=$(nsl "$ex_t" 127.0.0.1 2>/dev/null | nsl_v4 | sort -u | head -n 6)
         echo "DNS (asked like a device, via 127.0.0.1): ${ex_ips:-no IPv4 address}" | tr '\n' ' '; echo
         # domain entries that cover the name (the name itself or a parent domain)
         ex_any=0
@@ -2531,6 +2797,10 @@ cli_explain() {
             echo "   Rules: no ASN Manager entry contains this address"
         fi
         rm -f /tmp/asnmanager-ex.m
+        if [ -z "$ex_win" ] && [ -n "$ex_dev" ]; then
+            ex_dlw=$(dl_mark_of "$ex_dev")
+            if [ -n "$ex_dlw" ]; then ex_win=$ex_dlw; echo "   Device line: $ex_dev -> $(dg_target_of_mark "$ex_dlw") (everything of the device that no entry catches)"; fi
+        fi
         ex_dv=$(dg_route_dev "$ex_ip" "$ex_probe" "$ex_win")
         if [ -n "$ex_win" ]; then
             ex_want=$(dg_target_of_mark "$ex_win"); ex_got=$(dg_target_of_dev "$ex_dv")
@@ -2696,7 +2966,9 @@ cli_devices() {
     printf '%-15s %-20s %-7s %-34s %s\n' "IP" "NAME" "WAY" "CONNECTIONS NOW (per line)" "DNS"
     dvs_k=/tmp/asnmanager-dvs.keys; : > "$dvs_k"
     awk '$3 == "0x2" && $6 ~ /^br/ && $1 !~ /^169\.254\./ { print $1 }' /proc/net/arp 2>/dev/null | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | while read -r dvs_ip; do
-        dvs_w=$(dg_target_of_dev "$(dg_route_dev 1.1.1.1 "$dvs_ip")")
+        dvs_m=$(dl_mark_of "$dvs_ip")
+        if [ -n "$dvs_m" ]; then dvs_w="$(dg_target_of_dev "$(dg_route_dev 1.1.1.1 "$dvs_ip" "$dvs_m")")*"
+        else dvs_w=$(dg_target_of_dev "$(dg_route_dev 1.1.1.1 "$dvs_ip")"); fi
         dvs_l=$(awk -v ip="$dvs_ip" -v nf="$dvs_n" 'BEGIN { while ((getline l < nf) > 0) { split(l, a, " "); w[a[1]] = a[2] } }
             { k = 0; s = ""; f = ""; for (i = 1; i <= NF; i++) { if ($i ~ /^src=/ && s == "") s = substr($i, 5); if ($i ~ /^dst=/) { k++; if (k == 1) f = substr($i, 5); if (k == 2) d = substr($i, 5) } }
               # over WAN to a private address: the network in front of the router (e.g. the Fritz!Box), not the internet
@@ -2722,6 +2994,7 @@ cli_devices() {
     echo ""
     echo "WAN1-lan = connections over WAN to the network in front of the router (e.g. the Fritz!Box and its devices), not to the internet."
     echo "WAY = the normal way of the device (VPN Director); CONNECTIONS = lines its open connections use right now (entries of"
+    dl_list | grep -q . && echo "WAY with * = device line of ASN Manager (devline): all of the device that no entry catches goes there."
     echo "ASN Manager send single sites over other lines; a connection keeps the line it was opened on)."
     rm -f "$dvs_c" "$dvs_n"
     return 0
@@ -2764,6 +3037,13 @@ cli_device() {
     else echo "VPN Director rules for this device (or for all): none"; fi
     dv_def=$(dg_route_dev 1.1.1.1 "$dv_ip")
     echo "Normal way without an ASN Manager rule (test 1.1.1.1): ${dv_def:-?} ($(dg_target_of_dev "$dv_def"))"
+    dv_dlm=""; dv_dl=$(dl_of "$dv_ip")
+    if [ -n "$dv_dl" ]; then
+        dv_dlm=$(dl_mark_of "$dv_ip")
+        if [ -n "$dv_dlm" ]; then dv_dld=$(dg_route_dev 1.1.1.1 "$dv_ip" "$dv_dlm")
+            echo "Device line: -> ${dv_dl#* } (all of its traffic that no entry catches) - leaves via ${dv_dld:-?} ($(dg_target_of_dev "$dv_dld"))"
+        else echo "Device line: -> ${dv_dl#* } - not active ($(dl_state "${dv_dl%% *}")): the device takes its normal way"; fi
+    else echo "Device line: none"; fi
     dg_agh_clients > /tmp/asnmanager-dv.agh 2>/dev/null
     echo "DNS of this device: $(dg_dns_label "$dv_ip" /tmp/asnmanager-dv.agh)$(awk -F'\t' -v i="$dv_ip" '$1 == i { print "   (AdGuard Home client: " $2 ")"; exit }' /tmp/asnmanager-dv.agh)"
     echo "   real resolver (what leak tests show): $(dg_dns_real "$(dg_dns_key "$dv_ip" /tmp/asnmanager-dv.agh)")"
@@ -2796,8 +3076,10 @@ cli_device() {
             [ "$r_src" = "-" ] || [ "$r_src" = "$dv_ip" ] || continue
             ipset test "$r_set" "$dc_ip" >/dev/null 2>&1 && { dc_set=$r_set; dc_mk=$r_mk; break; }
         done < /tmp/asnmanager-dv.r
+        dc_dl=""; if [ -z "$dc_mk" ] && [ -n "$dv_dlm" ]; then dc_mk=$dv_dlm; dc_dl=1; fi
         dc_dev=$(dg_route_dev "$dc_ip" "$dv_ip" "$dc_mk")
         dc_rule="normal way"; [ -n "$dc_set" ] && dc_rule="$(dg_desc "$dc_set" "$dc_ip") -> $(dg_target_of_mark "$dc_mk")"
+        [ -n "$dc_dl" ] && dc_rule="device line -> $(dg_target_of_mark "$dc_mk")"
         printf '   %-16s %-28s %5s %9s  %-6s %s\n' "$dc_ip" "$(echo "${dc_nm:--}" | cut -c1-28)" "$dc_n" "$(fmt_bytes "$dc_b")" "$(dg_target_of_dev "$dc_dev")" "$dc_rule"
     done < /tmp/asnmanager-dv.c
     rm -f /tmp/asnmanager-dv.c /tmp/asnmanager-dv.r
@@ -2847,7 +3129,7 @@ cli_dnschain() {
     [ -s "$CUSTOM_FILE" ] && while IFS=: read -r e_id e_d e_s e_k e_v; do
         [ "$e_k" = "dom" ] || continue
         for dc_q in "$e_v" "www.$e_v"; do
-            dc_a=$(nsl "$dc_q" 127.0.0.1 2>/dev/null | awk '/^Name:/ { f = 1; next } f' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 3)
+            dc_a=$(nsl "$dc_q" 127.0.0.1 2>/dev/null | nsl_v4 | head -n 3)
             [ -n "$dc_a" ] || continue
             dc_hit=0; for x in $dc_a; do ipset test "ASNC_$e_id" "$x" >/dev/null 2>&1 && dc_hit=1; done
             if [ $dc_hit -eq 1 ]; then echo "[OK]   learning test: $dc_q -> $(echo $dc_a | tr ' ' ',') is in the set of *.$e_v ($e_id)"
@@ -3207,8 +3489,7 @@ cli_schedule() {
 resolve_ipv4() {
     if is_valid_ip "$1"; then echo "$1"; return 0; fi
     for srv in "" 1.1.1.1 8.8.8.8; do
-        r=$(nsl "$1" $srv 2>/dev/null | awk '/^Name:/ { f = 1; next } f && /Address/' \
-            | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | grep -vE '^(0\.|127\.)' | awk '!s[$0]++' | head -n 4)
+        r=$(nsl "$1" $srv 2>/dev/null | nsl_v4 | grep -vE '^(0\.|127\.)' | awk '!s[$0]++' | head -n 4)
         [ -n "$r" ] && { echo "$r"; return 0; }
     done
     return 1
@@ -3302,6 +3583,7 @@ web_export() {
         printf '"schedule":{"interval":%s,"time":"%s"},' "$INTERVAL" "$(json_esc "$TIME_VAL")"
         printf '"rules":"%s",' "$(rules_mode)"
         printf '"exclude":[%s],' "$(ex_list | awk '{ printf "%s\"%s\"", (NR > 1 ? "," : ""), $1 }')"
+        printf '"devlines":[%s],' "$(dl_json)"
         sm_json
 
         printf '"entries":['
@@ -5191,10 +5473,12 @@ dnsd_api_apply() {
 
 # "target ip" of the VPN Director: active rules for a device (source, no destination)
 dnsd_groups() {
-    [ -r "$VPND_FILE" ] || return 0
     # one address as "a.b.c.d/32" is the same device as "a.b.c.d"; the router itself (its own rule, e.g. for Unbound) is no device
-    tr '<' '\n' < "$VPND_FILE" | awk -F'>' -v rt="$(nvram get lan_ipaddr 2>/dev/null)" '$1 == "1" && $3 != "" && $4 == "" {
-        t = toupper($5); if (t == "WAN") t = "WAN1"; ip = $3; sub(/\/32$/, "", ip); if (ip == rt) next; print t, ip }' | sort -u
+    # v3.10.0: an active device line of ASN Manager wins over the VPN Director rule of the device (DNS takes the way of its traffic)
+    { [ -r "$VPND_FILE" ] && tr '<' '\n' < "$VPND_FILE" | awk -F'>' -v rt="$(nvram get lan_ipaddr 2>/dev/null)" '$1 == "1" && $3 != "" && $4 == "" {
+        t = toupper($5); if (t == "WAN") t = "WAN1"; ip = $3; sub(/\/32$/, "", ip); if (ip == rt) next; print t, ip }'
+      dl_list | while read -r dgr_a dgr_t; do [ "$(dl_state "$dgr_a")" = "active" ] && echo "DL $dgr_t ${dgr_a%/32}"; done
+    } | awk '$1 == "DL" { dl[$3] = $2; next } { vd[$2] = $1 } END { for (i in vd) if (!(i in dl)) print vd[i], i; for (i in dl) print dl[i], i }' | sort -u
 }
 # "ip<TAB>description" of the VPN Director rules for devices
 dnsd_descs() {
@@ -7081,6 +7365,21 @@ rc_print() {
             oknl)      echo "[OK]   ${lbl} -> ${d}: goes via ${got} (no address learned yet - learned when a device looks the name up)" ;;
         esac
     done
+    dl_list | while read -r dlp_a dlp_t; do
+        dlp_s=$(dl_state "$dlp_a"); dlp_ip=${dlp_a%%/*}
+        case "$dlp_s" in
+            active)
+                dlp_m=$(get_target_info "$dlp_t" | cut -d' ' -f2); dlp_d=$(dg_route_dev 1.1.1.1 "$dlp_ip" "$dlp_m"); dlp_g=$(dg_target_of_dev "$dlp_d")
+                dlp_act=$(cat "$FO_RT/active_$dlp_t" 2>/dev/null)
+                if [ "$dlp_g" = "$dlp_t" ]; then echo "[OK]   device $dlp_a -> $dlp_t: goes via $dlp_d"
+                elif [ "$dlp_act" = "BLOCK" ] || { [ -z "$dlp_d" ] && ks_on; }; then echo "[WARN] device $dlp_a -> $dlp_t: $dlp_t is down - traffic blocked (failover / kill switch)"
+                elif [ -n "$dlp_act" ] && [ "$dlp_act" = "$dlp_g" ]; then echo "[WARN] device $dlp_a -> $dlp_t: $dlp_t is down - failover via $dlp_g"
+                else echo "[FAIL] device $dlp_a -> $dlp_t: goes via ${dlp_d:-?} ($dlp_g) instead"; fi ;;
+            down)     echo "[WARN] device $dlp_a -> $dlp_t: $dlp_t is down - the device takes its normal way" ;;
+            excluded) echo "[INFO] device $dlp_a -> $dlp_t: excluded - ASN Manager leaves it alone" ;;
+            off)      echo "[INFO] device $dlp_a -> $dlp_t: safemode - rules are out" ;;
+        esac
+    done
     [ -s "$EP_CACHE" ] && while read -r ep_ip ep_who; do echo "[INFO] VPN server $ep_ip ($ep_who) always goes via WAN"; done < "$EP_CACHE"
     return 0
 }
@@ -7737,7 +8036,7 @@ sm_disable() {
     # DNS per line / per device: rules, stand-in addresses, Unbound, AdGuard Home clients (sm_on: everything out)
     dnsf_sync >/dev/null 2>&1
     # failover, VPN Director copies, tunnel protection, speed test
-    ks_clear; ex_clear
+    ks_clear; ex_clear; dl_clear
     for sd_p in "$FO_SELF_PRIO" "$FO_VPND_PRIO" $((FO_VPND_PRIO - 1)) "$EP_PRIO"; do
         while ip rule del prio "$sd_p" 2>/dev/null; do :; done
     done
@@ -7887,6 +8186,10 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   amtmupdate [check]                 update for amtm (check: exit code 0 = amtm may update)
   mail off|daily|weekly|test|check|status  e-mail on new versions (amtm e-mail settings; a notice only)
   exclude list | set <IP|net>,... | none   devices / networks ASN Manager leaves alone (e.g. the guest network)
+  devline list | set <IP|net> <TARGET> | del <IP|net> | none
+                                     a device via one line (e.g. a PC via WAN2) - its entries still win
+  languard on | off | status         the router always reaches its LAN / guest networks (also with a VPN kill switch)
+  vpnwatch on | off | status         after a WAN event: start WireGuard clients that are switched on but not running
   safemode status | on | off | test  self-test with rollback: show / take all rules out / put them back / test the router now
   devices                            all active devices: normal way, open connections per line, DNS
   agh login <user> [password] | logout | status  login of AdGuard Home: "DNS per device" changes its clients without restarting it
@@ -8037,6 +8340,10 @@ cli_main() {
                       none|clear) ex_set none ;;
                       *)       echo "Usage: exclude list | set <IP|network>[,...] | none"; false ;;
                   esac ;;
+        devline)  cli_devline "$@" ;;
+        languard) cli_languard "$1" ;;
+        vpnwatch) cli_vpnwatch "$1" ;;
+        wanwatch) cli_wanwatch "$1" "$2" ;;
         routes)   case "$1" in heal) sm_on || { nv_refresh; rt_heal; } ;; wait) rt_heal_wait ;; *) echo "Usage: routes heal | wait"; false ;; esac ;;
         help|-h|--help) cli_usage ;;
         *)        cli_usage; false ;;
@@ -8044,7 +8351,7 @@ cli_main() {
     rc=$?
     case "$cmd" in dnstls|dnsdevice|dnsfollow|failover) case "$1" in on|off|set|clear|vpnd|server) sm_watch_start "$cmd" ;; esac ;; esac
     # Keep the WebUI view in sync after CLI changes
-    case "$cmd" in add|preset|remove|del|clear|apply|reload|retry|edit|import|schedule|restore|custom|exclude)
+    case "$cmd" in add|preset|remove|del|clear|apply|reload|retry|edit|import|schedule|restore|custom|exclude|devline)
         [ -f "$ADDON_DIR/webui_page" ] && web_export ;;
     esac
     return $rc
@@ -8157,7 +8464,7 @@ while true; do
             if [ -n "$target" ]; then
                 clean_target=$(echo "$target" | sed -E 's#https?://##' | cut -d'/' -f1)
                 lookup_ip="$clean_target"
-                echo "$clean_target" | grep -q '[^0-9.]' && lookup_ip=$(nsl "$clean_target" 2>/dev/null | grep -A 20 "Name:" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
+                echo "$clean_target" | grep -q '[^0-9.]' && lookup_ip=$(nsl "$clean_target" 2>/dev/null | nsl_v4 | head -n 1)
                 if [ -n "$lookup_ip" ]; then
                     asn_info=$(curl -fsSk --connect-timeout 5 -m 10 "http://ip-api.com/line/$lookup_ip?fields=as")
                     echo -e "Result: ${GREEN}$asn_info${NC}"
