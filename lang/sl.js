@@ -444,6 +444,7 @@ window.ASNM_LANGPACK = {"code": "sl", "locale": "sl-SI", "name": "Slovenščina"
 "dl_need": "Najprej izberi vsaj eno napravo in povezavo.",
 "dnsc_title": "Predpomnilnik odjemalcev naprav",
 "dnsc_desc": "Naprave na povezavi VPN sprašujejo DNS svoje povezave - zanje AdGuard Home ne uporablja običajnega predpomnilnika. S tem vsaka dobi svojega. 1 MB sprejme približno 2.000 do 5.000 odgovorov - povsem dovolj za eno napravo.",
+"dnsc_confirm": "Nastavim predpomnilnik odjemalcev naprav na {v}? AdGuard Home se zato znova zažene - DNS za nekaj sekund izpade.",
 "perf_rules": "Pravila označevanja",
 "perf_rules_desc": "Združena: vsi ASN enega cilja si delijo en nabor in eno pravilo, zato usmerjevalnik vsak paket preveri samo enkrat na cilj (veliko manj procesorja pri mnogih ASN). Eno na ASN: stari način, za primerjavo ali če se kaj obnaša drugače.",
 "perf_rules_comb": "Združena (hitro)",

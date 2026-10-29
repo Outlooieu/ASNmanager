@@ -444,6 +444,7 @@ window.ASNM_LANGPACK = {"code": "hu", "locale": "hu-HU", "name": "Magyar", "t": 
 "dl_need": "Előbb válassz legalább egy eszközt és egy vonalat.",
 "dnsc_title": "Az eszközkliensek gyorsítótára",
 "dnsc_desc": "A VPN-vonalon lévő eszközök a vonaluk DNS-ét kérdezik - náluk az AdGuard Home nem használja a normál gyorsítótárát. Így mindegyik saját gyorsítótárat kap. 1 MB nagyjából 2000-5000 választ tárol - bőven elég egy eszköznek.",
+"dnsc_confirm": "Az eszközkliensek gyorsítótára legyen {v}? Az AdGuard Home ehhez újraindul - a DNS néhány másodpercre kiesik.",
 "perf_rules": "Jelölő szabályok",
 "perf_rules_desc": "Összevont: egy cél összes ASN-je egy halmazon és egy szabályon osztozik, így a router minden csomagot célonként csak egyszer ellenőriz (sok ASN-nél sokkal kevesebb CPU). ASN-enként egy: a régi módszer összehasonlításhoz, vagy ha valami másképp viselkedik.",
 "perf_rules_comb": "Összevont (gyors)",
