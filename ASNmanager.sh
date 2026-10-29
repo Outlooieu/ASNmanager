@@ -867,11 +867,13 @@ LG_PRIO=89
 LG_OFF="/jffs/addons/asnmanager/languard_off"
 lg_on() { [ ! -f "$LG_OFF" ]; }
 lg_nets() {
-    ip -4 route show table main 2>/dev/null | awk '$1 ~ /^[0-9.]+\/[0-9]+$/ && $2 == "dev" && $3 ~ /^(br[0-9]+|wl[0-9]+\.[0-9]+|wgs[0-9]+|tun2[0-9])$/ && / scope link/ { print $1 }' | sort -u
+    ip -4 route show table main 2>/dev/null | awk '$1 ~ /^[0-9.]+\/[0-9]+$/ && $2 == "dev" && $3 ~ /^(br[0-9]+|wl[0-9]+\.[0-9]+|wgs[0-9]+|tun2[0-9])$/ && / scope link/ && $1 !~ /^(22[4-9]|23[0-9]|169\.254)\./ { print $1 }' | sort -u      # (no multicast / link-local route)
 }
 lg_sync() {
     lg_on || return 0
     lg_have=$(ip rule show 2>/dev/null | awk -v p="${LG_PRIO}:" '$1 == p')
+    # 3.10.0 test 2 also took the multicast route of the LAN (239.0.0.0/8) - that rule of ASN Manager goes again
+    for lg_m in $(echo "$lg_have" | sed -n 's/.* to \(2[23][0-9]\.[0-9.]*\/[0-9]*\) lookup main.*/\1/p'); do ip rule del to "$lg_m" lookup main prio "$LG_PRIO" 2>/dev/null; done
     for lg_n in $(lg_nets); do
         echo "$lg_have" | grep -q "to $lg_n lookup main" || ip rule add to "$lg_n" lookup main prio "$LG_PRIO" 2>/dev/null
     done
