@@ -1,6 +1,7 @@
 ## v3.10.0 (test version 2)
 
 - **New: device lines** - a whole device over one line, e.g. a PC over WAN2 or the TV over a VPN (asked for by [KingGLEB](https://github.com/KingGLEB), [#6](https://github.com/Outlooieu/ASNmanager/issues/6)). Its entries still win: an entry "bank -> WAN1" keeps applying to the device, everything else goes over the chosen line. Failover chain and kill switch of the line apply like to an entry. A device line wins over the VPN Director rule of the device; is the line down without a failover, the device takes its normal way.
+- Device lines, excluded devices and the kill switch are set at boot as the first step (before the WAN is up): a device on a VPN line no longer reaches the internet over WAN for a few seconds until the rules are built
   - WebUI: Settings > Routing > "Device lines" - choose a device and a line, remove with one click. Command line: `devline list | set <IP|network> <line> | del <IP|network> | none`
   - One rule per device at the end of the marking rules (after the entries), the most exact address first (a single device before a network that holds it). Kept in place by the routing check like the excluded devices; out in safe mode, part of the backup (`DEVLINES=`)
   - DNS per device follows an active device line (the AdGuard Home client of the device moves to the line); is the line down, the VPN Director rule counts again

@@ -1998,7 +1998,7 @@ uninstall_menu() {
             # safemode: self-test, flags, boot hook
             sm_p=$(cat "$SM_PID" 2>/dev/null); [ -n "$sm_p" ] && kill "$sm_p" 2>/dev/null
             rm -f "$SM_RT" "$SM_FLAG" "$SM_PID" "$SM_ROLLED" "$SM_NOTUS" "$SM_LAST"
-            [ -f "$SERVICES_START" ] && sed -i "/# ${SM_HOOK}\$/d" "$SERVICES_START"
+            [ -f "$SERVICES_START" ] && sed -i "/# ${SM_HOOK}\$/d; /# ${EB_HOOK}\$/d" "$SERVICES_START"
 
             # Clean up kernel iptables rules, ipsets, and ip rules completely
             cleanup_rules
@@ -7866,8 +7866,33 @@ sm_on() { [ -f "$SM_RT" ]; }
 sm_log() { logger -t ASNmanager "Safemode: $1"; }
 
 # services-start: the self-test after every boot
+# Early step at boot (first line of services-start, before the WAN is up and long before the worker has built the
+# rules): excluded devices, device lines and the kill switch are in place at once - a device on a VPN line must not
+# reach the internet over WAN while the tunnel is not up yet (measured: 8 s over WAN without it). The routes of the
+# VPN tables follow as soon as each tunnel is up (routes wait, in the background).
+EB_HOOK="ASNmanager-Early"
+eb_hook_sync() {
+    [ -f "$SCRIPT_PATH" ] || return 0
+    ensure_script "$SERVICES_START"
+    # it has to be the first command (line 2, after #!/bin/sh)
+    [ "$(sed -n 2p "$SERVICES_START")" = "$SCRIPT_PATH early >/dev/null 2>&1 # ${EB_HOOK}" ] && return 0
+    sed -i "/# ${EB_HOOK}\$/d" "$SERVICES_START"
+    sed -i "1a $SCRIPT_PATH early >/dev/null 2>&1 # ${EB_HOOK}" "$SERVICES_START"
+}
+cli_early() {
+    nv_refresh
+    ex_sync
+    DL_NODNS=1; dl_sync; DL_NODNS=""
+    ks_sync
+    lg_sync
+    ( "$SCRIPT_PATH" routes wait ) </dev/null >/dev/null 2>&1 &
+    eb_n=$(dl_rules_now | grep -c .)
+    logger -t ASNmanager "Boot: early step - $eb_n device line rule(s), kill switch $(ks_on && echo on || echo off), excluded $(ex_list | grep -c .)"
+    return 0
+}
 sm_hook_sync() {
     [ -f "$SCRIPT_PATH" ] || return 0
+    eb_hook_sync
     # a worker of an older version knows nothing of safemode (its scheduled run would build the rules again)
     if [ -f "$WORKER_SCRIPT" ] && [ -s "$ASN_FILE" ] && ! grep -q 'asnmanager-safemode' "$WORKER_SCRIPT"; then rebuild_worker >/dev/null 2>&1; fi
     grep -q "# ${SM_HOOK}\$" "$SERVICES_START" 2>/dev/null && return 0
@@ -8336,6 +8361,7 @@ cli_main() {
         service_event) service_event "$1" "$2"; return 0 ;;
         devices)  cli_devices ;;
         safemode) cli_safemode "$@" ;;
+        early)    cli_early ;;
         exclude)  case "$1" in
                       ""|list) if ex_list | grep -q .; then ex_list | while read -r el_a; do echo "$el_a  $(dg_devname "${el_a%%/*}")"; done; else echo "No excluded devices."; fi ;;
                       set)     shift; ex_set "$(echo "$*" | tr ' ' ',')" ;;
