@@ -1,4 +1,4 @@
-## v3.10.1 (test version)
+## v3.10.1
 
 - Fixed: "DNS follows the route" - dnsmasq reads only one `servers-file`, the last one. unbound_manager deletes every `servers-file` line, so with Unbound the one of ASN Manager was gone and the domain entries of VPN lines were looked up through the normal DNS (the entries on WAN went to Unbound and worked). Without Unbound the line of ASN Manager came after the one of the firmware (`/tmp/resolv.dnsmasq`) and dnsmasq lost the normal DNS servers. Now the last line of `/jffs/scripts/dnsmasq.postconf` takes all `servers-file` lines out and adds the one of ASN Manager at the end; it carries the lines of the file it replaces. The routing check keeps the line at the end and restarts dnsmasq once when it did not read the file
 - `dnsfollow status` shows whether dnsmasq really reads the servers file (before: only whether ASN Manager wrote it)
