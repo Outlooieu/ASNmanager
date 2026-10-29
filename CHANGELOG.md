@@ -1,3 +1,9 @@
+## v3.10.1 (test version)
+
+- Fixed: "DNS follows the route" - dnsmasq reads only one `servers-file`, the last one. unbound_manager deletes every `servers-file` line, so with Unbound the one of ASN Manager was gone and the domain entries of VPN lines were looked up through the normal DNS (the entries on WAN went to Unbound and worked). Without Unbound the line of ASN Manager came after the one of the firmware (`/tmp/resolv.dnsmasq`) and dnsmasq lost the normal DNS servers. Now the last line of `/jffs/scripts/dnsmasq.postconf` takes all `servers-file` lines out and adds the one of ASN Manager at the end; it carries the lines of the file it replaces. The routing check keeps the line at the end and restarts dnsmasq once when it did not read the file
+- `dnsfollow status` shows whether dnsmasq really reads the servers file (before: only whether ASN Manager wrote it)
+- dnscrypt-proxy as the normal DNS (server=127.0.0.1#port) works with all DNS features: the normal DNS goes over WAN, devices on a VPN line ask the DNS of their line through the tunnel
+
 ## v3.10.0
 
 - **New: device lines** - a whole device over one line, e.g. a PC over WAN2 or the TV over a VPN (asked for by [KingGLEB](https://github.com/KingGLEB), [#6](https://github.com/Outlooieu/ASNmanager/issues/6)). Your entries still come first: with an entry "google.de -> WAN1" the device reaches google.de over WAN1 and everything else over its device line. The device line takes precedence over the VPN Director rule of the device, and with DNS per device its lookups follow it. If the line fails, its failover chain or kill switch applies; without either, the device takes its normal way.

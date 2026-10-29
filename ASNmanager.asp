@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.10.0 -->
+<!-- ASNmanager-WebUI v3.10.1 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -525,7 +525,7 @@ var ASNM_NS = 'asnmanager';
 // the settings of ALL add-ons: the firmware writes custom_settings.txt anew from what a page sends - so every command
 // sends them back along with its own (taken when the page loads, refreshed from the router after each job)
 var ASNM_CS = <% get_custom_settings(); %>;
-var ASNM_PAGE_VER = '3.10.0';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.10.1';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */

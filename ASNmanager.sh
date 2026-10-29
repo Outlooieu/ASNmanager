@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.10.0
+version=3.10.1
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -12,7 +12,7 @@ case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
 export PATH
 
-SCRIPT_VERSION="3.10.0"
+SCRIPT_VERSION="3.10.1"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -1999,6 +1999,7 @@ uninstall_menu() {
             sm_p=$(cat "$SM_PID" 2>/dev/null); [ -n "$sm_p" ] && kill "$sm_p" 2>/dev/null
             rm -f "$SM_RT" "$SM_FLAG" "$SM_PID" "$SM_ROLLED" "$SM_NOTUS" "$SM_LAST"
             [ -f "$SERVICES_START" ] && sed -i "/# ${SM_HOOK}\$/d; /# ${EB_HOOK}\$/d" "$SERVICES_START"
+            [ -f "$DNSMASQ_POSTCONF" ] && sed -i "/# ${DP_HOOK}\$/d" "$DNSMASQ_POSTCONF"
 
             # Clean up kernel iptables rules, ipsets, and ip rules completely
             cleanup_rules
@@ -4673,7 +4674,11 @@ sgd_collect() {
 # Names: domain entries (for all devices) + names learned for ASN entries (lookup log, no name in two targets).
 DNSF_FLAG="$ADDON_DIR/dns_follow"
 DNSF_CONF="$ADDON_DIR/dns_follow.conf"           # optional: TARGET=ip [ip] (own DNS servers per target)
-DNSF_SERVERS="$ADDON_DIR/dnsf_servers.conf"      # read by dnsmasq (servers-file)
+DNSF_SERVERS="$ADDON_DIR/dnsf_servers.conf"      # read by dnsmasq (servers-file): the lines of ASN Manager + the replaced file
+DNSF_OWN="$ADDON_DIR/dnsf_servers.own"           # the lines of ASN Manager
+DNSF_BASEF=/tmp/asnmanager-dnsf.basefile         # the servers file dnsmasq had before ours (firmware: /tmp/resolv.dnsmasq)
+DNSMASQ_POSTCONF=/jffs/scripts/dnsmasq.postconf
+DP_HOOK="ASNmanager-Dnsmasq"
 DNSF_STATE=/tmp/asnmanager-dnsf.state            # last result, for the WebUI / status
 DNSF_RULES=/tmp/asnmanager-dnsf.rules            # the rules set last time
 DNSF_PRIO=10500                                  # before the VPN Director (11xxx), after the ASN marks (99xx)
@@ -4890,7 +4895,45 @@ dnsf_clear() {
     done
     rm -f "$DNSF_RULES" "$DNSF_STATE"
     [ -s "$DNSF_UBSTATE" ] && { : > /tmp/asnmanager-ub.none; dnsf_ub_sync /tmp/asnmanager-ub.none; rm -f /tmp/asnmanager-ub.none "$DNSF_UBSTATE"; }
-    [ -f "$DNSF_SERVERS" ] && { rm -f "$DNSF_SERVERS"; dnsf_conf_write; }
+    [ -f "$DNSF_SERVERS" ] && { rm -f "$DNSF_SERVERS" "$DNSF_OWN"; dnsf_conf_write; }
+}
+
+# dnsmasq reads only ONE servers-file - the last one. The firmware has its own (/tmp/resolv.dnsmasq, the normal DNS
+# servers) and unbound_manager deletes every servers-file line. So the last line of dnsmasq.postconf (dp_hook_sync)
+# notes the other file, takes all servers-file lines out and adds ours at the end; ours carries the lines of the other.
+# Written (flash) only when it changed; 0 = changed
+dnsf_servers_write() {
+    [ -f "$DNSF_OWN" ] || { [ -f "$DNSF_SERVERS" ] || return 1; cp "$DNSF_SERVERS" "$DNSF_OWN"; }   # file of an older version
+    dsw_b=$(cat "$DNSF_BASEF" 2>/dev/null)
+    { [ -n "$dsw_b" ] && grep -E '^(server|rev-server)=' "$dsw_b" 2>/dev/null; cat "$DNSF_OWN"; } > /tmp/asnmanager-dnsf.srv
+    if cmp -s /tmp/asnmanager-dnsf.srv "$DNSF_SERVERS"; then rm -f /tmp/asnmanager-dnsf.srv; return 1; fi
+    cp /tmp/asnmanager-dnsf.srv "$DNSF_SERVERS"; rm -f /tmp/asnmanager-dnsf.srv
+    return 0
+}
+# called by dnsmasq.postconf with the dnsmasq configuration (dnsmasqconf <file>)
+cli_dnsmasq_conf() {
+    dc_c=$1; [ -f "$dc_c" ] || return 0
+    sed -n 's/^servers-file=//p' "$dc_c" | grep -vxF "$DNSF_SERVERS" | tail -n 1 > "$DNSF_BASEF"
+    sm_on && return 0
+    { dnsf_on && [ -f "$DNSF_SERVERS" ]; } || return 0
+    sed -i '/^servers-file=/d' "$dc_c"
+    echo "servers-file=$DNSF_SERVERS" >> "$dc_c"
+    dnsf_servers_write
+    return 0
+}
+# our line has to be the last one of dnsmasq.postconf (after unbound_manager, AdGuard Home, ...)
+dp_hook_sync() {
+    [ -f "$SCRIPT_PATH" ] || return 0
+    dp_l="$SCRIPT_PATH dnsmasqconf \"\$1\" # ${DP_HOOK}"
+    [ "$(tail -n 1 "$DNSMASQ_POSTCONF" 2>/dev/null)" = "$dp_l" ] && return 0
+    ensure_script "$DNSMASQ_POSTCONF"
+    sed -i "/# ${DP_HOOK}\$/d" "$DNSMASQ_POSTCONF"
+    echo "$dp_l" >> "$DNSMASQ_POSTCONF"
+    # dnsmasq runs with the old configuration until it starts again
+    if dnsf_on && ! sm_on && ! grep -qxF "servers-file=$DNSF_SERVERS" /etc/dnsmasq.conf 2>/dev/null; then
+        logger -t ASNmanager "DNS follows the route: dnsmasq did not read the servers file of ASN Manager - dnsmasq restarted"
+        dnsmasq_restart
+    fi
 }
 
 # our block in dnsmasq.conf.add: "servers-file=..." while on; dnsmasq restarts only when the block changed
@@ -5121,7 +5164,8 @@ dnsf_sync_run() {
     # 8) servers file: written (flash) only when it changed; dnsmasq reads it again on SIGHUP
     dnsf_on || : > "$ds_tmp/servers"
     ds_changed=0
-    if ! cmp -s "$ds_tmp/servers" "$DNSF_SERVERS"; then cp "$ds_tmp/servers" "$DNSF_SERVERS"; ds_changed=1; fi
+    cmp -s "$ds_tmp/servers" "$DNSF_OWN" || cp "$ds_tmp/servers" "$DNSF_OWN"
+    dnsf_servers_write && ds_changed=1
     if ! dnsf_conf_write && [ $ds_changed -eq 1 ]; then killall -HUP dnsmasq 2>/dev/null; fi
     if [ -s "$ds_tmp/ubf" ] || [ -s "$DNSF_UBSTATE" ]; then dnsf_ub_sync "$ds_tmp/ubf"; fi
     # 10) last: AdGuard Home clients per device (or their removal) - its restart also restarts dnsmasq, nothing else may run then
@@ -5160,7 +5204,15 @@ dnsf_status() {
         if [ "$st_a" = "BLOCK" ]; then echo "  FAILOVER: $st_t is down and blocked - its lookups stay blocked"
         else echo "  FAILOVER: $st_t is down - its names and devices are looked up through the DNS of $st_a"; fi
     done
-    echo "  rules: $(ip rule show 2>/dev/null | grep -c "^${DNSF_PRIO}:\|^$((DNSF_PRIO + 1)):\|^${DNSF_VPRIO}:\|^$((DNSF_VPRIO + 1)):") (prio $DNSF_PRIO/$((DNSF_PRIO + 1))$([ -s "$DNSF_VMAP" ] && echo ", stand-ins $DNSF_VPRIO/$((DNSF_VPRIO + 1))")), servers file: $(grep -c . "$DNSF_SERVERS" 2>/dev/null || echo 0) lines"
+    echo "  rules: $(ip rule show 2>/dev/null | grep -c "^${DNSF_PRIO}:\|^$((DNSF_PRIO + 1)):\|^${DNSF_VPRIO}:\|^$((DNSF_VPRIO + 1)):") (prio $DNSF_PRIO/$((DNSF_PRIO + 1))$([ -s "$DNSF_VMAP" ] && echo ", stand-ins $DNSF_VPRIO/$((DNSF_VPRIO + 1))")), servers file: $(grep -c . "$DNSF_OWN" 2>/dev/null || echo 0) lines"
+    if dnsf_on && ! sm_on; then
+        if grep -qxF "servers-file=$DNSF_SERVERS" /etc/dnsmasq.conf 2>/dev/null; then
+            st_bf=$(cat "$DNSF_BASEF" 2>/dev/null)
+            echo "  dnsmasq reads the servers file: yes$([ -n "$st_bf" ] && echo " (with the servers of $st_bf)")"
+        else
+            echo "  dnsmasq reads the servers file: NO - another script took the line out; the routing check puts it back (or: service restart_dnsmasq)"
+        fi
+    fi
     if dnsd_on; then
         sed -n 's/^dev //p' "$DNSF_STATE" | while read -r st_t st_n; do echo "  devices on $st_t (VPN Director): $st_n"; done
         echo "  other devices ($(sed -n 's/^lan //p' "$DNSF_STATE")): WAN1"
@@ -7893,6 +7945,7 @@ cli_early() {
 sm_hook_sync() {
     [ -f "$SCRIPT_PATH" ] || return 0
     eb_hook_sync
+    dp_hook_sync
     # a worker of an older version knows nothing of safemode (its scheduled run would build the rules again)
     if [ -f "$WORKER_SCRIPT" ] && [ -s "$ASN_FILE" ] && ! grep -q 'asnmanager-safemode' "$WORKER_SCRIPT"; then rebuild_worker >/dev/null 2>&1; fi
     grep -q "# ${SM_HOOK}\$" "$SERVICES_START" 2>/dev/null && return 0
@@ -8362,6 +8415,7 @@ cli_main() {
         devices)  cli_devices ;;
         safemode) cli_safemode "$@" ;;
         early)    cli_early ;;
+        dnsmasqconf) cli_dnsmasq_conf "$1" ;;
         exclude)  case "$1" in
                       ""|list) if ex_list | grep -q .; then ex_list | while read -r el_a; do echo "$el_a  $(dg_devname "${el_a%%/*}")"; done; else echo "No excluded devices."; fi ;;
                       set)     shift; ex_set "$(echo "$*" | tr ' ' ',')" ;;
