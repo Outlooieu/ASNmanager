@@ -1,3 +1,7 @@
+## v3.10.2 (test version)
+
+- **New: cache for the device clients** (DNS per device): a client of AdGuard Home with its own upstreams - every device on a VPN line - does not use the global cache of AdGuard Home, so these devices had no cache there at all. Each of them can now get its own cache: WebUI: Settings > DNS > "Cache of the device clients" (off, 1, 2, 4, 8 MB), command line: `dnsdevice cache off | <MB>`. 1 MB holds roughly 2,000 to 5,000 answers. Off by default; `dnsfollow status` shows the setting
+
 ## v3.10.1
 
 - Fixed: "DNS follows the route" - dnsmasq reads only one `servers-file`, the last one. unbound_manager deletes every `servers-file` line, so with Unbound the one of ASN Manager was gone and the domain entries of VPN lines were looked up through the normal DNS (the entries on WAN went to Unbound and worked). Without Unbound the line of ASN Manager came after the one of the firmware (`/tmp/resolv.dnsmasq`) and dnsmasq lost the normal DNS servers. Now the last line of `/jffs/scripts/dnsmasq.postconf` takes all `servers-file` lines out and adds the one of ASN Manager at the end; it carries the lines of the file it replaces. The routing check keeps the line at the end and restarts dnsmasq once when it did not read the file

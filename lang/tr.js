@@ -442,6 +442,8 @@ window.ASNM_LANGPACK = {"code": "tr", "locale": "tr-TR", "name": "Türkçe", "t"
 "dl_st_off": "güvenli mod",
 "dl_confirm": "{d} cihaz hattı kaldırılsın mı?",
 "dl_need": "Önce en az bir cihaz ve bir hat seçin.",
+"dnsc_title": "Cihaz istemcilerinin önbelleği",
+"dnsc_desc": "Bir VPN hattındaki cihazlar kendi hatlarının DNS'ine sorar - onlar için AdGuard Home normal önbelleğini kullanmaz. Bununla her biri kendi önbelleğini alır. 1 MB kabaca 2.000 ila 5.000 yanıt tutar - tek bir cihaz için fazlasıyla yeterli.",
 "perf_rules": "İşaretleme kuralları",
 "perf_rules_desc": "Birleşik: bir hedefin tüm ASN'leri tek bir küme ve tek bir kuralı paylaşır, böylece yönlendirici her paketi hedef başına yalnızca bir kez denetler (çok ASN'de çok daha az CPU). ASN başına bir: eski yöntem, karşılaştırma için veya bir şey farklı davranırsa.",
 "perf_rules_comb": "Birleşik (hızlı)",

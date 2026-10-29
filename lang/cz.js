@@ -442,6 +442,8 @@ window.ASNM_LANGPACK = {"code": "cz", "locale": "cs-CZ", "name": "Čeština", "t
 "dl_st_off": "nouzový režim",
 "dl_confirm": "Odebrat linku zařízení {d}?",
 "dl_need": "Nejprve vyberte aspoň jedno zařízení a linku.",
+"dnsc_title": "Mezipaměť klientů zařízení",
+"dnsc_desc": "Zařízení na VPN lince se ptají DNS své linky - pro ně AdGuard Home nepoužívá svou běžnou mezipaměť. Takto dostane každé vlastní mezipaměť. 1 MB pojme zhruba 2 000 až 5 000 odpovědí - pro jedno zařízení víc než dost.",
 "perf_rules": "Pravidla značkování",
 "perf_rules_desc": "Sloučená: všechna ASN cíle sdílejí jednu sadu a jedno pravidlo, takže router kontroluje každý paket jen jednou na cíl (mnohem méně CPU při mnoha ASN). Jedno na ASN: starý způsob, pro srovnání nebo když se něco chová jinak.",
 "perf_rules_comb": "Sloučená (rychlé)",

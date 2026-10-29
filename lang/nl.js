@@ -442,6 +442,8 @@ window.ASNM_LANGPACK = {"code": "nl", "locale": "nl-NL", "name": "Nederlands", "
 "dl_st_off": "veilige modus",
 "dl_confirm": "De apparaatlijn van {d} verwijderen?",
 "dl_need": "Kies eerst minstens één apparaat en een lijn.",
+"dnsc_title": "Cache van de apparaatclients",
+"dnsc_desc": "Apparaten op een VPN-lijn vragen de DNS van hun lijn - voor hen gebruikt AdGuard Home zijn normale cache niet. Hiermee krijgt elk ervan een eigen cache. 1 MB bevat grofweg 2.000 tot 5.000 antwoorden - ruim voldoende voor één apparaat.",
 "perf_rules": "Markeringsregels",
 "perf_rules_desc": "Gecombineerd: alle ASN's van een doel delen één set en één regel, zodat de router elk pakket maar één keer per doel controleert (veel minder CPU bij veel ASN's). Eén per ASN: de oude manier, om te vergelijken of als iets zich anders gedraagt.",
 "perf_rules_comb": "Gecombineerd (snel)",

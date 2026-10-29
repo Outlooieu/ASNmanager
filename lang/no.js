@@ -442,6 +442,8 @@ window.ASNM_LANGPACK = {"code": "no", "locale": "nb-NO", "name": "Norsk", "t": {
 "dl_st_off": "sikker modus",
 "dl_confirm": "Fjerne enhetslinjen for {d}?",
 "dl_need": "Velg først minst én enhet og en linje.",
+"dnsc_title": "Hurtigbuffer for enhetsklientene",
+"dnsc_desc": "Enheter på en VPN-linje spør DNS-en til linjen sin - for dem bruker AdGuard Home ikke den vanlige hurtigbufferen. Med dette får hver av dem sin egen. 1 MB rommer omtrent 2 000 til 5 000 svar - rikelig for én enhet.",
 "perf_rules": "Merkeregler",
 "perf_rules_desc": "Samlet: alle ASN-er for et mål deler ett sett og én regel, så ruteren sjekker hver pakke bare én gang per mål (mye mindre CPU med mange ASN-er). Én per ASN: den gamle måten, for sammenligning eller hvis noe oppfører seg annerledes.",
 "perf_rules_comb": "Samlet (rask)",

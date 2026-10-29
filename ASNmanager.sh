@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.10.1
+version=3.10.2
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -12,7 +12,7 @@ case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
 export PATH
 
-SCRIPT_VERSION="3.10.1"
+SCRIPT_VERSION="3.10.2"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -1776,6 +1776,7 @@ rs_setting() {
         SG_DOMAINS:on|SG_DOMAINS:off)  sgd_set "$2" ;;
         DNS_FOLLOW:on|DNS_FOLLOW:off)  dnsf_set "$2" ;;
         DNS_DEVICE:on|DNS_DEVICE:off)  dnsd_set "$2" ;;
+        DNS_CACHE:*)                   dnsd_cache_set "$2" ;;
         DNS_TLS:on|DNS_TLS:off)        dnsf_tls_set "$2" ;;
         MAIL_NOTIFY:off|MAIL_NOTIFY:daily|MAIL_NOTIFY:weekly)  mail_set "$2" ;;
         FO_VPND:on|FO_VPND:off)        fo_vpnd_set "$2" ;;
@@ -5216,13 +5217,14 @@ dnsf_status() {
     if dnsd_on; then
         sed -n 's/^dev //p' "$DNSF_STATE" | while read -r st_t st_n; do echo "  devices on $st_t (VPN Director): $st_n"; done
         echo "  other devices ($(sed -n 's/^lan //p' "$DNSF_STATE")): WAN1"
-        echo "  AdGuard Home clients: $(grep -cE "^ +(- )?$DNSD_OURS" "$(agh_yaml)" 2>/dev/null)"
+        echo "  AdGuard Home clients: $(grep -cE "^ +(- )?$DNSD_OURS" "$(agh_yaml)" 2>/dev/null), cache of the clients with their own DNS: $(dnsd_cache_mb | sed 's/^0$/off (dnsdevice cache <MB>)/;s/^[1-9][0-9]*$/& MB each/')"
     fi
     sed -n 's/^derr /  ERROR: /p' "$DNSF_STATE"
 }
 # for data.js: ,"dnsf":{...}
 dnsf_json() {
     printf ',"dnsf":{"on":%d,"dev":%d,"agh":%d,"tls":%d,"tlsst":"%s"' "$(dnsf_on && echo 1 || echo 0)" "$(dnsd_on && echo 1 || echo 0)" "$(agh_present && echo 1 || echo 0)" "$(dnsf_tls_on && echo 1 || echo 0)" "$(sed -n 's/^tls=//p' "$DNSF_STATE" 2>/dev/null) base:$(sed -n 's/^btls=//p' "$DNSF_STATE" 2>/dev/null)"
+    printf ',"dcache":%d' "$(dnsd_cache_mb)"
     printf ',"aghlogin":%d,"aghrefused":%d,"aghapi":"%s"' "$([ -s "$AGH_AUTH" ] && echo 1 || echo 0)" "$([ -s "$AGH_AUTH.refused" ] && echo 1 || echo 0)" "$(head -n 1 "$AGH_API_ST" 2>/dev/null | tr -d '"\\' | cut -c1-200)"
     if [ -f "$DNSF_STATE" ]; then
         printf ',"lan":"%s","derr":"%s","devs":{' "$(sed -n 's/^lan //p' "$DNSF_STATE")" "$(sed -n 's/^derr //p' "$DNSF_STATE" | tr -d '"\\')"
@@ -5255,10 +5257,23 @@ DNSD_ERR=/tmp/asnmanager-dnsd.err
 AGH_INIT=/opt/etc/init.d/S99AdGuardHome
 VPND_FILE=/jffs/openvpn/vpndirector_rulelist
 DNSD_NAMES="$ADDON_DIR/dns_device.names"
+DNSD_CACHE="$ADDON_DIR/dns_device.cache"         # MB of AdGuard Home cache per client with own upstreams (none = off)
 # our clients in AdGuardHome.yaml: "<name> (ASNM <target>)" (before 3.9.20 test 2: "ASNM <target>")
 DNSD_OURS='name: .?(ASNM |.*[(]ASNM [A-Za-z0-9]+[)].?[[:space:]]*$)'
 
 dnsd_on() { [ -f "$DNSD_FLAG" ]; }
+# clients with their own upstreams do not use the global cache of AdGuard Home; each can get its own (MB, 0 = off)
+dnsd_cache_mb() { dcm_v=$(cat "$DNSD_CACHE" 2>/dev/null); case "$dcm_v" in [1-9]|[1-5][0-9]|6[0-4]) echo "$dcm_v" ;; *) echo 0 ;; esac; }
+dnsd_cache_set() {
+    case "$1" in
+        off|0)                 rm -f "$DNSD_CACHE" ;;
+        [1-9]|[1-5][0-9]|6[0-4]) mkdir -p "$ADDON_DIR"; echo "$1" > "$DNSD_CACHE" ;;
+        *) echo "Usage: dnsdevice cache off | <MB 1-64>   (now: $(dnsd_cache_mb | sed 's/^0$/off/;s/^[1-9][0-9]*$/& MB/'))"; return 1 ;;
+    esac
+    { dnsf_on || dnsd_on; } && dnsf_sync >/dev/null 2>&1
+    if [ "$(dnsd_cache_mb)" = "0" ]; then echo "Cache of the device clients: off."; else echo "Cache of the device clients: $(dnsd_cache_mb) MB each."; fi
+    return 0
+}
 agh_yaml() { for ay in $DNS_AGH_YAML; do [ -r "$ay" ] && { echo "$ay"; return 0; }; done; return 1; }
 agh_present() { agh_yaml >/dev/null && [ -x "$AGH_INIT" ]; }
 agh_up() { pidof AdGuardHome >/dev/null 2>&1 && netstat -lnu 2>/dev/null | grep -qE '[:.]53[[:space:]]'; }
@@ -5454,11 +5469,11 @@ agh_login_status() {
 }
 # our client items (yaml lines as dnsd_apply builds them) as "name<TAB>json" lines for the API
 dnsd_items_json() {
-    awk '
+    awk -v csz="${DNSD_CSZ:-0}" '
         function q(s) { gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); return "\"" s "\"" }
         function out() {
             if (name == "") return
-            printf "%s\t{\"name\":%s,\"ids\":[%s],\"tags\":[],\"upstreams\":[%s],\"use_global_settings\":true,\"filtering_enabled\":true,\"parental_enabled\":false,\"safebrowsing_enabled\":false,\"use_global_blocked_services\":true,\"ignore_querylog\":false,\"ignore_statistics\":false,\"upstreams_cache_enabled\":false,\"upstreams_cache_size\":0}\n", name, q(name), ids, ups
+            printf "%s\t{\"name\":%s,\"ids\":[%s],\"tags\":[],\"upstreams\":[%s],\"use_global_settings\":true,\"filtering_enabled\":true,\"parental_enabled\":false,\"safebrowsing_enabled\":false,\"use_global_blocked_services\":true,\"ignore_querylog\":false,\"ignore_statistics\":false,\"upstreams_cache_enabled\":%s,\"upstreams_cache_size\":%d}\n", name, q(name), ids, ups, (ups != "" && csz > 0) ? "true" : "false", (ups != "" && csz > 0) ? csz : 0
             name = ""; ids = ""; ups = ""
         }
         /^    - name: / { out(); name = $0; sub(/^    - name: /, "", name); sec = ""; next }
@@ -5480,7 +5495,7 @@ dnsd_api_apply() {
     # AdGuard Home may be restarting right now (its start script does that after a dnsmasq restart): wait for it
     if ! agh_up || agh_busy; then agh_settle && ! agh_busy || return 1; fi
     dp_t=$(dirname "$1")
-    dnsd_items_json "$1" > "$dp_t/json"
+    DNSD_CSZ=$(( $(dnsd_cache_mb) * 1048576 )) dnsd_items_json "$1" > "$dp_t/json"
     cut -f1 "$dp_t/json" > "$dp_t/newn"
     dnsd_have "$2" > "$dp_t/have"
     dp_n=0
@@ -5658,6 +5673,7 @@ dnsd_apply() {
     da_y=$(agh_yaml) || { echo "AdGuard Home not found." > "$DNSD_ERR"; return 1; }
     da_tmp=/tmp/asnmanager-dnsd.$$; mkdir -p "$da_tmp"
     : > "$da_tmp/items"
+    da_cmb=$(dnsd_cache_mb)
     if dnsd_on; then
         # the global upstreams: local zones ("[/lan/]...") as they are, the general one = dnsmasq
         awk '/^  upstream_dns:/ { f = 1; next } f && /^  [a-z_]+:/ { f = 0 } f && /^ *- / { v = $0; sub(/^ *- */, "", v); print v }' "$da_y" > "$da_tmp/up"
@@ -5710,7 +5726,8 @@ dnsd_apply() {
                     echo "      ids:"
                     echo "        - $da_i"
                     echo "      tags: []"
-                    if [ -n "$(echo $da_srv)" ] || [ -s "$da_tmp/spec" ]; then
+                    da_up=0; { [ -n "$(echo $da_srv)" ] || [ -s "$da_tmp/spec" ]; } && da_up=1
+                    if [ $da_up -eq 1 ]; then
                         echo "      upstreams:"
                         sed 's/^/        - /' "$da_tmp/local"
                         [ -n "$da_ddoms" ] && echo "        - '[/${da_ddoms}]${da_dm}'"
@@ -5721,8 +5738,13 @@ dnsd_apply() {
                         echo "      upstreams: []"
                     fi
                     echo "      uid: @UID@"
-                    echo "      upstreams_cache_size: 0"
-                    echo "      upstreams_cache_enabled: false"
+                    if [ $da_up -eq 1 ] && [ "$da_cmb" -gt 0 ]; then
+                        echo "      upstreams_cache_size: $((da_cmb * 1048576))"
+                        echo "      upstreams_cache_enabled: true"
+                    else
+                        echo "      upstreams_cache_size: 0"
+                        echo "      upstreams_cache_enabled: false"
+                    fi
                     echo "      use_global_settings: true"
                     echo "      filtering_enabled: true"
                     echo "      parental_enabled: false"
@@ -8337,6 +8359,7 @@ cli_main() {
                    [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1 ;;
         dnsdevice) case "$1" in
                        on|off) dnsd_set "$1" ;;
+                       cache)  dnsd_cache_set "$2" ;;
                        *)      dnsf_status ;;
                    esac
                    [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1 ;;

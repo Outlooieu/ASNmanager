@@ -442,6 +442,8 @@ window.ASNM_LANGPACK = {"code": "da", "locale": "da-DK", "name": "Dansk", "t": {
 "dl_st_off": "sikker tilstand",
 "dl_confirm": "Fjern enhedslinjen for {d}?",
 "dl_need": "Vælg først mindst én enhed og en linje.",
+"dnsc_title": "Cache for enhedsklienterne",
+"dnsc_desc": "Enheder på en VPN-linje spørger DNS'en for deres linje - for dem bruger AdGuard Home ikke sin normale cache. Hermed får hver af dem sin egen cache. 1 MB rummer cirka 2.000 til 5.000 svar - rigeligt til én enhed.",
 "perf_rules": "Markeringsregler",
 "perf_rules_desc": "Samlet: alle ASN for et mål deler ét sæt og én regel, så routeren kun kontrollerer hver pakke én gang pr. mål (langt mindre CPU med mange ASN). Én pr. ASN: den gamle måde, til sammenligning eller hvis noget opfører sig anderledes.",
 "perf_rules_comb": "Samlet (hurtig)",

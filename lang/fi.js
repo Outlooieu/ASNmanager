@@ -442,6 +442,8 @@ window.ASNM_LANGPACK = {"code": "fi", "locale": "fi-FI", "name": "Suomi", "t": {
 "dl_st_off": "vikasietotila",
 "dl_confirm": "Poistetaanko laitteen {d} linja?",
 "dl_need": "Valitse ensin vähintään yksi laite ja linja.",
+"dnsc_title": "Laiteasiakkaiden välimuisti",
+"dnsc_desc": "VPN-linjan laitteet kysyvät linjansa DNS:ltä - niille AdGuard Home ei käytä tavallista välimuistiaan. Tällä jokainen saa oman välimuistin. 1 Mt mahtuu noin 2 000-5 000 vastausta - reilusti yhdelle laitteelle.",
 "perf_rules": "Merkintäsäännöt",
 "perf_rules_desc": "Yhdistetty: kaikki kohteen ASN:t jakavat yhden joukon ja yhden säännön, joten reititin tarkistaa jokaisen paketin vain kerran kohdetta kohden (paljon vähemmän suoritinta monilla ASN:illä). Yksi ASN:ää kohden: vanha tapa vertailuun tai jos jokin toimii toisin.",
 "perf_rules_comb": "Yhdistetty (nopea)",

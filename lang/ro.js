@@ -442,6 +442,8 @@ window.ASNM_LANGPACK = {"code": "ro", "locale": "ro-RO", "name": "Română", "t"
 "dl_st_off": "mod sigur",
 "dl_confirm": "Elimini linia lui {d}?",
 "dl_need": "Alege mai întâi cel puțin un dispozitiv și o linie.",
+"dnsc_title": "Cache pentru clienții dispozitivelor",
+"dnsc_desc": "Dispozitivele pe o linie VPN întreabă DNS-ul liniei lor - pentru ele AdGuard Home nu folosește cache-ul normal. Astfel fiecare primește propriul cache. 1 MB cuprinde aproximativ 2.000-5.000 de răspunsuri - suficient pentru un dispozitiv.",
 "perf_rules": "Reguli de marcare",
 "perf_rules_desc": "Combinat: toate ASN-urile unei ținte împart un set și o regulă, astfel routerul verifică fiecare pachet o singură dată pe țintă (mult mai puțin procesor cu multe ASN-uri). Unul pe ASN: metoda veche, pentru comparație sau dacă ceva se comportă altfel.",
 "perf_rules_comb": "Combinat (rapid)",

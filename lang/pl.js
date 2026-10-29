@@ -442,6 +442,8 @@ window.ASNM_LANGPACK = {"code": "pl", "locale": "pl-PL", "name": "Polski", "t": 
 "dl_st_off": "tryb awaryjny",
 "dl_confirm": "Usunąć łącze urządzenia {d}?",
 "dl_need": "Najpierw wybierz co najmniej jedno urządzenie i łącze.",
+"dnsc_title": "Pamięć podręczna klientów urządzeń",
+"dnsc_desc": "Urządzenia na łączu VPN pytają DNS swojego łącza - dla nich AdGuard Home nie używa swojej zwykłej pamięci podręcznej. Dzięki temu każde dostaje własną. 1 MB mieści około 2000-5000 odpowiedzi - aż nadto dla jednego urządzenia.",
 "perf_rules": "Reguły znakowania",
 "perf_rules_desc": "Połączone: wszystkie ASN celu dzielą jeden zestaw i jedną regułę, więc router sprawdza każdy pakiet tylko raz na cel (znacznie mniej procesora przy wielu ASN). Jedna na ASN: stary sposób, do porównania lub gdy coś zachowuje się inaczej.",
 "perf_rules_comb": "Połączone (szybko)",

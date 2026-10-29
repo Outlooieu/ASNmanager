@@ -442,6 +442,8 @@ window.ASNM_LANGPACK = {"code": "es", "locale": "es-ES", "name": "Español", "t"
 "dl_st_off": "modo seguro",
 "dl_confirm": "¿Quitar la línea de {d}?",
 "dl_need": "Elige primero al menos un dispositivo y una línea.",
+"dnsc_title": "Caché de los clientes por dispositivo",
+"dnsc_desc": "Los dispositivos en una línea VPN consultan el DNS de su línea; para ellos AdGuard Home no usa su caché normal. Con esto cada uno recibe su propia caché. 1 MB guarda aproximadamente de 2.000 a 5.000 respuestas, de sobra para un dispositivo.",
 "perf_rules": "Reglas de marcado",
 "perf_rules_desc": "Combinadas: todos los ASN de un destino comparten un conjunto y una regla, así el router comprueba cada paquete solo una vez por destino (mucha menos CPU con muchos ASN). Una por ASN: el método antiguo, para comparar o si algo se comporta distinto.",
 "perf_rules_comb": "Combinadas (rápido)",
