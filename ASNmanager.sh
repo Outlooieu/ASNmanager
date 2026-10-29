@@ -2412,14 +2412,9 @@ for active_set in $(ipset list -n | grep -E "^ASNU?_"); do
             iptables -t mangle $rule 2>/dev/null
         done
         
-        while ip rule del fwmark "$FWMARK" 2>/dev/null; do :; done
+        # the routing rule and the table of the target stay: removed and built again they left a gap of seconds in
+        # which marked traffic (and a device line on this target) went over the normal way - also past the kill switch
         while ip rule del fwmark "${FWMARK_VAL}/${FWMARK_VAL}" 2>/dev/null; do :; done
-        
-        case "$dest_name" in
-            OVPN*|WGC*)
-                ip route flush table "$TABLE" 2>/dev/null
-                ;;
-        esac
     fi
     
     ipset flush "$active_set" 2>/dev/null
@@ -2471,9 +2466,9 @@ while IFS=':' read -r asn dest src_ip; do
             # routing rule and table of this target: once per target
             case "$DONE_DESTS" in *" $dest "*) ;; *)
                 DONE_DESTS="$DONE_DESTS$dest "
-                while ip rule del fwmark "$FWMARK" 2>/dev/null; do :; done
                 while ip rule del fwmark "${FWMARK_VAL}/${FWMARK_VAL}" 2>/dev/null; do :; done
-                ip rule add from 0/0 fwmark "$FWMARK" table "$TABLE" prio "$PRIO"
+                # only when it is missing (a failover may point it to its fallback right now - that stays)
+                ip rule show 2>/dev/null | grep -q "fwmark ${FWMARK} " || ip rule add from 0/0 fwmark "$FWMARK" table "$TABLE" prio "$PRIO"
                 if [ -n "$iface_dev" ]; then
                     case "$dest" in
                         OVPN*|WGC*)
@@ -7882,6 +7877,10 @@ eb_hook_sync() {
 cli_early() {
     nv_refresh
     ex_sync
+    # first the routing rule and the kill switch block of every line a device line uses, then the device rules -
+    # otherwise the first marked packets find an empty table and take the normal way
+    for eb_t in $(dl_list | awk '{ print $2 }' | sort -u); do cu_usable "$eb_t" && cu_route "$eb_t"; done
+    ks_sync
     DL_NODNS=1; dl_sync; DL_NODNS=""
     ks_sync
     lg_sync
