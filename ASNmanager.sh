@@ -5265,12 +5265,18 @@ dnsd_on() { [ -f "$DNSD_FLAG" ]; }
 # clients with their own upstreams do not use the global cache of AdGuard Home; each can get its own (MB, 0 = off)
 dnsd_cache_mb() { dcm_v=$(cat "$DNSD_CACHE" 2>/dev/null); case "$dcm_v" in [1-9]|[1-5][0-9]|6[0-4]) echo "$dcm_v" ;; *) echo 0 ;; esac; }
 dnsd_cache_set() {
+    dcs_old=$(dnsd_cache_mb)
     case "$1" in
         off|0)                 rm -f "$DNSD_CACHE" ;;
         [1-9]|[1-5][0-9]|6[0-4]) mkdir -p "$ADDON_DIR"; echo "$1" > "$DNSD_CACHE" ;;
         *) echo "Usage: dnsdevice cache off | <MB 1-64>   (now: $(dnsd_cache_mb | sed 's/^0$/off/;s/^[1-9][0-9]*$/& MB/'))"; return 1 ;;
     esac
     { dnsf_on || dnsd_on; } && dnsf_sync >/dev/null 2>&1
+    # AdGuard Home takes the new cache of a client over its API but builds it only when it starts
+    if dnsd_on && [ "$dcs_old" != "$(dnsd_cache_mb)" ] && [ -x "$AGH_INIT" ] && pidof AdGuardHome >/dev/null 2>&1; then
+        "$AGH_INIT" restart >/dev/null 2>&1
+        logger -t ASNmanager "DNS per device: cache of the device clients $(dnsd_cache_mb) MB - AdGuard Home restarted to build it"
+    fi
     if [ "$(dnsd_cache_mb)" = "0" ]; then echo "Cache of the device clients: off."; else echo "Cache of the device clients: $(dnsd_cache_mb) MB each."; fi
     return 0
 }

@@ -1,6 +1,6 @@
 ## v3.10.2 (test version)
 
-- **New: cache for the device clients** (DNS per device): a client of AdGuard Home with its own upstreams - every device on a VPN line - does not use the global cache of AdGuard Home, so these devices had no cache there at all. Each of them can now get its own cache: WebUI: Settings > DNS > "Cache of the device clients" (off, 1, 2, 4, 8 MB), command line: `dnsdevice cache off | <MB>`. 1 MB holds roughly 2,000 to 5,000 answers. Off by default; `dnsfollow status` shows the setting
+- **New: cache for the device clients** (DNS per device): a client of AdGuard Home with its own upstreams - every device on a VPN line - does not use the global cache of AdGuard Home, so these devices had no cache there at all. Each of them can now get its own cache: WebUI: Settings > DNS > "Cache of the device clients" (off, 1, 2, 4, 8 MB), command line: `dnsdevice cache off | <MB>`. 1 MB holds roughly 2,000 to 5,000 answers. Off by default; `dnsfollow status` shows the setting. AdGuard Home takes the setting over its API but builds the cache only when it starts - so it is restarted once when the size changes (DNS stops for a few seconds)
 
 ## v3.10.1
 
