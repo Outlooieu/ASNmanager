@@ -508,6 +508,14 @@
 #asnm_add_domnote { color: var(--warn); }
 #asnm_add_ms .asnm-ms-btn, #asnm_preset_ms .asnm-ms-btn { width: 165px; }
 #asnm_edit_ms .asnm-ms-btn { width: 200px; }
+/* device lines / excluded devices: the list looks and opens like a normal select - full width, right under the field */
+#asnm_dl_ms, #asnm_ex_ms { display: block; flex: 1 1 100%; width: 100%; min-width: 0; }
+#asnm_dl_ms .asnm-ms-btn, #asnm_ex_ms .asnm-ms-btn { display: flex; width: 100%; height: 36px; box-sizing: border-box; padding: 0 11px; font-size: 13px; }
+#asnm_dl_ms .asnm-ms-pop, #asnm_ex_ms .asnm-ms-pop { left: 0; right: 0; min-width: 0; max-height: min(480px, 70vh); padding: 4px 0; border-radius: 8px; }
+#asnm_dl_ms .asnm-ms-item, #asnm_ex_ms .asnm-ms-item { font-size: 13px; padding: 6px 14px; border-radius: 0; white-space: normal; }
+#asnm_dl_ms .asnm-ms-grp, #asnm_ex_ms .asnm-ms-grp { font-size: 13px; font-weight: 700; text-transform: none; letter-spacing: 0; color: var(--text);
+    background: var(--row-hover); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 5px 12px; }
+#asnm_dl_ms .asnm-ms-grp:first-child, #asnm_ex_ms .asnm-ms-grp:first-child { border-top: 0; }
 .asnm-tr-dest { color: var(--muted); font-size: 11px; margin-left: 6px; }
 .asnm-tr-name { display: block; margin: 2px 0 0 26px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
 .asnm-tr-gone { color: var(--muted); font-size: 11px; margin-left: 6px; font-style: italic; }
@@ -3907,7 +3915,7 @@ function asnmTabBadges() {
 
 function initial() {
     document.addEventListener('click', function () {
-        var ids = ['asnm_add_ms', 'asnm_preset_ms', 'asnm_edit_ms'];
+        var ids = ['asnm_add_ms', 'asnm_preset_ms', 'asnm_edit_ms', 'asnm_dl_ms', 'asnm_ex_ms'];
         for (var i = 0; i < ids.length; i++) { var b = document.getElementById(ids[i]); if (b) b.className = 'asnm-ms'; }
     });
     try { ASNM_TR.unit = localStorage.getItem('asnm_rate_unit') === 'mbyte' ? 'mbyte' : 'mbit'; } catch (e) { ASNM_TR.unit = 'mbit'; }
@@ -4200,7 +4208,7 @@ function initial() {
   <div class="asnm-card" id="asnm_rules_card">
     <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M6 12h12M10 18h4"/></svg><div class="asnm-card-titles"><h3 data-i18n="rules_title"></h3><div class="asnm-card-sub" data-i18n="rules_sub"></div></div></div>
     <div class="asnm-field"><span class="asnm-label" data-i18n="ex_title"></span><span class="asnm-help" data-i18n="ex_desc"></span>
-      <div class="asnm-dw-ed" style="margin-top:8px;flex-wrap:wrap;gap:8px;"><div class="asnm-ms" id="asnm_ex_ms" style="flex:1;min-width:200px;"></div><input type="hidden" id="asnm_ex_ips" value=""/>
+      <div class="asnm-dw-ed" style="margin-top:8px;flex-wrap:wrap;gap:8px;"><div class="asnm-ms" id="asnm_ex_ms"></div><input type="hidden" id="asnm_ex_ips" value=""/>
         <input type="text" id="asnm_ex_in" maxlength="18" autocomplete="off" spellcheck="false" data-i18n-ph="ex_ph" style="width:170px;"/>
         <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="ex_add" onclick="asnmExAdd();"/></div>
       <div class="asnm-help" id="asnm_ex_info" style="margin-top:6px;"></div>
@@ -4208,7 +4216,7 @@ function initial() {
     </div>
     <div class="asnm-divider"></div>
     <div class="asnm-field"><span class="asnm-label" data-i18n="dl_title"></span><span class="asnm-help" data-i18n="dl_desc"></span>
-      <div class="asnm-dw-ed" style="margin-top:8px;flex-wrap:wrap;gap:8px;"><div class="asnm-ms" id="asnm_dl_ms" style="flex:1;min-width:200px;"></div><input type="hidden" id="asnm_dl_ips" value=""/>
+      <div class="asnm-dw-ed" style="margin-top:8px;flex-wrap:wrap;gap:8px;"><div class="asnm-ms" id="asnm_dl_ms"></div><input type="hidden" id="asnm_dl_ips" value=""/>
         <select id="asnm_dl_tgt" class="input_option" style="min-width:170px;"></select>
         <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="dl_add" onclick="asnmDlAdd();"/></div>
       <div id="asnm_dl_list" style="margin-top:8px;"></div>
