@@ -2754,10 +2754,10 @@ function asnmInNet(ip, net) {
     return Math.floor(asnmIp2n(ip) / z) === Math.floor(asnmIp2n(p[0]) / z);
 }
 function asnmExRender() {
-    var box = document.getElementById('asnm_ex_list'), info = document.getElementById('asnm_ex_info'), sd = document.getElementById('asnm_ex_dev');
+    var box = document.getElementById('asnm_ex_list'), info = document.getElementById('asnm_ex_info'), ms = document.getElementById('asnm_ex_ms');
     if (!box || !ASNM.data) return;
     if (!ASNM.data.devices) ASNM.data.devices = [];
-    if (document.activeElement !== sd) { var kd = sd.value; sd.innerHTML = asnmDeviceOptions(kd).replace(asnmEsc(t('pick_device')), asnmEsc(t('ex_pick'))); }
+    if (!/ open/.test(' ' + ms.className)) asnmDevMsRender('asnm_ex_ms', 'asnm_ex_ips', { empty: t('dl_pick'), noAll: true });
     var ex = ASNM.data.exclude || [], devs = ASNM.data.devices, h = '';
     info.textContent = ex.length ? t('ex_now', { n: ex.length }) : t('ex_none');
     for (var i = 0; i < ex.length; i++) {
@@ -2784,12 +2784,18 @@ function asnmExSend(list) {
     asnmSend('setting', ['EXCLUDE', list.length ? list.join(',') : 'none']);
 }
 function asnmExAdd() {
-    var inp = document.getElementById('asnm_ex_in'), v = (inp.value || '').replace(/\s+/g, '') || document.getElementById('asnm_ex_dev').value;
-    if (!v) { alert(t('ex_need')); return; }
-    if (!/^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(v)) { alert(t('ex_bad', { v: v })); return; }
+    var inp = document.getElementById('asnm_ex_in'), v = (inp.value || '').replace(/\s+/g, ''), add = asnmDevMsIps('asnm_ex_ips');
+    if (v) {
+        if (!/^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(v)) { alert(t('ex_bad', { v: v })); return; }
+        add.push(v);
+    }
+    if (!add.length) { alert(t('ex_need')); return; }
+    if (ASNM.busy) return;
     var ex = ((ASNM.data && ASNM.data.exclude) || []).slice();
-    if (ex.indexOf(v) < 0) ex.push(v);
+    for (var i = 0; i < add.length; i++) if (ex.indexOf(add[i]) < 0) ex.push(add[i]);
     inp.value = '';
+    document.getElementById('asnm_ex_ips').value = '';
+    asnmDevMsRender('asnm_ex_ms', 'asnm_ex_ips');
     asnmExSend(ex);
 }
 function asnmExDel(a) {
@@ -4194,7 +4200,7 @@ function initial() {
   <div class="asnm-card" id="asnm_rules_card">
     <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M6 12h12M10 18h4"/></svg><div class="asnm-card-titles"><h3 data-i18n="rules_title"></h3><div class="asnm-card-sub" data-i18n="rules_sub"></div></div></div>
     <div class="asnm-field"><span class="asnm-label" data-i18n="ex_title"></span><span class="asnm-help" data-i18n="ex_desc"></span>
-      <div class="asnm-dw-ed" style="margin-top:8px;flex-wrap:wrap;gap:8px;"><select id="asnm_ex_dev" class="input_option" style="flex:1;min-width:200px;"></select>
+      <div class="asnm-dw-ed" style="margin-top:8px;flex-wrap:wrap;gap:8px;"><div class="asnm-ms" id="asnm_ex_ms" style="flex:1;min-width:200px;"></div><input type="hidden" id="asnm_ex_ips" value=""/>
         <input type="text" id="asnm_ex_in" maxlength="18" autocomplete="off" spellcheck="false" data-i18n-ph="ex_ph" style="width:170px;"/>
         <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" data-i18n-value="ex_add" onclick="asnmExAdd();"/></div>
       <div class="asnm-help" id="asnm_ex_info" style="margin-top:6px;"></div>
