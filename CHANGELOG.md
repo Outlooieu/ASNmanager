@@ -1,17 +1,13 @@
-## v3.10.7 (test version)
+## v3.10.7
 
-- WebUI: "dnsmasq is not running" no longer shows up after a normal Apply. While dnsmasq and AdGuard Home restart in the background the DNS check says "restarting" (no warning), and it is checked again as soon as the restart is over - before, the warning written during the restart stayed until the next routing check (up to 5 minutes)
-
-## v3.10.6
-
-Sums up the changes of 30 October (v3.10.3 to v3.10.6).
+Sums up the changes of 30 October (v3.10.3 to v3.10.7).
 
 - **Fixed: AdGuard Home could stop after domain entries were added or removed** - DNS was down until it was started by hand
   - "unknown ipset": the installer of AdGuard Home copies the ipset= lines of dnsmasq into its own ipset file and can put an older copy back at any dnsmasq start. When ASN Manager had destroyed the set of a removed entry, AdGuard Home stopped at once on every start. Domain sets are now never destroyed, only emptied (gone after the next reboot), the ipset file of AdGuard Home is left alone, and a set it still names is created empty when dnsmasq starts, at boot, after every Apply and in the routing check
   - Too many dnsmasq restarts: one Apply restarted dnsmasq up to three times, while the start script of AdGuard Home needs about a minute after each restart - a second one inside that minute made it fail and start its own recovery. Now an Apply restarts dnsmasq at most once, at the end and in the background, and only when the start script of AdGuard Home is quiet
   - The self-test no longer switches to safemode while the start script of AdGuard Home stops and starts dnsmasq itself
 - **Apply is two to three times faster**: started by the user the domain entries are built once instead of twice, the routing check and the restart of dnsmasq / AdGuard Home run in the background, the page data is written once, and the domain entries need far fewer calls. `ASNM_TIME=1 ASNmanager.sh apply` shows the time of each step
-- WebUI: while dnsmasq and AdGuard Home restart after an Apply, the page says so and keeps its buttons locked; it checks every 5 seconds and frees them as soon as AdGuard Home answers again
+- WebUI: while dnsmasq and AdGuard Home restart after an Apply, the page says so and keeps its buttons locked; it checks every 5 seconds and frees them as soon as AdGuard Home answers again. The DNS check shows "restarting" meanwhile instead of "dnsmasq is not running" and checks again right after the restart
 - WebUI, Traffic: the rows of the entries are grouped behind one row "Via rules", closed by default - like "No rule (normal way)"
 - "Check device": the list of current connections fits a phone screen - the rule of a connection gets its own line, a group of domain entries shows its first domain and how many more
 
