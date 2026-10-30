@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.10.2 -->
+<!-- ASNmanager-WebUI v3.10.3 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -282,6 +282,7 @@
                background: var(--card2); border: 1px solid var(--line); color: var(--muted); vertical-align: 1px; white-space: nowrap; }
 .asnm-tr-sub.asnm-tr-row td:first-child { padding-left: 34px; }
 .asnm-tr-sub.asnm-lv2 td:first-child { padding-left: 62px; }
+.asnm-tr-in td:first-child { padding-left: 34px; }
 .asnm-tr-hint { display: flex; align-items: center; gap: 4px; margin: 0 0 10px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
 .asnm-tr-hint .asnm-tgl { margin-right: 6px; cursor: default; }
 .asnm-tr-hint .asnm-link { margin-left: 10px; }
@@ -525,7 +526,7 @@ var ASNM_NS = 'asnmanager';
 // the settings of ALL add-ons: the firmware writes custom_settings.txt anew from what a page sends - so every command
 // sends them back along with its own (taken when the page loads, refreshed from the router after each job)
 var ASNM_CS = <% get_custom_settings(); %>;
-var ASNM_PAGE_VER = '3.10.2';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.10.3';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -2926,7 +2927,7 @@ function asnmTrExpandAll(on) {
     var d = ASNM_TR.data;
     ASNM_TR.expanded = {};
     if (on && d) {
-        ASNM_TR.expanded['O'] = true;
+        ASNM_TR.expanded['O'] = true; ASNM_TR.expanded['R'] = true;
         for (var i = 0; i < d.rows.length; i++) {
             var r = d.rows[i];
             ASNM_TR.expanded[r.asn === 'O' ? 'O|' + r.dest : r.dest + '|' + r.asn] = true;
@@ -3057,13 +3058,22 @@ function asnmTrRender() {
         html += asnmTrClientRows(ol, other, 1);
     }
 
+    // all rows of the rules behind one group row, like "No rule"
+    var kr = ASNM_TR.expanded['R'], aPk = 0, aRd = 0, aRu = 0, aDev = {};
     for (i = 0; i < asns.length; i++) {
+        aPk += asns[i].up + asns[i].dp; aRd += asns[i].rd || 0; aRu += asns[i].ru || 0;
+        for (var ac = 0; ac < asns[i].cl.length; ac++) aDev[asns[i].cl[ac][0]] = 1;
+    }
+    if (asns.length) html += '<tr class="asnm-tr-row asnm-tr-other' + (kr ? ' open' : '') + '" onclick="asnmTrExpand(\'R\')"><td><span class="asnm-tgl"></span>' +
+            asnmEsc(t('tr_split_asn')) + '<span class="asnm-tr-cnt">' + asnmEsc(t('sec_cnt', { n: asns.length })) + '</span>' + asnmDevCount(Object.keys(aDev).length) + '</td>' +
+            asnmTrCells(aDb, aUb, aPk, tAll, aRd, aRu) + '</tr>';
+    for (i = 0; kr && i < asns.length; i++) {
         var a = asns[i], key = a.dest + '|' + a.asn, open = ASNM_TR.expanded[key];
-        html += '<tr class="asnm-tr-row' + (open ? ' open' : '') + '" onclick="asnmTrExpand(\'' + asnmEsc(key) + '\')"><td><span class="asnm-tgl"></span>' +
+        html += '<tr class="asnm-tr-row asnm-tr-in' + (open ? ' open' : '') + '" onclick="asnmTrExpand(\'' + asnmEsc(key) + '\')"><td><span class="asnm-tgl"></span>' +
                 asnmTrRowLabel(a) + '<span class="asnm-tr-dest">' + asnmEsc(asnmNormDest(a.dest)) + '</span>' +
                 (listed[asnmNormDest(a.dest) + '|' + a.asn] ? '' : '<span class="asnm-tr-gone">' + asnmEsc(t('tr_gone')) + '</span>') +
                 asnmDevCount(a.cl.length) + asnmTrNameLine(a) + '</td>' + asnmTrCells(a.db, a.ub, a.up + a.dp, tAll, a.rd || 0, a.ru || 0) + '</tr>';
-        if (open) html += asnmTrClientRows(a.cl, { db: a.db, ub: a.ub, pk: a.up + a.dp, rd: a.rd || 0, ru: a.ru || 0 }, 1);
+        if (open) html += asnmTrClientRows(a.cl, { db: a.db, ub: a.ub, pk: a.up + a.dp, rd: a.rd || 0, ru: a.ru || 0 }, 2);
     }
     if (!asns.length && other.db + other.ub === 0)
         html += '<tr><td colspan="6" class="asnm-muted" style="text-align:center;padding:12px;">' + asnmEsc(st === 'enabled' ? t('tr_empty') : t('tr_off_hint')) + '</td></tr>';
