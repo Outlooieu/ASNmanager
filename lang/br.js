@@ -445,6 +445,8 @@ window.ASNM_LANGPACK = {"code": "br", "locale": "pt-BR", "name": "Português (Br
 "dnsc_title": "Cache dos clientes por dispositivo",
 "dnsc_desc": "Dispositivos em uma linha VPN consultam o DNS da sua linha - para eles o AdGuard Home não usa seu cache normal. Com isso cada um recebe seu próprio cache. 1 MB guarda cerca de 2.000 a 5.000 respostas - o bastante para um dispositivo.",
 "dnsc_confirm": "Definir o cache dos clientes por dispositivo para {v}? O AdGuard Home é reiniciado para isso - o DNS para por alguns segundos.",
+"rs_wait": "dnsmasq e AdGuard Home estão reiniciando em segundo plano ({s} s) - os botões ficam livres assim que o AdGuard Home responder.",
+"rs_done": "dnsmasq e AdGuard Home estão funcionando de novo.",
 "perf_rules": "Regras de marcação",
 "perf_rules_desc": "Combinadas: todos os ASN de um destino compartilham um conjunto e uma regra, então o roteador verifica cada pacote só uma vez por destino (muito menos CPU com muitos ASN). Uma por ASN: o jeito antigo, para comparar ou se algo se comportar de outro modo.",
 "perf_rules_comb": "Combinadas (rápido)",

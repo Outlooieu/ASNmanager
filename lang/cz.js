@@ -445,6 +445,8 @@ window.ASNM_LANGPACK = {"code": "cz", "locale": "cs-CZ", "name": "Čeština", "t
 "dnsc_title": "Mezipaměť klientů zařízení",
 "dnsc_desc": "Zařízení na VPN lince se ptají DNS své linky - pro ně AdGuard Home nepoužívá svou běžnou mezipaměť. Takto dostane každé vlastní mezipaměť. 1 MB pojme zhruba 2 000 až 5 000 odpovědí - pro jedno zařízení víc než dost.",
 "dnsc_confirm": "Nastavit mezipaměť klientů zařízení na {v}? AdGuard Home se kvůli tomu restartuje - DNS na pár sekund vypadne.",
+"rs_wait": "dnsmasq a AdGuard Home se restartují na pozadí ({s} s) - tlačítka budou znovu volná, jakmile AdGuard Home odpoví.",
+"rs_done": "dnsmasq a AdGuard Home opět běží.",
 "perf_rules": "Pravidla značkování",
 "perf_rules_desc": "Sloučená: všechna ASN cíle sdílejí jednu sadu a jedno pravidlo, takže router kontroluje každý paket jen jednou na cíl (mnohem méně CPU při mnoha ASN). Jedno na ASN: starý způsob, pro srovnání nebo když se něco chová jinak.",
 "perf_rules_comb": "Sloučená (rychlé)",

@@ -445,6 +445,8 @@ window.ASNM_LANGPACK = {"code": "no", "locale": "nb-NO", "name": "Norsk", "t": {
 "dnsc_title": "Hurtigbuffer for enhetsklientene",
 "dnsc_desc": "Enheter på en VPN-linje spør DNS-en til linjen sin - for dem bruker AdGuard Home ikke den vanlige hurtigbufferen. Med dette får hver av dem sin egen. 1 MB rommer omtrent 2 000 til 5 000 svar - rikelig for én enhet.",
 "dnsc_confirm": "Sette hurtigbufferen for enhetsklientene til {v}? AdGuard Home startes på nytt for det - DNS er borte i noen sekunder.",
+"rs_wait": "dnsmasq og AdGuard Home startes på nytt i bakgrunnen ({s} s) - knappene er ledige igjen så snart AdGuard Home svarer.",
+"rs_done": "dnsmasq og AdGuard Home kjører igjen.",
 "perf_rules": "Merkeregler",
 "perf_rules_desc": "Samlet: alle ASN-er for et mål deler ett sett og én regel, så ruteren sjekker hver pakke bare én gang per mål (mye mindre CPU med mange ASN-er). Én per ASN: den gamle måten, for sammenligning eller hvis noe oppfører seg annerledes.",
 "perf_rules_comb": "Samlet (rask)",

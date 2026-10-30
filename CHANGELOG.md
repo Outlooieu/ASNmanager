@@ -1,6 +1,7 @@
 ## v3.10.6 (test version)
 
 - Fixed: adding or removing a domain entry could leave DNS without AdGuard Home. One Apply restarted dnsmasq up to three times (domain entries, DNS follows the route, the rebuild in the background), and the start script of AdGuard Home needs about a minute after each restart; a second restart inside that minute made it fail and start its own recovery - more restarts, and DNS stayed down. Now an Apply restarts dnsmasq at most once, at the end, and every restart waits until the start script of AdGuard Home is quiet (at most 2 minutes). That restart and the restart of AdGuard Home that follows it run in the background - the Apply is done without waiting for them
+- WebUI: while dnsmasq and AdGuard Home restart in the background after an Apply, the page says so (with the seconds) and keeps its buttons locked; it asks the router every 5 seconds and frees them as soon as AdGuard Home answers again (also after reloading the page)
 - The self-test after an Apply no longer counts "dnsmasq is not running" while the start script of AdGuard Home is at work (it stops and starts dnsmasq itself) - it had switched to safemode for that
 
 ## v3.10.5

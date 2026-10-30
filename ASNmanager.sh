@@ -3481,7 +3481,9 @@ cli_apply() {
     # A pending dnsmasq restart (and the restart of AdGuard Home that follows it, about a minute) runs in the
     # background - AdGuard Home starts with an empty cache then; without it the cache is emptied here.
     if [ -f "$DNSMASQ_PENDING" ]; then
-        ( dnsmasq_pending_run ) </dev/null >/dev/null 2>&1 &
+        # the page keeps its buttons locked while restart.js says "on" (it asks every 5 seconds)
+        [ -d "$WEB_DIR" ] && printf '{"on":1,"ts":%s}\n' "$(date +%s)" > "$WEB_DIR/restart.js"
+        ( dnsmasq_pending_run; [ -d "$WEB_DIR" ] && printf '{"on":0,"ts":%s}\n' "$(date +%s)" > "$WEB_DIR/restart.js" ) </dev/null >/dev/null 2>&1 &
         echo "dnsmasq and AdGuard Home restart in the background (about a minute)."
         tmark "dnsmasq restart started in the background"
     else

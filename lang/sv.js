@@ -445,6 +445,8 @@ window.ASNM_LANGPACK = {"code": "sv", "locale": "sv-SE", "name": "Svenska", "t":
 "dnsc_title": "Cache för enhetsklienterna",
 "dnsc_desc": "Enheter på en VPN-linje frågar DNS:en för sin linje - för dem använder AdGuard Home inte sin vanliga cache. Med detta får var och en sin egen cache. 1 MB rymmer ungefär 2 000 till 5 000 svar - gott och väl för en enhet.",
 "dnsc_confirm": "Ställa cachen för enhetsklienterna på {v}? AdGuard Home startas om för det - DNS är borta några sekunder.",
+"rs_wait": "dnsmasq och AdGuard Home startas om i bakgrunden ({s} s) - knapparna blir fria igen så snart AdGuard Home svarar.",
+"rs_done": "dnsmasq och AdGuard Home körs igen.",
 "perf_rules": "Märkregler",
 "perf_rules_desc": "Sammanslagna: alla ASN för ett mål delar en uppsättning och en regel, så routern kontrollerar varje paket bara en gång per mål (mycket mindre CPU med många ASN). En per ASN: det gamla sättet, för jämförelse eller om något beter sig annorlunda.",
 "perf_rules_comb": "Sammanslagna (snabbt)",
