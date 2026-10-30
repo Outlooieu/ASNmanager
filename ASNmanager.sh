@@ -3669,7 +3669,8 @@ web_export() {
     cron=0; cru l 2>/dev/null | grep -q "#ASN_Worker#" && cron=1
     worker=0; [ -x "$WORKER_SCRIPT" ] && worker=1
 
-    out="$WEB_DIR/data.js.tmp.$$"     # own file per run: two exports at the same time (Apply + its background routing check)
+    # own file per run: two exports at the same time (Apply + its background routing check - a ( ) subshell has the same $$)
+    out=$(mktemp "$WEB_DIR/data.js.XXXXXX" 2>/dev/null) || out="$WEB_DIR/data.js.tmp.$$.$RANDOM"
     {
         printf '{"version":"%s","generated":%s,"last_apply":%s,"pending":%s,"cron":%s,"worker":%s,' \
             "$SCRIPT_VERSION" "$(date +%s)" "$last_apply" "$pending" "$cron" "$worker"
