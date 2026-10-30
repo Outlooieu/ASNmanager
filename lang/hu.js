@@ -447,6 +447,7 @@ window.ASNM_LANGPACK = {"code": "hu", "locale": "hu-HU", "name": "Magyar", "t": 
 "dnsc_confirm": "Az eszközkliensek gyorsítótára legyen {v}? Az AdGuard Home ehhez újraindul - a DNS néhány másodpercre kiesik.",
 "rs_wait": "A dnsmasq és az AdGuard Home a háttérben újraindul ({s} s) - a gombok újra szabadok, amint az AdGuard Home válaszol.",
 "rs_done": "A dnsmasq és az AdGuard Home újra fut.",
+"dns_busy": "a dnsmasq / AdGuard Home éppen újraindul",
 "perf_rules": "Jelölő szabályok",
 "perf_rules_desc": "Összevont: egy cél összes ASN-je egy halmazon és egy szabályon osztozik, így a router minden csomagot célonként csak egyszer ellenőriz (sok ASN-nél sokkal kevesebb CPU). ASN-enként egy: a régi módszer összehasonlításhoz, vagy ha valami másképp viselkedik.",
 "perf_rules_comb": "Összevont (gyors)",

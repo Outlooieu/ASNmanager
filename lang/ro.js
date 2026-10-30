@@ -447,6 +447,7 @@ window.ASNM_LANGPACK = {"code": "ro", "locale": "ro-RO", "name": "Română", "t"
 "dnsc_confirm": "Setezi cache-ul clienților dispozitivelor la {v}? AdGuard Home este repornit pentru asta - DNS-ul se oprește câteva secunde.",
 "rs_wait": "dnsmasq și AdGuard Home repornesc în fundal ({s} s) - butoanele sunt din nou libere imediat ce AdGuard Home răspunde.",
 "rs_done": "dnsmasq și AdGuard Home rulează din nou.",
+"dns_busy": "dnsmasq / AdGuard Home repornesc",
 "perf_rules": "Reguli de marcare",
 "perf_rules_desc": "Combinat: toate ASN-urile unei ținte împart un set și o regulă, astfel routerul verifică fiecare pachet o singură dată pe țintă (mult mai puțin procesor cu multe ASN-uri). Unul pe ASN: metoda veche, pentru comparație sau dacă ceva se comportă altfel.",
 "perf_rules_comb": "Combinat (rapid)",

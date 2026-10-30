@@ -447,6 +447,7 @@ window.ASNM_LANGPACK = {"code": "sl", "locale": "sl-SI", "name": "Slovenščina"
 "dnsc_confirm": "Nastavim predpomnilnik odjemalcev naprav na {v}? AdGuard Home se zato znova zažene - DNS za nekaj sekund izpade.",
 "rs_wait": "dnsmasq in AdGuard Home se v ozadju znova zaganjata ({s} s) - gumbi bodo spet prosti, ko AdGuard Home odgovori.",
 "rs_done": "dnsmasq in AdGuard Home spet delujeta.",
+"dns_busy": "dnsmasq / AdGuard Home se znova zaganjata",
 "perf_rules": "Pravila označevanja",
 "perf_rules_desc": "Združena: vsi ASN enega cilja si delijo en nabor in eno pravilo, zato usmerjevalnik vsak paket preveri samo enkrat na cilj (veliko manj procesorja pri mnogih ASN). Eno na ASN: stari način, za primerjavo ali če se kaj obnaša drugače.",
 "perf_rules_comb": "Združena (hitro)",

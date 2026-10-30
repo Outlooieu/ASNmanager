@@ -447,6 +447,7 @@ window.ASNM_LANGPACK = {"code": "da", "locale": "da-DK", "name": "Dansk", "t": {
 "dnsc_confirm": "Sæt cachen for enhedsklienterne til {v}? AdGuard Home genstartes til det - DNS er væk i et par sekunder.",
 "rs_wait": "dnsmasq og AdGuard Home genstartes i baggrunden ({s} s) - knapperne er fri igen, så snart AdGuard Home svarer.",
 "rs_done": "dnsmasq og AdGuard Home kører igen.",
+"dns_busy": "dnsmasq / AdGuard Home genstarter",
 "perf_rules": "Markeringsregler",
 "perf_rules_desc": "Samlet: alle ASN for et mål deler ét sæt og én regel, så routeren kun kontrollerer hver pakke én gang pr. mål (langt mindre CPU med mange ASN). Én pr. ASN: den gamle måde, til sammenligning eller hvis noget opfører sig anderledes.",
 "perf_rules_comb": "Samlet (hurtig)",

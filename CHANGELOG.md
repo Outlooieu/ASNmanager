@@ -1,3 +1,7 @@
+## v3.10.7 (test version)
+
+- WebUI: "dnsmasq is not running" no longer shows up after a normal Apply. While dnsmasq and AdGuard Home restart in the background the DNS check says "restarting" (no warning), and it is checked again as soon as the restart is over - before, the warning written during the restart stayed until the next routing check (up to 5 minutes)
+
 ## v3.10.6
 
 Sums up the changes of 30 October (v3.10.3 to v3.10.6).

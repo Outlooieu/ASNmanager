@@ -447,6 +447,7 @@ window.ASNM_LANGPACK = {"code": "it", "locale": "it-IT", "name": "Italiano", "t"
 "dnsc_confirm": "Impostare la cache dei client per dispositivo su {v}? AdGuard Home viene riavviato: il DNS si ferma per qualche secondo.",
 "rs_wait": "dnsmasq e AdGuard Home si riavviano in background ({s} s): i pulsanti tornano disponibili appena AdGuard Home risponde.",
 "rs_done": "dnsmasq e AdGuard Home sono di nuovo attivi.",
+"dns_busy": "dnsmasq / AdGuard Home si stanno riavviando",
 "perf_rules": "Regole di marcatura",
 "perf_rules_desc": "Combinate: tutti gli ASN di una destinazione condividono un set e una regola, quindi il router controlla ogni pacchetto una sola volta per destinazione (molta meno CPU con molti ASN). Una per ASN: il vecchio metodo, per confronto o se qualcosa si comporta diversamente.",
 "perf_rules_comb": "Combinate (veloce)",

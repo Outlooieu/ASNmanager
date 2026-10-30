@@ -447,6 +447,7 @@ window.ASNM_LANGPACK = {"code": "fr", "locale": "fr-FR", "name": "Français", "t
 "dnsc_confirm": "Régler le cache des clients par appareil sur {v} ? AdGuard Home est redémarré pour cela - le DNS s'arrête quelques secondes.",
 "rs_wait": "dnsmasq et AdGuard Home redémarrent en arrière-plan ({s} s) - les boutons sont de nouveau disponibles dès qu'AdGuard Home répond.",
 "rs_done": "dnsmasq et AdGuard Home fonctionnent de nouveau.",
+"dns_busy": "dnsmasq / AdGuard Home redémarrent",
 "perf_rules": "Règles de marquage",
 "perf_rules_desc": "Combinées : tous les ASN d'une cible partagent un ensemble et une règle, le routeur ne vérifie donc chaque paquet qu'une fois par cible (beaucoup moins de CPU avec de nombreux ASN). Une par ASN : l'ancienne méthode, pour comparer ou si quelque chose se comporte différemment.",
 "perf_rules_comb": "Combinées (rapide)",

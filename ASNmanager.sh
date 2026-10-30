@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.10.6
+version=3.10.7
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -12,7 +12,7 @@ case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
 export PATH
 
-SCRIPT_VERSION="3.10.6"
+SCRIPT_VERSION="3.10.7"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -1685,6 +1685,11 @@ dns_export() {
     # a problem is checked once more a few seconds later: dnsmasq is restarted now and then (apply, other add-ons) and is
     # gone for a moment - that must not show up as "dnsmasq is not running"
     if [ "$1" = "bad" ]; then sleep 8; set -- $(dns_health); fi
+    # still bad while dnsmasq / AdGuard Home restart (after an Apply, or the start script of AdGuard Home is at work):
+    # that is no fault - shown as "restarting", checked again when the restart is over
+    if [ "$1" = "bad" ] && { grep -q '"on":1' "$WEB_DIR/restart.js" 2>/dev/null || { [ -x "$AGH_INIT" ] && agh_busy; }; }; then
+        set -- busy restart "$3" "$4" "$5" "$6" "$7"
+    fi
     de_prev=$(cat "$DNS_STATE" 2>/dev/null)
     if [ "$2" != "$de_prev" ]; then
         echo "$2" > "$DNS_STATE"
@@ -3483,7 +3488,7 @@ cli_apply() {
     if [ -f "$DNSMASQ_PENDING" ]; then
         # the page keeps its buttons locked while restart.js says "on" (it asks every 5 seconds)
         [ -d "$WEB_DIR" ] && printf '{"on":1,"ts":%s}\n' "$(date +%s)" > "$WEB_DIR/restart.js"
-        ( dnsmasq_pending_run; [ -d "$WEB_DIR" ] && printf '{"on":0,"ts":%s}\n' "$(date +%s)" > "$WEB_DIR/restart.js" ) </dev/null >/dev/null 2>&1 &
+        ( dnsmasq_pending_run; [ -d "$WEB_DIR" ] && printf '{"on":0,"ts":%s}\n' "$(date +%s)" > "$WEB_DIR/restart.js"; dns_export ) </dev/null >/dev/null 2>&1 &
         echo "dnsmasq and AdGuard Home restart in the background (about a minute)."
         tmark "dnsmasq restart started in the background"
     else

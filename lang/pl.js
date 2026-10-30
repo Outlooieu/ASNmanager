@@ -447,6 +447,7 @@ window.ASNM_LANGPACK = {"code": "pl", "locale": "pl-PL", "name": "Polski", "t": 
 "dnsc_confirm": "Ustawić pamięć podręczną klientów urządzeń na {v}? AdGuard Home zostanie zrestartowany - DNS zniknie na kilka sekund.",
 "rs_wait": "dnsmasq i AdGuard Home restartują się w tle ({s} s) - przyciski będą znów dostępne, gdy tylko AdGuard Home odpowie.",
 "rs_done": "dnsmasq i AdGuard Home znów działają.",
+"dns_busy": "dnsmasq / AdGuard Home właśnie się restartują",
 "perf_rules": "Reguły znakowania",
 "perf_rules_desc": "Połączone: wszystkie ASN celu dzielą jeden zestaw i jedną regułę, więc router sprawdza każdy pakiet tylko raz na cel (znacznie mniej procesora przy wielu ASN). Jedna na ASN: stary sposób, do porównania lub gdy coś zachowuje się inaczej.",
 "perf_rules_comb": "Połączone (szybko)",

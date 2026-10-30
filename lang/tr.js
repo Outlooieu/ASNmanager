@@ -447,6 +447,7 @@ window.ASNM_LANGPACK = {"code": "tr", "locale": "tr-TR", "name": "Türkçe", "t"
 "dnsc_confirm": "Cihaz istemcilerinin önbelleği {v} olarak ayarlansın mı? Bunun için AdGuard Home yeniden başlatılır - DNS birkaç saniye kesilir.",
 "rs_wait": "dnsmasq ve AdGuard Home arka planda yeniden başlatılıyor ({s} s) - AdGuard Home yanıt verir vermez düğmeler yeniden kullanılabilir.",
 "rs_done": "dnsmasq ve AdGuard Home yeniden çalışıyor.",
+"dns_busy": "dnsmasq / AdGuard Home yeniden başlatılıyor",
 "perf_rules": "İşaretleme kuralları",
 "perf_rules_desc": "Birleşik: bir hedefin tüm ASN'leri tek bir küme ve tek bir kuralı paylaşır, böylece yönlendirici her paketi hedef başına yalnızca bir kez denetler (çok ASN'de çok daha az CPU). ASN başına bir: eski yöntem, karşılaştırma için veya bir şey farklı davranırsa.",
 "perf_rules_comb": "Birleşik (hızlı)",

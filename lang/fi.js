@@ -447,6 +447,7 @@ window.ASNM_LANGPACK = {"code": "fi", "locale": "fi-FI", "name": "Suomi", "t": {
 "dnsc_confirm": "Asetetaanko laiteasiakkaiden välimuistiksi {v}? AdGuard Home käynnistetään uudelleen - DNS katkeaa muutamaksi sekunniksi.",
 "rs_wait": "dnsmasq ja AdGuard Home käynnistyvät uudelleen taustalla ({s} s) - painikkeet vapautuvat heti, kun AdGuard Home vastaa.",
 "rs_done": "dnsmasq ja AdGuard Home ovat taas käynnissä.",
+"dns_busy": "dnsmasq / AdGuard Home käynnistyvät uudelleen",
 "perf_rules": "Merkintäsäännöt",
 "perf_rules_desc": "Yhdistetty: kaikki kohteen ASN:t jakavat yhden joukon ja yhden säännön, joten reititin tarkistaa jokaisen paketin vain kerran kohdetta kohden (paljon vähemmän suoritinta monilla ASN:illä). Yksi ASN:ää kohden: vanha tapa vertailuun tai jos jokin toimii toisin.",
 "perf_rules_comb": "Yhdistetty (nopea)",

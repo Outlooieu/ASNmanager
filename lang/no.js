@@ -447,6 +447,7 @@ window.ASNM_LANGPACK = {"code": "no", "locale": "nb-NO", "name": "Norsk", "t": {
 "dnsc_confirm": "Sette hurtigbufferen for enhetsklientene til {v}? AdGuard Home startes på nytt for det - DNS er borte i noen sekunder.",
 "rs_wait": "dnsmasq og AdGuard Home startes på nytt i bakgrunnen ({s} s) - knappene er ledige igjen så snart AdGuard Home svarer.",
 "rs_done": "dnsmasq og AdGuard Home kjører igjen.",
+"dns_busy": "dnsmasq / AdGuard Home starter på nytt",
 "perf_rules": "Merkeregler",
 "perf_rules_desc": "Samlet: alle ASN-er for et mål deler ett sett og én regel, så ruteren sjekker hver pakke bare én gang per mål (mye mindre CPU med mange ASN-er). Én per ASN: den gamle måten, for sammenligning eller hvis noe oppfører seg annerledes.",
 "perf_rules_comb": "Samlet (rask)",
