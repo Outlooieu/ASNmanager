@@ -1,3 +1,7 @@
+## v3.10.5 (test version)
+
+- Fixed: AdGuard Home could still stop with "unknown ipset" after removing domain entries. ASN Manager removed the lines of sets that no longer existed from the ipset file of AdGuard Home and then destroyed the sets - but the installer of AdGuard Home puts an older copy of that file back at the next dnsmasq start. Domain sets are now never destroyed, only emptied (an empty set costs nothing and is gone after the next reboot), and the ipset file of AdGuard Home is no longer changed
+
 ## v3.10.4
 
 - Apply is about twice as fast: started by the user it no longer builds the domain entries twice (the early pass is for boot and the schedule only); the routing check runs in the background after it; the page data is written once at the end instead of also inside the rebuild; the domain entries read the list of sets once per run instead of once per entry, look up a target once instead of once per entry, and put the addresses already known for their names into the sets with one call instead of two per address. `ASNM_TIME=1 ASNmanager.sh apply` shows the time of each step

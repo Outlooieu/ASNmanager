@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.10.4
+version=3.10.5
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -12,7 +12,7 @@ case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
 export PATH
 
-SCRIPT_VERSION="3.10.4"
+SCRIPT_VERSION="3.10.5"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -1242,6 +1242,7 @@ cu_group_cleanup() {
 # AdGuard Home copies the dnsmasq ipset= lines into its own file (Merlin AdGuardHome installer): a line that names a
 # set ASN Manager just destroyed makes AdGuard Home stop at its next start ("unknown ipset"). Such lines are removed.
 agh_ipset_prune() {
+    return 0      # off: sets are no longer destroyed (asnm_set_drop), and the installer restores its own copy anyway
     for aip_y in $DNS_AGH_YAML; do [ -r "$aip_y" ] && break; aip_y=""; done
     [ -n "$aip_y" ] || return 0
     aip_f=$(sed -n 's/^ *ipset_file: *//p' "$aip_y" | tr -d "\"' " | head -n 1)
@@ -5370,8 +5371,14 @@ agh_ipset_names() {
     { [ -n "$ain_f" ] && cat "$ain_f" 2>/dev/null; awk '/^ *ipset:/ { f = 1; print; next } f && /^ *- / { print; next } { f = 0 }' "$ain_y"; } |
         grep -o 'ASN[CD]_[A-Za-z0-9_]*' | sort -u
 }
+# The installer of AdGuard Home can put back an older copy of its ipset file at any dnsmasq start - a set that is gone
+# by then stops AdGuard Home. So domain sets (ASNC_ / ASND_) are only emptied, never destroyed; an empty set costs
+# nothing and is gone after the next reboot.
 asnm_set_drop() {
-    if agh_ipset_names | grep -qx "$1"; then ipset flush "$1" 2>/dev/null; else ipset destroy "$1" 2>/dev/null; fi
+    case "$1" in
+        ASNC_*|ASND_*) ipset flush "$1" 2>/dev/null ;;
+        *)             ipset destroy "$1" 2>/dev/null ;;
+    esac
 }
 agh_ipset_guard() {
     aig_have=$(ipset list -n 2>/dev/null)
