@@ -1,4 +1,4 @@
-## v3.10.4 (test version)
+## v3.10.4
 
 - Apply is about twice as fast: started by the user it no longer builds the domain entries twice (the early pass is for boot and the schedule only); the routing check runs in the background after it; the page data is written once at the end instead of also inside the rebuild; the domain entries read the list of sets once per run instead of once per entry, look up a target once instead of once per entry, and put the addresses already known for their names into the sets with one call instead of two per address. `ASNM_TIME=1 ASNmanager.sh apply` shows the time of each step
 - Fixed: AdGuard Home did not start any more after domain entries were changed - "unknown ipset". Its installer copies the ipset= lines of dnsmasq into its own ipset file (and can put an older copy back); when ASN Manager had destroyed a set of a removed or changed entry, AdGuard Home stopped at once on every start. A domain set that AdGuard Home still names is now only emptied, never destroyed, and a missing one is created empty (when dnsmasq starts, after every Apply and in the routing check)
