@@ -1,24 +1,15 @@
-## v3.10.6 (test version)
+## v3.10.6
 
-- Fixed: adding or removing a domain entry could leave DNS without AdGuard Home. One Apply restarted dnsmasq up to three times (domain entries, DNS follows the route, the rebuild in the background), and the start script of AdGuard Home needs about a minute after each restart; a second restart inside that minute made it fail and start its own recovery - more restarts, and DNS stayed down. Now an Apply restarts dnsmasq at most once, at the end, and every restart waits until the start script of AdGuard Home is quiet (at most 2 minutes). That restart and the restart of AdGuard Home that follows it run in the background - the Apply is done without waiting for them
-- WebUI: while dnsmasq and AdGuard Home restart in the background after an Apply, the page says so (with the seconds) and keeps its buttons locked; it asks the router every 5 seconds and frees them as soon as AdGuard Home answers again (also after reloading the page)
-- The self-test after an Apply no longer counts "dnsmasq is not running" while the start script of AdGuard Home is at work (it stops and starts dnsmasq itself) - it had switched to safemode for that
+Sums up the changes of 30 October (v3.10.3 to v3.10.6).
 
-## v3.10.5
-
-- The sets AdGuard Home names are also created at boot: in the early step and when the rules are built (its ipset file is on the USB device, which may be mounted only after dnsmasq started)
-- The page data (data.js) is written through a file of its own per run - an Apply and its routing check in the background wrote it at the same moment ("mv: can't rename data.js.tmp")
-- Fixed: AdGuard Home could still stop with "unknown ipset" after removing domain entries. ASN Manager removed the lines of sets that no longer existed from the ipset file of AdGuard Home and then destroyed the sets - but the installer of AdGuard Home puts an older copy of that file back at the next dnsmasq start. Domain sets are now never destroyed, only emptied (an empty set costs nothing and is gone after the next reboot), and the ipset file of AdGuard Home is no longer changed
-
-## v3.10.4
-
-- Apply is about twice as fast: started by the user it no longer builds the domain entries twice (the early pass is for boot and the schedule only); the routing check runs in the background after it; the page data is written once at the end instead of also inside the rebuild; the domain entries read the list of sets once per run instead of once per entry, look up a target once instead of once per entry, and put the addresses already known for their names into the sets with one call instead of two per address. `ASNM_TIME=1 ASNmanager.sh apply` shows the time of each step
-- Fixed: AdGuard Home did not start any more after domain entries were changed - "unknown ipset". Its installer copies the ipset= lines of dnsmasq into its own ipset file (and can put an older copy back); when ASN Manager had destroyed a set of a removed or changed entry, AdGuard Home stopped at once on every start. A domain set that AdGuard Home still names is now only emptied, never destroyed, and a missing one is created empty (when dnsmasq starts, after every Apply and in the routing check)
-- "Check device" (`device <IP>`): the list of current connections fits a phone screen - address, traffic, connections and line first, the name or "normal way" behind it; a rule gets its own line below, a group of domain entries shows its first domain and how many more
-
-## v3.10.3
-
-- WebUI, Traffic: the rows of the entries are grouped behind one row "Via rules" (with the number of entries and devices and their sum), closed by default - like "No rule (normal way)". "expand all" opens it as well
+- **Fixed: AdGuard Home could stop after domain entries were added or removed** - DNS was down until it was started by hand
+  - "unknown ipset": the installer of AdGuard Home copies the ipset= lines of dnsmasq into its own ipset file and can put an older copy back at any dnsmasq start. When ASN Manager had destroyed the set of a removed entry, AdGuard Home stopped at once on every start. Domain sets are now never destroyed, only emptied (gone after the next reboot), the ipset file of AdGuard Home is left alone, and a set it still names is created empty when dnsmasq starts, at boot, after every Apply and in the routing check
+  - Too many dnsmasq restarts: one Apply restarted dnsmasq up to three times, while the start script of AdGuard Home needs about a minute after each restart - a second one inside that minute made it fail and start its own recovery. Now an Apply restarts dnsmasq at most once, at the end and in the background, and only when the start script of AdGuard Home is quiet
+  - The self-test no longer switches to safemode while the start script of AdGuard Home stops and starts dnsmasq itself
+- **Apply is two to three times faster**: started by the user the domain entries are built once instead of twice, the routing check and the restart of dnsmasq / AdGuard Home run in the background, the page data is written once, and the domain entries need far fewer calls. `ASNM_TIME=1 ASNmanager.sh apply` shows the time of each step
+- WebUI: while dnsmasq and AdGuard Home restart after an Apply, the page says so and keeps its buttons locked; it checks every 5 seconds and frees them as soon as AdGuard Home answers again
+- WebUI, Traffic: the rows of the entries are grouped behind one row "Via rules", closed by default - like "No rule (normal way)"
+- "Check device": the list of current connections fits a phone screen - the rule of a connection gets its own line, a group of domain entries shows its first domain and how many more
 
 ## v3.10.2
 
