@@ -1032,6 +1032,14 @@ CU_HOOK="ASNmanager-Domains"
 # a domain set (hash:ip with expiry). Prints "new" when it was just created. An old set without expiry
 # (before v3.3.0) is rebuilt with its addresses kept: filled copy, swapped in (works while rules use the set)
 cu_set_make() {
+    # CU_SETS / CU_TSETS (all sets / sets with expiry, read once per run by cu_apply_dom_run): no ipset call per entry
+    if [ -n "$CU_SETS" ]; then
+        case " $CU_SETS " in
+            *" $1 "*) case " $CU_TSETS " in *" $1 "*) return 0 ;; esac ;;
+            *) ipset create "$1" hash:ip family inet hashsize 1024 maxelem 262144 timeout "$CU_TIMEOUT" 2>/dev/null
+               CU_SETS="$CU_SETS $1"; CU_TSETS="$CU_TSETS $1"; echo new; return 0 ;;
+        esac
+    fi
     if ! ipset list -n 2>/dev/null | grep -qx "$1"; then
         ipset create "$1" hash:ip family inet hashsize 1024 maxelem 262144 timeout "$CU_TIMEOUT" 2>/dev/null
         echo new; return 0
@@ -1131,13 +1139,21 @@ cu_apply_dom() {
 }
 cu_apply_dom_run() {
     tmark "domain entries: start"
+    CU_SETS=$(ipset list -n 2>/dev/null | tr '\n' ' ')
+    CU_TSETS=$(ipset list -t 2>/dev/null | awk '/^Name:/ { n = $2 } /^Header:.*timeout/ { print n }' | tr '\n' ' ')
+    [ -n "$CU_SETS" ] || CU_SETS=" "
+    cad_hk=""
     : > "$CU_GROUPS.raw.$$"; : > /tmp/asnmanager-dnsmasq.$$; : > /tmp/asnmanager-seed.$$; cad_new=""; cad_fresh=""
     if [ -s "$CUSTOM_FILE" ]; then
         while IFS=: read -r cid cdest csrc ckind cval; do
             [ "$ckind" = "dom" ] || continue
             case "$cid" in C[0-9]*) ;; *) continue ;; esac
             cad_key="${cdest}|${csrc}"
-            cad_set="ASND_${cdest}_$(echo "$cad_key" | md5sum | cut -c1-6)"
+            case "$cad_hk" in
+                *"<$cad_key>="*) cad_h=${cad_hk#*"<$cad_key>="}; cad_h=${cad_h%%;*} ;;
+                *) cad_h=$(echo "$cad_key" | md5sum | cut -c1-6); cad_hk="$cad_hk<$cad_key>=$cad_h;" ;;
+            esac
+            cad_set="ASND_${cdest}_${cad_h}"
             printf '%s\t%s\t%s\n' "$cad_key" "$cad_set" "$cval" >> "$CU_GROUPS.raw.$$"
             # one line per domain: the group set routes, the entry's own set counts what was learned for this domain
             [ "$(cu_set_make "ASNC_$cid")" = "new" ] && { cad_new=force; cad_fresh="$cad_fresh ASNC_$cid"; }
@@ -1173,6 +1189,7 @@ cu_apply_dom_run() {
     cu_cset_cleanup
     agh_ipset_prune
     cu_hook_sync "$(cut -f2 "$CU_GROUPS" 2>/dev/null)"
+    CU_SETS=""; CU_TSETS=""
     tmark "domain entries: set cleanup, AdGuard Home ipset file, hook"
 }
 
@@ -1181,16 +1198,22 @@ cu_apply_dom_run() {
 # which addresses were looked up under which name (last 2 days): those go into the sets right away.
 cu_seed_known() {         # file "id <TAB> group set <TAB> domain"
     [ -s "$1" ] && [ -s "$TS_RT/sg_dns.txt" ] || return 0
-    awk -F'\t' 'FILENAME == ARGV[1] { id[++n] = $1; gs[n] = $2; dm[n] = $3; next }
-        {
+    # every name is checked against the domains by its suffixes (a.b.example.com, b.example.com, example.com, com),
+    # the matches go into the sets with one ipset call
+    awk -F'\t' 'FILENAME == ARGV[1] { n++; id[n] = $1; gs[n] = $2; if ($3 in ix) ix[$3] = ix[$3] " " n; else ix[$3] = n; next }
+        $1 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ {
             m = split($2, nm, ",")
-            for (j = 1; j <= m; j++) for (i = 1; i <= n; i++) {
-                d = dm[i]; x = nm[j]
-                if (x == d || (length(x) > length(d) && substr(x, length(x) - length(d)) == "." d)) {
-                    if (!((i "|" $1) in done)) { done[i "|" $1] = 1; print "ASNC_" id[i], $1; print gs[i], $1 }
+            for (j = 1; j <= m; j++) {
+                x = nm[j]
+                while (x != "") {
+                    if (x in ix) {
+                        k = split(ix[x], l, " ")
+                        for (q = 1; q <= k; q++) { i = l[q]; if (!((i "|" $1) in done)) { done[i "|" $1] = 1; print "add ASNC_" id[i], $1; print "add " gs[i], $1 } }
+                    }
+                    p = index(x, "."); if (p == 0) break; x = substr(x, p + 1)
                 }
             }
-        }' "$1" "$TS_RT/sg_dns.txt" 2>/dev/null | sort -u | while read -r cs_set cs_ip; do ipset -q add -exist "$cs_set" "$cs_ip"; done
+        }' "$1" "$TS_RT/sg_dns.txt" 2>/dev/null | sort -u | ipset -q restore -exist
     return 0
 }
 
@@ -1315,10 +1338,15 @@ cu_apply_body() {
     tmark "IP entries"
     cu_apply_dom
     if [ -s "$CUSTOM_FILE" ]; then
+        cab_ok=" "; cab_no=" "
         while IFS=: read -r cid cdest csrc ckind cval; do
             [ "$ckind" = "dom" ] || continue
-            if cu_usable "$cdest"; then printf '%s\tok\n' "$cid" >> "$CU_STATUS"; else printf '%s\tdown\n' "$cid" >> "$CU_STATUS"; fi
-        done < "$CUSTOM_FILE"
+            case "$cab_ok$cab_no" in
+                *" $cdest "*) ;;
+                *) if cu_usable "$cdest"; then cab_ok="$cab_ok$cdest "; else cab_no="$cab_no$cdest "; fi ;;
+            esac
+            case "$cab_ok" in *" $cdest "*) printf '%s\tok\n' "$cid" ;; *) printf '%s\tdown\n' "$cid" ;; esac
+        done < "$CUSTOM_FILE" >> "$CU_STATUS"
     fi
     cu_cset_cleanup
     tmark "status of the entries, set cleanup"
@@ -3486,7 +3514,7 @@ cli_apply_run() {
         echo "Rebuilding rules from cache, downloading only missing ASNs..."
     fi
     rm -f /tmp/asn_progress.txt /tmp/asnmanager-time.log
-    ASN_QUICK=1 "$WORKER_SCRIPT" $wmode >/dev/null 2>&1 &
+    ASN_QUICK=1 ASNM_NOEXPORT=1 "$WORKER_SCRIPT" $wmode >/dev/null 2>&1 &     # the page data is written once, at the end
     wpid=$!
     while kill -0 "$wpid" 2>/dev/null; do
         if [ -n "$JOB_ID" ] && [ -s /tmp/asn_progress.txt ]; then
@@ -8538,7 +8566,7 @@ cli_main() {
     case "$cmd" in dnstls|dnsdevice|dnsfollow|failover) case "$1" in on|off|set|clear|vpnd|server) sm_watch_start "$cmd" ;; esac ;; esac
     # Keep the WebUI view in sync after CLI changes
     case "$cmd" in add|preset|remove|del|clear|apply|reload|retry|edit|import|schedule|restore|custom|exclude|devline)
-        [ -f "$ADDON_DIR/webui_page" ] && web_export ;;
+        [ -f "$ADDON_DIR/webui_page" ] && [ -z "$ASNM_NOEXPORT" ] && web_export ;;
     esac
     return $rc
 }
