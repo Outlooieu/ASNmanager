@@ -1106,6 +1106,13 @@ cu_hook_sync() {
 # one at a time: two runs at once (e.g. the nightly WAN reconnect starts firewall and VPN clients again while the
 # check runs) shared their work files - one saw half a list and took the addresses of many entries out of their sets
 CU_LOCK=/tmp/asnmanager-cu.lock
+# ASNM_TIME=1 ASNmanager.sh apply: how long each step of an Apply takes
+tmark() {
+    [ -n "$ASNM_TIME" ] || return 0
+    tm_n=$(cut -d' ' -f1 /proc/uptime); [ -n "$TM_LAST" ] || TM_LAST=$tm_n
+    awk -v a="$tm_n" -v b="$TM_LAST" -v l="$1" 'BEGIN { printf "[time] %6.2f s  %s\n", a - b, l }'
+    TM_LAST=$tm_n
+}
 cu_apply_dom() {
     sm_on && return 0
     cl_i=0
@@ -1118,9 +1125,11 @@ cu_apply_dom() {
     rmdir "$CU_LOCK" 2>/dev/null
     ex_sync
     dl_sync
+    tmark "excluded devices, device lines"
     return $cl_rc
 }
 cu_apply_dom_run() {
+    tmark "domain entries: start"
     : > "$CU_GROUPS.raw.$$"; : > /tmp/asnmanager-dnsmasq.$$; : > /tmp/asnmanager-seed.$$; cad_new=""; cad_fresh=""
     if [ -s "$CUSTOM_FILE" ]; then
         while IFS=: read -r cid cdest csrc ckind cval; do
@@ -1135,6 +1144,7 @@ cu_apply_dom_run() {
             printf '%s\t%s\t%s\n' "$cid" "$cad_set" "$cval" >> /tmp/asnmanager-seed.$$
         done < "$CUSTOM_FILE"
     fi
+    tmark "domain entries: one set per entry"
     awk -F'\t' '{ if ($1 in l) l[$1] = l[$1] " " $3; else { l[$1] = $3; s[$1] = $2 } } END { for (k in l) printf "%s\t%s\t%s\n", k, s[k], l[k] }' "$CU_GROUPS.raw.$$" > "$CU_GROUPS.new.$$"
     mv -f "$CU_GROUPS.new.$$" "$CU_GROUPS"; rm -f "$CU_GROUPS.raw.$$"
     # marking rules of every domain set go (they are added again below); sets of groups that no longer exist are destroyed
@@ -1148,16 +1158,21 @@ cu_apply_dom_run() {
         [ "$(cu_set_make "$cad_set")" = "new" ] && { cad_new=force; cad_fresh="$cad_fresh $cad_set"; }
         if cu_usable "$cad_t"; then cu_route "$cad_t"; cu_rules_add "$cad_set" "$cad_t" "$cad_src"; fi
     done < "$CU_GROUPS"
+    tmark "domain entries: group sets and marking rules"
     cu_learned_restore $cad_fresh
     cu_seed_known /tmp/asnmanager-seed.$$
+    tmark "domain entries: learned addresses restored / seeded"
     cu_group_cleanup /tmp/asnmanager-seed.$$
     cu_group_prune /tmp/asnmanager-seed.$$
+    tmark "domain entries: cleanup of old groups"
     cp -f /tmp/asnmanager-seed.$$ "$CU_IDMAP" 2>/dev/null; rm -f /tmp/asnmanager-seed.$$
     cu_dnsmasq_write /tmp/asnmanager-dnsmasq.$$ "$cad_new"
     rm -f /tmp/asnmanager-dnsmasq.$$
+    tmark "domain entries: dnsmasq lines (restart when changed)"
     cu_cset_cleanup
     agh_ipset_prune
     cu_hook_sync "$(cut -f2 "$CU_GROUPS" 2>/dev/null)"
+    tmark "domain entries: set cleanup, AdGuard Home ipset file, hook"
 }
 
 # A device asked for the name before the entry existed: its answer is cached on the device (and in AdGuard Home),
@@ -1292,10 +1307,11 @@ cu_learned_js() {
     } > "$WEB_DIR/learned.js.tmp" 2>/dev/null && mv -f "$WEB_DIR/learned.js.tmp" "$WEB_DIR/learned.js"
 }
 
-cu_apply() { sm_on && return 0; cu_apply_body "$@"; cab_r=$?; ex_sync; dl_sync; agh_ipset_guard; return $cab_r; }
+cu_apply() { sm_on && return 0; cu_apply_body "$@"; cab_r=$?; ex_sync; dl_sync; agh_ipset_guard; tmark "excluded devices, device lines (again), AdGuard Home sets"; return $cab_r; }
 cu_apply_body() {
     : > "$CU_STATUS"
     cu_apply_ip
+    tmark "IP entries"
     cu_apply_dom
     if [ -s "$CUSTOM_FILE" ]; then
         while IFS=: read -r cid cdest csrc ckind cval; do
@@ -1304,6 +1320,7 @@ cu_apply_body() {
         done < "$CUSTOM_FILE"
     fi
     cu_cset_cleanup
+    tmark "status of the entries, set cleanup"
     return 0
 }
 
@@ -3416,7 +3433,7 @@ cli_apply() {
     sm_on && { rm -f "$SM_RT" "$SM_FLAG"; sm_log "turned off by Apply"; echo "Safemode turned off - the rules are applied again."; sgd_write >/dev/null 2>&1; }
     cli_apply_run "$@"; ca_rc=$?
     # answers from DNS caches and connections opened on the old way would keep a site on the wrong line
-    agh_cache_clear; ct_fix apply
+    agh_cache_clear; tmark "AdGuard Home cache"; ct_fix apply; tmark "connections on a wrong line closed"
     sm_watch_start apply
     return $ca_rc
 }
@@ -3427,12 +3444,16 @@ cli_apply_run() {
     if [ "$amode" = "smart" ] && [ -s "$ASN_FILE" ] && cmp -s "$ASN_FILE" "$APPLIED_ASNS" && \
        ipset list -n 2>/dev/null | grep -qE '^ASNU?_' && iptables -t mangle -S PREROUTING 2>/dev/null | grep -q -- "--mark 0x0/$MARK_MASK"; then
         echo "ASN list unchanged since the last build - applying the IP / domain entries only."
+        tmark "start"
         : > "$CU_STATUS"; cu_apply
         mark_applied
         cu_list
+        tmark "list"
         echo "Rules applied: ASN rules kept, custom entries applied."
         rc_check >/dev/null 2>&1
+        tmark "routing check"
         { dnsf_on || dnsd_on; } && dnsf_sync >/dev/null 2>&1
+        tmark "DNS follows the route / DNS per device"
         return 0
     fi
     wmode="force"; [ "$amode" != "force" ] && wmode=""
