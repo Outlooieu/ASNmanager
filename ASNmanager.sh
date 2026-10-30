@@ -3476,9 +3476,18 @@ cli_apply() {
     # one dnsmasq restart at the end instead of one per step (also in the rebuild in the background: the variable is passed on)
     rm -f "$DNSMASQ_PENDING"; export DNSMASQ_DEFER=1
     cli_apply_run "$@"; ca_rc=$?
-    DNSMASQ_DEFER=""; dnsmasq_pending_run; tmark "dnsmasq restart (once, when needed)"
-    # answers from DNS caches and connections opened on the old way would keep a site on the wrong line
-    agh_cache_clear; tmark "AdGuard Home cache"; ct_fix apply; tmark "connections on a wrong line closed"
+    DNSMASQ_DEFER=""
+    # answers from DNS caches and connections opened on the old way would keep a site on the wrong line.
+    # A pending dnsmasq restart (and the restart of AdGuard Home that follows it, about a minute) runs in the
+    # background - AdGuard Home starts with an empty cache then; without it the cache is emptied here.
+    if [ -f "$DNSMASQ_PENDING" ]; then
+        ( dnsmasq_pending_run ) </dev/null >/dev/null 2>&1 &
+        echo "dnsmasq and AdGuard Home restart in the background (about a minute)."
+        tmark "dnsmasq restart started in the background"
+    else
+        agh_cache_clear; tmark "AdGuard Home cache"
+    fi
+    ct_fix apply; tmark "connections on a wrong line closed"
     sm_watch_start apply
     return $ca_rc
 }
