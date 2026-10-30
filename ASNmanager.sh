@@ -1110,6 +1110,7 @@ CU_LOCK=/tmp/asnmanager-cu.lock
 tmark() {
     [ -n "$ASNM_TIME" ] || return 0
     tm_n=$(cut -d' ' -f1 /proc/uptime); [ -n "$TM_LAST" ] || TM_LAST=$tm_n
+    if [ -n "$ASNM_TIME_LOG" ]; then echo "$tm_n   . $1" >> /tmp/asnmanager-time.log; TM_LAST=$tm_n; return 0; fi
     awk -v a="$tm_n" -v b="$TM_LAST" -v l="$1" 'BEGIN { printf "[time] %6.2f s  %s\n", a - b, l }'
     TM_LAST=$tm_n
 }
@@ -2325,14 +2326,16 @@ NC='\033[0m'
 
 # ASNM_TIME=1: time of each step (read by "apply")
 wt() { [ -n "$ASNM_TIME" ] && echo "$(cut -d' ' -f1 /proc/uptime) $1" >> /tmp/asnmanager-time.log; return 0; }
+[ -n "$ASNM_TIME" ] && export ASNM_TIME_LOG=1
 wt "worker started"
 # safemode (self-test rolled the rules back): nothing until Apply / "safemode off" / the next reboot
 [ -f /tmp/asnmanager-safemode ] && exit 0
 # no ASNs: only the custom entries (IP/CIDR, domains) may be left
 [ ! -s "$ASN_FILE" ] && { [ -x /jffs/scripts/ASNmanager.sh ] && /jffs/scripts/ASNmanager.sh custom apply >/dev/null 2>&1; exit 0; }
 # domain sets and their marking rules first (also before the internet wait at boot): what dnsmasq learned stays
-[ -x /jffs/scripts/ASNmanager.sh ] && /jffs/scripts/ASNmanager.sh custom early >/dev/null 2>&1
-wt "worker: domain entries first (custom early)"
+# (only at boot / by the schedule: started by the user they are in place already, "custom apply" below builds them)
+[ -z "$ASN_QUICK" ] && [ -x /jffs/scripts/ASNmanager.sh ] && /jffs/scripts/ASNmanager.sh custom early >/dev/null 2>&1
+wt "worker: domain entries first (custom early - not when started by the user)"
 
 # Better DNS & Internet check for boot
 n=0
@@ -3458,8 +3461,7 @@ cli_apply_run() {
         cu_list
         tmark "list"
         echo "Rules applied: ASN rules kept, custom entries applied."
-        rc_check >/dev/null 2>&1
-        tmark "routing check"
+        ( rc_check >/dev/null 2>&1; [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1 ) </dev/null >/dev/null 2>&1 &
         { dnsf_on || dnsd_on; } && dnsf_sync >/dev/null 2>&1
         tmark "DNS follows the route / DNS per device"
         return 0
@@ -3517,8 +3519,8 @@ cli_apply_run() {
     ep_guard_sync >/dev/null 2>&1
     fo_round_safe >/dev/null 2>&1
     tmark "tunnel protection, failover"
-    rc_check >/dev/null 2>&1
-    tmark "routing check"
+    # the routing check only looks and repairs (its result is for the page): in the background, the Apply is done
+    ( rc_check >/dev/null 2>&1; [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1 ) </dev/null >/dev/null 2>&1 &
     { dnsf_on || dnsd_on; } && dnsf_sync >/dev/null 2>&1
     tmark "DNS follows the route / DNS per device"
 }
