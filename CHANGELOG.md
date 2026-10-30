@@ -1,5 +1,6 @@
 ## v3.10.4 (test version)
 
+- Fixed: AdGuard Home did not start any more after domain entries were changed - "unknown ipset". Its installer copies the ipset= lines of dnsmasq into its own ipset file (and can put an older copy back); when ASN Manager had destroyed a set of a removed or changed entry, AdGuard Home stopped at once on every start. A domain set that AdGuard Home still names is now only emptied, never destroyed, and a missing one is created empty (when dnsmasq starts, after every Apply and in the routing check)
 - "Check device" (`device <IP>`): the list of current connections fits a phone screen - address, traffic, connections and line first, the name or "normal way" behind it; a rule gets its own line below, a group of domain entries shows its first domain and how many more
 
 ## v3.10.3

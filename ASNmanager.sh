@@ -1140,7 +1140,7 @@ cu_apply_dom_run() {
     # marking rules of every domain set go (they are added again below); sets of groups that no longer exist are destroyed
     for cad_s in $(ipset list -n 2>/dev/null | grep '^ASND_'); do
         cu_rules_del "$cad_s"
-        cut -f2 "$CU_GROUPS" | grep -qx "$cad_s" || ipset destroy "$cad_s" 2>/dev/null
+        cut -f2 "$CU_GROUPS" | grep -qx "$cad_s" || asnm_set_drop "$cad_s"
     done
     while IFS="$(printf '\t')" read -r cad_key cad_set cad_list; do
         [ -n "$cad_set" ] || continue
@@ -1237,7 +1237,7 @@ cu_group_prune() {
 }
 cu_cset_cleanup() {
     for ccc_s in $(ipset list -n 2>/dev/null | grep '^ASNC_'); do
-        cu_has "${ccc_s#ASNC_}" || { cu_rules_del "$ccc_s"; ipset destroy "$ccc_s" 2>/dev/null; }
+        cu_has "${ccc_s#ASNC_}" || { cu_rules_del "$ccc_s"; asnm_set_drop "$ccc_s"; }
     done
     return 0
 }
@@ -1292,7 +1292,7 @@ cu_learned_js() {
     } > "$WEB_DIR/learned.js.tmp" 2>/dev/null && mv -f "$WEB_DIR/learned.js.tmp" "$WEB_DIR/learned.js"
 }
 
-cu_apply() { sm_on && return 0; cu_apply_body "$@"; cab_r=$?; ex_sync; dl_sync; return $cab_r; }
+cu_apply() { sm_on && return 0; cu_apply_body "$@"; cab_r=$?; ex_sync; dl_sync; agh_ipset_guard; return $cab_r; }
 cu_apply_body() {
     : > "$CU_STATUS"
     cu_apply_ip
@@ -1309,8 +1309,8 @@ cu_apply_body() {
 
 # removes everything of the domain routing: rules, sets, our lines in dnsmasq.conf.add
 cu_purge() {
-    for cp_s in $(ipset list -n 2>/dev/null | grep '^ASND_'); do cu_rules_del "$cp_s"; ipset destroy "$cp_s" 2>/dev/null; done
-    for cp_s in $(ipset list -n 2>/dev/null | grep '^ASNC_'); do cu_rules_del "$cp_s"; ipset destroy "$cp_s" 2>/dev/null; done
+    for cp_s in $(ipset list -n 2>/dev/null | grep '^ASND_'); do cu_rules_del "$cp_s"; asnm_set_drop "$cp_s"; done
+    for cp_s in $(ipset list -n 2>/dev/null | grep '^ASNC_'); do cu_rules_del "$cp_s"; asnm_set_drop "$cp_s"; done
     cu_hook_sync ""
     rm -f "$(cu_save_jffs)" "$(cu_save_usb)" 2>/dev/null
     cu_dnsmasq_write /dev/null
@@ -4210,7 +4210,7 @@ ts_sync() {
         iptables-save 2>/dev/null | grep -q -- "--match-set $s " || ipset destroy "$s" 2>/dev/null
     done
     for s in $(ipset list -n 2>/dev/null | grep '^ASNC_'); do
-        grep -q "^${s#ASNC_}:" "$CUSTOM_FILE" 2>/dev/null || ipset destroy "$s" 2>/dev/null
+        grep -q "^${s#ASNC_}:" "$CUSTOM_FILE" 2>/dev/null || asnm_set_drop "$s"
     done
 
     ts_net_codes > "$TS_RT/nets.txt"
@@ -4923,6 +4923,7 @@ dnsf_servers_write() {
 # called by dnsmasq.postconf with the dnsmasq configuration (dnsmasqconf <file>)
 cli_dnsmasq_conf() {
     dc_c=$1; [ -f "$dc_c" ] || return 0
+    agh_ipset_guard
     sed -n 's/^servers-file=//p' "$dc_c" | grep -vxF "$DNSF_SERVERS" | tail -n 1 > "$DNSF_BASEF"
     sm_on && return 0
     { dnsf_on && [ -f "$DNSF_SERVERS" ]; } || return 0
@@ -5290,6 +5291,29 @@ dnsd_cache_set() {
     return 0
 }
 agh_yaml() { for ay in $DNS_AGH_YAML; do [ -r "$ay" ] && { echo "$ay"; return 0; }; done; return 1; }
+# The installer of AdGuard Home copies the ipset= lines of dnsmasq into an ipset file of AdGuard Home (and can put an
+# older copy back). AdGuard Home does not start when a set named there is missing ("unknown ipset"). So a domain set
+# AdGuard Home still names is never destroyed (only emptied), and a missing one is created empty.
+agh_ipset_names() {
+    ain_y=$(agh_yaml) || return 0
+    ain_f=$(sed -n 's/^ *ipset_file: *//p' "$ain_y" | head -n 1 | tr -d "'\"")
+    { [ -n "$ain_f" ] && cat "$ain_f" 2>/dev/null; awk '/^ *ipset:/ { f = 1; print; next } f && /^ *- / { print; next } { f = 0 }' "$ain_y"; } |
+        grep -o 'ASN[CD]_[A-Za-z0-9_]*' | sort -u
+}
+asnm_set_drop() {
+    if agh_ipset_names | grep -qx "$1"; then ipset flush "$1" 2>/dev/null; else ipset destroy "$1" 2>/dev/null; fi
+}
+agh_ipset_guard() {
+    aig_have=$(ipset list -n 2>/dev/null)
+    for aig_s in $(agh_ipset_names); do
+        echo "$aig_have" | grep -qx "$aig_s" && continue
+        case "$aig_s" in
+            ASNC_*) ipset create "$aig_s" hash:net family inet hashsize 64 maxelem 1024 2>/dev/null ;;
+            ASND_*) ipset create "$aig_s" hash:ip family inet hashsize 1024 maxelem 262144 timeout "$CU_TIMEOUT" 2>/dev/null ;;
+        esac && logger -t ASNmanager "AdGuard Home names the set $aig_s that no longer exists - created empty, so AdGuard Home can start"
+    done
+    return 0
+}
 agh_present() { agh_yaml >/dev/null && [ -x "$AGH_INIT" ]; }
 agh_up() { pidof AdGuardHome >/dev/null 2>&1 && netstat -lnu 2>/dev/null | grep -qE '[:.]53[[:space:]]'; }
 # the start script of AdGuard Home works in steps through the router service (stop and start run for up to a minute,
@@ -8161,7 +8185,7 @@ sm_disable() {
     # counting rules (they use the sets); the statistics put them back when the sets are there again
     ts_remove_rules >/dev/null 2>&1
     # domain sets and their rules
-    for sd_s in $(ipset list -n 2>/dev/null | grep -E '^ASN[CD]_'); do cu_rules_del "$sd_s"; ipset destroy "$sd_s" 2>/dev/null; done
+    for sd_s in $(ipset list -n 2>/dev/null | grep -E '^ASN[CD]_'); do cu_rules_del "$sd_s"; asnm_set_drop "$sd_s"; done
     # ASN sets, their rules and routing rules of every target
     cleanup_rules
     for sd_t in $VALID_DESTS; do
@@ -8417,7 +8441,7 @@ cli_main() {
             esac ;;
         check)
             case "$1" in
-                run) proc_reap; ts_ensure_loop >/dev/null 2>&1; sm_hook_sync; cu_learned_save >/dev/null 2>&1; dns_export >/dev/null 2>&1; sgd_trim; rc_run_once
+                run) proc_reap; ts_ensure_loop >/dev/null 2>&1; sm_hook_sync; agh_ipset_guard; cu_learned_save >/dev/null 2>&1; dns_export >/dev/null 2>&1; sgd_trim; rc_run_once
                      { dnsf_on || dnsd_on; } && dnsf_sync >/dev/null 2>&1
                      # new ASN names: write the page data again so they show up without a manual refresh
                      nm_before=$(md5sum "$NAMES_FILE" 2>/dev/null | cut -c1-32)
