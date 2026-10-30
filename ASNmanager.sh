@@ -3670,7 +3670,7 @@ web_export() {
     worker=0; [ -x "$WORKER_SCRIPT" ] && worker=1
 
     # own file per run: two exports at the same time (Apply + its background routing check - a ( ) subshell has the same $$)
-    out=$(mktemp "$WEB_DIR/data.js.XXXXXX" 2>/dev/null) || out="$WEB_DIR/data.js.tmp.$$.$RANDOM"
+    out="$WEB_DIR/data.js.tmp.$(cut -c1-8 /proc/sys/kernel/random/uuid 2>/dev/null)$$"
     {
         printf '{"version":"%s","generated":%s,"last_apply":%s,"pending":%s,"cron":%s,"worker":%s,' \
             "$SCRIPT_VERSION" "$(date +%s)" "$last_apply" "$pending" "$cron" "$worker"
