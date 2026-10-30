@@ -1,3 +1,8 @@
+## v3.10.6 (test version)
+
+- Fixed: adding or removing a domain entry could leave DNS without AdGuard Home. One Apply restarted dnsmasq up to three times (domain entries, DNS follows the route, the rebuild in the background), and the start script of AdGuard Home needs about a minute after each restart; a second restart inside that minute made it fail and start its own recovery - more restarts, and DNS stayed down. Now an Apply restarts dnsmasq at most once, at the end, and every restart waits until the start script of AdGuard Home is quiet (at most 2 minutes)
+- The self-test after an Apply no longer counts "dnsmasq is not running" while the start script of AdGuard Home is at work (it stops and starts dnsmasq itself) - it had switched to safemode for that
+
 ## v3.10.5
 
 - The sets AdGuard Home names are also created at boot: in the early step and when the rules are built (its ipset file is on the USB device, which may be mounted only after dnsmasq started)

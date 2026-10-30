@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.10.5
+version=3.10.6
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -12,7 +12,7 @@ case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
 export PATH
 
-SCRIPT_VERSION="3.10.5"
+SCRIPT_VERSION="3.10.6"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -3473,7 +3473,10 @@ APPLIED_ASNS="/tmp/asnmanager-applied.asns"
 # Apply turns safemode off; afterwards the self-test watches the router
 cli_apply() {
     sm_on && { rm -f "$SM_RT" "$SM_FLAG"; sm_log "turned off by Apply"; echo "Safemode turned off - the rules are applied again."; sgd_write >/dev/null 2>&1; }
+    # one dnsmasq restart at the end instead of one per step (also in the rebuild in the background: the variable is passed on)
+    rm -f "$DNSMASQ_PENDING"; export DNSMASQ_DEFER=1
     cli_apply_run "$@"; ca_rc=$?
+    DNSMASQ_DEFER=""; dnsmasq_pending_run; tmark "dnsmasq restart (once, when needed)"
     # answers from DNS caches and connections opened on the old way would keep a site on the wrong line
     agh_cache_clear; tmark "AdGuard Home cache"; ct_fix apply; tmark "connections on a wrong line closed"
     sm_watch_start apply
@@ -3492,7 +3495,7 @@ cli_apply_run() {
         cu_list
         tmark "list"
         echo "Rules applied: ASN rules kept, custom entries applied."
-        ( rc_check >/dev/null 2>&1; [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1 ) </dev/null >/dev/null 2>&1 &
+        ( DNSMASQ_DEFER=""; rc_check >/dev/null 2>&1; [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1 ) </dev/null >/dev/null 2>&1 &
         { dnsf_on || dnsd_on; } && dnsf_sync >/dev/null 2>&1
         tmark "DNS follows the route / DNS per device"
         return 0
@@ -3551,7 +3554,7 @@ cli_apply_run() {
     fo_round_safe >/dev/null 2>&1
     tmark "tunnel protection, failover"
     # the routing check only looks and repairs (its result is for the page): in the background, the Apply is done
-    ( rc_check >/dev/null 2>&1; [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1 ) </dev/null >/dev/null 2>&1 &
+    ( DNSMASQ_DEFER=""; rc_check >/dev/null 2>&1; [ -f "$ADDON_DIR/webui_page" ] && web_export >/dev/null 2>&1 ) </dev/null >/dev/null 2>&1 &
     { dnsf_on || dnsd_on; } && dnsf_sync >/dev/null 2>&1
     tmark "DNS follows the route / DNS per device"
 }
@@ -5473,8 +5476,33 @@ agh_guard_start() {
     ( agh_guard_run ) </dev/null >/dev/null 2>&1 &
     echo $! > "$AGH_GUARD_PID"
 }
+# The start script of AdGuard Home needs about a minute after a dnsmasq restart (port guard, hand-off, start, checks);
+# a second dnsmasq restart inside that minute makes it fail and start its own recovery - more restarts, DNS gone.
+# So: during an Apply every restart is only noted and done once at the end (DNSMASQ_DEFER), and before a restart
+# ASN Manager waits until that start script is quiet (no action lock, its log silent for 10 s; at most 2 minutes).
+DNSMASQ_PENDING=/tmp/asnmanager-dnsmasq.pending
+agh_quiet_wait() {
+    [ -x "$AGH_INIT" ] || return 0
+    aqw_i=0; aqw_q=0; aqw_l=$(agh_log_n 'S99AdGuardHome')
+    while [ $aqw_i -lt 120 ]; do
+        aqw_n=$(agh_log_n 'S99AdGuardHome')
+        if [ "$aqw_n" = "$aqw_l" ] && ! agh_busy; then aqw_q=$((aqw_q + 2)); [ $aqw_q -ge 10 ] && return 0; else aqw_q=0; fi
+        aqw_l=$aqw_n; sleep 2; aqw_i=$((aqw_i + 2))
+    done
+    logger -t ASNmanager "dnsmasq restart: the start script of AdGuard Home was still at work after 120s - restarting anyway"
+    return 1
+}
+dnsmasq_pending_run() {
+    [ -f "$DNSMASQ_PENDING" ] || return 0
+    rm -f "$DNSMASQ_PENDING"
+    DNSMASQ_DEFER="" dnsmasq_restart
+    [ -x "$AGH_INIT" ] && agh_settle >/dev/null 2>&1
+    return 0
+}
 # every restart of dnsmasq by ASN Manager goes through here
 dnsmasq_restart() {
+    if [ -n "$DNSMASQ_DEFER" ]; then : > "$DNSMASQ_PENDING"; return 0; fi
+    agh_quiet_wait
     dr_up=0
     [ -x "$AGH_INIT" ] && pidof AdGuardHome >/dev/null 2>&1 && dr_up=1     # only when AdGuard Home was running
     service restart_dnsmasq >/dev/null 2>&1
@@ -8147,6 +8175,8 @@ sm_lan_bad() {
 
 # prints the reason and returns 0 when something is broken
 sm_fail() {
+    # the start script of AdGuard Home is at work (it stops and starts dnsmasq itself): not a fault of the rules
+    [ -x "$AGH_INIT" ] && agh_busy && return 1
     pidof dnsmasq >/dev/null 2>&1 || { echo "dnsmasq is not running"; return 0; }
     sm_dns_ok || { echo "no DNS answers from the router (127.0.0.1)"; return 0; }
     sm_lan_bad && return 0
