@@ -1,4 +1,4 @@
-## v3.10.5 (test version)
+## v3.10.5
 
 - The sets AdGuard Home names are also created at boot: in the early step and when the rules are built (its ipset file is on the USB device, which may be mounted only after dnsmasq started)
 - The page data (data.js) is written through a file of its own per run - an Apply and its routing check in the background wrote it at the same moment ("mv: can't rename data.js.tmp")
