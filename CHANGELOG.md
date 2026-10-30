@@ -1,4 +1,4 @@
-## v3.10.3 (test version)
+## v3.10.3
 
 - WebUI, Traffic: the rows of the entries are grouped behind one row "Via rules" (with the number of entries and devices and their sum), closed by default - like "No rule (normal way)". "expand all" opens it as well
 
