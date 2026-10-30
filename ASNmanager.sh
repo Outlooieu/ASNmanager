@@ -3731,7 +3731,7 @@ web_export() {
         printf ',"pfiles":["/jffs/addons/asnmanager/presets.txt"'
         for pf_d in /tmp/mnt/*/ASNmanager; do [ -d "$pf_d" ] && printf ',"%s"' "$pf_d/presets.txt" | tr -d '\\'; done
         printf ']}\n'
-    } > "$out" && mv -f "$out" "$WEB_DIR/data.js"; rm -f "$out"
+    } > "$out" && chmod 644 "$out" && mv -f "$out" "$WEB_DIR/data.js"; rm -f "$out"
     rm -f "$sets_tmp" "$fail_tmp" "$pend_tmp" "$nm_tmp" "$nt_tmp"
     dns_export >/dev/null 2>&1
     ts_export >/dev/null 2>&1
