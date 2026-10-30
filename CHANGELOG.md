@@ -1,5 +1,6 @@
 ## v3.10.5 (test version)
 
+- The sets AdGuard Home names are also created at boot: in the early step and when the rules are built (its ipset file is on the USB device, which may be mounted only after dnsmasq started)
 - The page data (data.js) is written through a file of its own per run - an Apply and its routing check in the background wrote it at the same moment ("mv: can't rename data.js.tmp")
 - Fixed: AdGuard Home could still stop with "unknown ipset" after removing domain entries. ASN Manager removed the lines of sets that no longer existed from the ipset file of AdGuard Home and then destroyed the sets - but the installer of AdGuard Home puts an older copy of that file back at the next dnsmasq start. Domain sets are now never destroyed, only emptied (an empty set costs nothing and is gone after the next reboot), and the ipset file of AdGuard Home is no longer changed
 

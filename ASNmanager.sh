@@ -2357,6 +2357,8 @@ NC='\033[0m'
 wt() { [ -n "$ASNM_TIME" ] && echo "$(cut -d' ' -f1 /proc/uptime) $1" >> /tmp/asnmanager-time.log; return 0; }
 [ -n "$ASNM_TIME" ] && export ASNM_TIME_LOG=1
 wt "worker started"
+# sets AdGuard Home still names (its ipset file is on the USB device - at boot it may be mounted only now)
+[ -x /jffs/scripts/ASNmanager.sh ] && /jffs/scripts/ASNmanager.sh aghguard >/dev/null 2>&1
 # safemode (self-test rolled the rules back): nothing until Apply / "safemode off" / the next reboot
 [ -f /tmp/asnmanager-safemode ] && exit 0
 # no ASNs: only the custom entries (IP/CIDR, domains) may be left
@@ -8066,6 +8068,7 @@ eb_hook_sync() {
     sed -i "1a $SCRIPT_PATH early >/dev/null 2>&1 # ${EB_HOOK}" "$SERVICES_START"
 }
 cli_early() {
+    agh_ipset_guard
     nv_refresh
     ex_sync
     # first the routing rule and the kill switch block of every line a device line uses, then the device rules -
@@ -8555,6 +8558,7 @@ cli_main() {
         safemode) cli_safemode "$@" ;;
         early)    cli_early ;;
         dnsmasqconf) cli_dnsmasq_conf "$1" ;;
+        aghguard) agh_ipset_guard ;;
         exclude)  case "$1" in
                       ""|list) if ex_list | grep -q .; then ex_list | while read -r el_a; do echo "$el_a  $(dg_devname "${el_a%%/*}")"; done; else echo "No excluded devices."; fi ;;
                       set)     shift; ex_set "$(echo "$*" | tr ' ' ',')" ;;
