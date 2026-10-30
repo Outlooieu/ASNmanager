@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.10.3
+version=3.10.4
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -12,7 +12,7 @@ case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
 export PATH
 
-SCRIPT_VERSION="3.10.3"
+SCRIPT_VERSION="3.10.4"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -3066,7 +3066,9 @@ cli_device() {
         sort -t "$(printf '\t')" -k1,1nr | head -n 15 > /tmp/asnmanager-dv.c
     if [ ! -s /tmp/asnmanager-dv.c ]; then echo "No connections to the internet right now."; rm -f /tmp/asnmanager-dv.c; return 0; fi
     echo "Current connections (top 15 by traffic):"
-    printf '   %-16s %-28s %5s %9s  %-6s %s\n' "DESTINATION" "NAME" "CONN" "TRAFFIC" "VIA" "RULE"
+    # narrow lines (the page on a phone): address, traffic, connections, line, then name or "normal way";
+    # a rule goes on its own line below, a domain group shows its first domain and how many more
+    printf '   %-15s %9s %4s  %-5s %s\n' "DESTINATION" "TRAFFIC" "CONN" "VIA" "NAME / RULE"
     dg_rules > /tmp/asnmanager-dv.r
     while IFS="$(printf '\t')" read -r dc_b dc_ip dc_n dc_pt; do
         dc_nm=$(awk -F'\t' -v ip="$dc_ip" '$1 == ip { split($2, a, ","); print a[1]; exit }' "$TS_RT/sg_dns.txt" 2>/dev/null)
@@ -3077,9 +3079,16 @@ cli_device() {
         done < /tmp/asnmanager-dv.r
         dc_dl=""; if [ -z "$dc_mk" ] && [ -n "$dv_dlm" ]; then dc_mk=$dv_dlm; dc_dl=1; fi
         dc_dev=$(dg_route_dev "$dc_ip" "$dv_ip" "$dc_mk")
-        dc_rule="normal way"; [ -n "$dc_set" ] && dc_rule="$(dg_desc "$dc_set" "$dc_ip") -> $(dg_target_of_mark "$dc_mk")"
-        [ -n "$dc_dl" ] && dc_rule="device line -> $(dg_target_of_mark "$dc_mk")"
-        printf '   %-16s %-28s %5s %9s  %-6s %s\n' "$dc_ip" "$(echo "${dc_nm:--}" | cut -c1-28)" "$dc_n" "$(fmt_bytes "$dc_b")" "$(dg_target_of_dev "$dc_dev")" "$dc_rule"
+        dc_rule=""
+        if [ -n "$dc_dl" ]; then dc_rule="device line -> $(dg_target_of_mark "$dc_mk")"
+        elif [ -n "$dc_set" ]; then
+            dc_d=$(dg_desc "$dc_set" "$dc_ip"); dc_f=${dc_d%%, *}
+            if [ "$dc_f" != "$dc_d" ]; then dc_f="$dc_f +$(echo "$dc_d" | awk -F', ' '{ print NF - 1 }') more"; fi
+            dc_rule="$dc_f -> $(dg_target_of_mark "$dc_mk")"
+        fi
+        dc_tail=$(echo "${dc_nm}" | cut -c1-40); [ -z "$dc_rule" ] && dc_tail="${dc_tail:+$dc_tail - }normal way"
+        printf '   %-15s %9s %4s  %-5s %s\n' "$dc_ip" "$(fmt_bytes "$dc_b")" "${dc_n}x" "$(dg_target_of_dev "$dc_dev")" "$dc_tail"
+        [ -n "$dc_rule" ] && echo "      rule: $dc_rule"
     done < /tmp/asnmanager-dv.c
     rm -f /tmp/asnmanager-dv.c /tmp/asnmanager-dv.r
     [ "$(cat /proc/sys/net/netfilter/nf_conntrack_acct 2>/dev/null)" = "1" ] || echo "(traffic counters are off - turn on the traffic statistics to see the bytes)"

@@ -1,3 +1,7 @@
+## v3.10.4 (test version)
+
+- "Check device" (`device <IP>`): the list of current connections fits a phone screen - address, traffic, connections and line first, the name or "normal way" behind it; a rule gets its own line below, a group of domain entries shows its first domain and how many more
+
 ## v3.10.3
 
 - WebUI, Traffic: the rows of the entries are grouped behind one row "Via rules" (with the number of entries and devices and their sum), closed by default - like "No rule (normal way)". "expand all" opens it as well
