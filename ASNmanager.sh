@@ -2323,12 +2323,16 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
+# ASNM_TIME=1: time of each step (read by "apply")
+wt() { [ -n "$ASNM_TIME" ] && echo "$(cut -d' ' -f1 /proc/uptime) $1" >> /tmp/asnmanager-time.log; return 0; }
+wt "worker started"
 # safemode (self-test rolled the rules back): nothing until Apply / "safemode off" / the next reboot
 [ -f /tmp/asnmanager-safemode ] && exit 0
 # no ASNs: only the custom entries (IP/CIDR, domains) may be left
 [ ! -s "$ASN_FILE" ] && { [ -x /jffs/scripts/ASNmanager.sh ] && /jffs/scripts/ASNmanager.sh custom apply >/dev/null 2>&1; exit 0; }
 # domain sets and their marking rules first (also before the internet wait at boot): what dnsmasq learned stays
 [ -x /jffs/scripts/ASNmanager.sh ] && /jffs/scripts/ASNmanager.sh custom early >/dev/null 2>&1
+wt "worker: domain entries first (custom early)"
 
 # Better DNS & Internet check for boot
 n=0
@@ -2336,6 +2340,7 @@ nmax=45; [ -n "$ASN_QUICK" ] && nmax=5      # started by the user (WebUI / menu)
 until ping -c 1 -W 2 github.com >/dev/null 2>&1 || ping -c 1 -W 2 google.com >/dev/null 2>&1; do
     n=$((n+1)); [ $n -ge $nmax ] && break; sleep 2
 done
+wt "worker: internet check ($n retries)"
 
 > "$STATS_FILE"
 > /tmp/asn_failed.txt
@@ -2539,10 +2544,13 @@ while IFS=':' read -r asn dest src_ip; do
     fi
 done < "$ASN_ORDER"
 rm -f "$ASN_ORDER" /tmp/asn_progress.txt
+wt "worker: ASN sets and rules ($ASN_TOTAL ASNs)"
 # custom entries (IP/CIDR into the combined sets, domain rules)
 [ -x /jffs/scripts/ASNmanager.sh ] && /jffs/scripts/ASNmanager.sh custom apply >/dev/null 2>&1
+wt "worker: entries again (custom apply)"
 # VPN servers always via WAN (tunnel protection), also after a scheduled run
 [ -x /jffs/scripts/ASNmanager.sh ] && /jffs/scripts/ASNmanager.sh guard >/dev/null 2>&1
+wt "worker: tunnel protection"
 # the ASN list these sets were built from (RAM): "apply" can then skip the rebuild when only custom entries changed
 cp -f "$ASN_FILE" /tmp/asnmanager-applied.asns 2>/dev/null
 WORKER_EOF
@@ -3467,13 +3475,15 @@ cli_apply_run() {
         { dnsf_on || dnsd_on; } && dnsf_sync >/dev/null 2>&1
         return 0
     fi
+    tmark "start"
     rebuild_worker || return 1
+    tmark "worker script written"
     if [ -n "$wmode" ]; then
         echo "Fetching subnets for $(grep -c . "$ASN_FILE") ASN(s)..."
     else
         echo "Rebuilding rules from cache, downloading only missing ASNs..."
     fi
-    rm -f /tmp/asn_progress.txt
+    rm -f /tmp/asn_progress.txt /tmp/asnmanager-time.log
     ASN_QUICK=1 "$WORKER_SCRIPT" $wmode >/dev/null 2>&1 &
     wpid=$!
     while kill -0 "$wpid" 2>/dev/null; do
@@ -3486,6 +3496,11 @@ cli_apply_run() {
         sleep 2
     done
     wait "$wpid" 2>/dev/null
+    if [ -n "$ASNM_TIME" ] && [ -s /tmp/asnmanager-time.log ]; then
+        awk -v p="$TM_LAST" '{ printf "[time] %6.2f s    %s\n", $1 - p, substr($0, index($0, " ") + 1); p = $1 }' /tmp/asnmanager-time.log
+        TM_LAST=$(tail -n 1 /tmp/asnmanager-time.log | cut -d' ' -f1)
+    fi
+    tmark "worker: end"
     mark_applied
     ok=0; fail=0
     while IFS=':' read -r asn dest src_ip; do
@@ -3498,10 +3513,14 @@ cli_apply_run() {
         fi
     done < "$ASN_FILE"
     echo "Rules applied: ${ok} OK, ${fail} failed."
+    tmark "summary"
     ep_guard_sync >/dev/null 2>&1
     fo_round_safe >/dev/null 2>&1
+    tmark "tunnel protection, failover"
     rc_check >/dev/null 2>&1
+    tmark "routing check"
     { dnsf_on || dnsd_on; } && dnsf_sync >/dev/null 2>&1
+    tmark "DNS follows the route / DNS per device"
 }
 
 cli_schedule() {
