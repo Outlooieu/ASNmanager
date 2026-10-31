@@ -1,3 +1,7 @@
+## v3.10.8 (test version)
+
+- Fixed: "Suggestions by domain" stayed empty when dnsmasq had not written its lookup log (yet) - the query log of AdGuard Home was then not read either. With DNS per device most lookups go through AdGuard Home only, so it is now always read
+
 ## v3.10.7
 
 Sums up the changes of 30 October (v3.10.3 to v3.10.7).

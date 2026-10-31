@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.10.7
+version=3.10.8
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -12,7 +12,7 @@ case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
 export PATH
 
-SCRIPT_VERSION="3.10.7"
+SCRIPT_VERSION="3.10.8"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -4713,9 +4713,11 @@ sgd_trim() {
 # reads the new lines of the lookup log into $TS_RT/sg_dns.txt ("address <TAB> name[,name...] <TAB> last seen")
 sgd_collect() {
     sgd_on || return 0
-    sgc_f=$(sgd_file); [ -n "$sgc_f" ] && [ -r "$sgc_f" ] || return 0
+    # the lookup log of dnsmasq may be missing (dnsmasq has not written yet, safemode took the lines out): the query
+    # log of AdGuard Home is read anyway - with DNS per device most lookups never reach dnsmasq
+    sgc_f=$(sgd_file); [ -n "$sgc_f" ] && [ -r "$sgc_f" ] || sgc_f=/dev/null
     sgc_own=0; [ "$sgc_f" = "$SGD_LOG" ] && sgc_own=1
-    sgc_size=$(wc -c < "$sgc_f" 2>/dev/null); case "$sgc_size" in ''|*[!0-9]*) return 0 ;; esac
+    sgc_size=$(wc -c < "$sgc_f" 2>/dev/null); case "$sgc_size" in ''|*[!0-9]*) sgc_size=0 ;; esac
     sgc_off=$(cat "$TS_RT/sgd_off" 2>/dev/null); case "$sgc_off" in ''|*[!0-9]*) sgc_off=0 ;; esac
     [ "$sgc_size" -lt "$sgc_off" ] && sgc_off=0            # emptied or rotated meanwhile
     [ "$sgc_off" -eq 0 ] && [ "$sgc_own" -eq 0 ] && [ ! -f "$TS_RT/sgd_off" ] && sgc_off=$sgc_size   # someone else's file: from now on
@@ -4752,7 +4754,7 @@ sgd_collect() {
         sgc_off=$sgc_size
         if [ "$sgc_own" -eq 1 ] && [ "$sgc_size" -gt 524288 ]; then : > "$sgc_f"; sgc_off=0; fi
     fi
-    echo "$sgc_off" > "$TS_RT/sgd_off"
+    [ "$sgc_f" = /dev/null ] || echo "$sgc_off" > "$TS_RT/sgd_off"
     # AdGuard Home answers some devices itself (DNS per device): its query log knows those names too
     sgd_agh_collect >> "$TS_RT/sgd_new.txt" 2>/dev/null
     # merge: newest name first, up to 3 names per address; forget what was not seen for SGD_KEEP seconds
