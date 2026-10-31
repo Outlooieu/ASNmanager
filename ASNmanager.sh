@@ -8570,7 +8570,10 @@ cli_main() {
             esac ;;
         check)
             case "$1" in
-                run) proc_reap; ts_ensure_loop >/dev/null 2>&1; sm_hook_sync; agh_ipset_guard; cu_learned_save >/dev/null 2>&1; dns_export >/dev/null 2>&1; sgd_trim; rc_run_once
+                run) proc_reap; ts_ensure_loop >/dev/null 2>&1; sm_hook_sync; agh_ipset_guard
+                     # the lookup log lines of dnsmasq (suggestions by domain): put back when safemode or a reboot after
+                     # safemode left them out (dnsmasq is restarted only when they changed)
+                     sm_on || sgd_write >/dev/null 2>&1; cu_learned_save >/dev/null 2>&1; dns_export >/dev/null 2>&1; sgd_trim; rc_run_once
                      { dnsf_on || dnsd_on; } && dnsf_sync >/dev/null 2>&1
                      # new ASN names: write the page data again so they show up without a manual refresh
                      nm_before=$(md5sum "$NAMES_FILE" 2>/dev/null | cut -c1-32)

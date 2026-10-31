@@ -1,6 +1,7 @@
 ## v3.10.8 (test version)
 
 - Fixed: "Suggestions by domain" stayed empty when dnsmasq had not written its lookup log (yet) - the query log of AdGuard Home was then not read either. With DNS per device most lookups go through AdGuard Home only, so it is now always read
+- The lookup log lines of dnsmasq (suggestions by domain) were missing after safemode was ended by a reboot - the routing check now puts them back
 
 ## v3.10.7
 
