@@ -1,4 +1,4 @@
-## v3.10.9 (test version)
+## v3.10.9
 
 - E-mail on new versions: when GitHub was not reachable at the daily check (for example while dnsmasq and AdGuard Home restarted), the check counted as done for the day and the error stayed on the page until the next day. Now it is tried again every 30 minutes until it works, and the error says when it happened
 
