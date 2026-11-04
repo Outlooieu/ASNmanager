@@ -1,3 +1,7 @@
+## v3.10.9 (test version)
+
+- E-mail on new versions: when GitHub was not reachable at the daily check (for example while dnsmasq and AdGuard Home restarted), the check counted as done for the day and the error stayed on the page until the next day. Now it is tried again every 30 minutes until it works, and the error says when it happened
+
 ## v3.10.8
 
 - Fixed: "Suggestions by domain" stayed empty when dnsmasq had not written its lookup log (yet) - the query log of AdGuard Home was then not read either. With DNS per device most lookups go through AdGuard Home only, so it is now always read

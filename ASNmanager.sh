@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.10.8
+version=3.10.9
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -12,7 +12,7 @@ case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
 export PATH
 
-SCRIPT_VERSION="3.10.8"
+SCRIPT_VERSION="3.10.9"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -7721,10 +7721,17 @@ mail_check() {
     if [ "$1" != "force" ]; then
         [ "$(mail_st checked)" = "$mc_today" ] && return 0
         [ "$(date +%H | sed 's/^0//')" -ge "$MAIL_HOUR" ] || return 0
+        # GitHub was not reachable a moment ago (e.g. while dnsmasq / AdGuard Home restarted): next try after 30 minutes
+        mc_ft=$(mail_st fail_ts); case "$mc_ft" in ''|*[!0-9]*) mc_ft=0 ;; esac
+        [ $(( $(date +%s) - mc_ft )) -lt 1800 ] && return 0
     fi
-    mail_st_set checked "$mc_today"
     mc_tmp="/tmp/${WEBUI_NS}-mail-check.tmp"; mc_rv=$(upd_fetch "$mc_tmp" head); rm -f "$mc_tmp"
-    [ -n "$mc_rv" ] || { mail_st_set err "GitHub not reachable"; return 1; }
+    if [ -z "$mc_rv" ]; then
+        # not marked as checked: the routing check tries again (every 30 minutes) until it works
+        mail_st_set fail_ts "$(date +%s)"; mail_st_set err "GitHub not reachable ($(date '+%Y-%m-%d %H:%M')) - tried again every 30 minutes"
+        return 1
+    fi
+    mail_st_set checked "$mc_today"; mail_st_set fail_ts ""
     is_remote_newer "$SCRIPT_VERSION" "$mc_rv" || { mail_st_set err ""; return 0; }
     [ "$(mail_st sent)" = "$mc_rv" ] && return 0                                   # already told about this version
     mc_last=$(mail_st sent_ts); case "$mc_last" in ''|*[!0-9]*) mc_last=0 ;; esac
