@@ -1,3 +1,7 @@
+## v3.10.10 (test version)
+
+- dnsmasq could not start after a reboot - no DNS and no DHCP, and the start script of AdGuard Home restarted everything again every minute. AdGuard Home held port 53, but its start script had left "port=553" out of the dnsmasq configuration (its hand-off marker was missing), so dnsmasq wanted port 53 as well and stopped with "Address already in use". The dnsmasq.postconf hook of ASN Manager now adds "port=553" when AdGuard Home itself has port 53 and the line is missing (nothing is changed while AdGuard Home does not run)
+
 ## v3.10.9
 
 - E-mail on new versions: when GitHub was not reachable at the daily check (for example while dnsmasq and AdGuard Home restarted), the check counted as done for the day and the error stayed on the page until the next day. Now it is tried again every 30 minutes until it works, and the error says when it happened
