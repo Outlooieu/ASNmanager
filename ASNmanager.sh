@@ -5456,7 +5456,7 @@ agh_settle() {
 # The installer of AdGuard Home restarts AdGuard Home by itself about a second after every dnsmasq restart (it copies the ipset= lines).
 # Two service requests within that second can collide: AdGuard Home was stopped, its start never came, a "monitor-start" process
 # and its lock stay behind and DNS runs without AdGuard Home. After OUR dnsmasq restart a watcher (in the background, one at a time)
-# checks that AdGuard Home comes back; if it is not running and its start script has been silent for 90 seconds it cleans up
+# checks that AdGuard Home comes back; if it is not running and its start script has been silent for 40 seconds it cleans up
 # (the steps of "kill the monitor-start processes, remove the hand-off and the lock, start") once and writes it to the system log.
 AGH_GUARD_PID=/tmp/asnmanager-aghguard.pid
 agh_unstick() {
