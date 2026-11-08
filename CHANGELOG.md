@@ -1,4 +1,8 @@
-## v3.10.10 (test version)
+## v3.10.11 (test version)
+
+- Devices in the LAN/WLAN had no internet after the fix of v3.10.10 (guest WLAN worked): with "port=553" dnsmasq no longer gives itself out as DNS server by DHCP, so the devices got no DNS server at all. The hook now also adds the DNS server line for DHCP ("dhcp-option=lan,6,<router>") and "add-mac", like the start script of AdGuard Home does
+
+## v3.10.10
 
 - dnsmasq could not start after a reboot - no DNS and no DHCP, and the start script of AdGuard Home restarted everything again every minute. AdGuard Home held port 53, but its start script had left "port=553" out of the dnsmasq configuration (its hand-off marker was missing), so dnsmasq wanted port 53 as well and stopped with "Address already in use". The dnsmasq.postconf hook of ASN Manager now adds "port=553" when AdGuard Home itself has port 53 and the line is missing (nothing is changed while AdGuard Home does not run)
 

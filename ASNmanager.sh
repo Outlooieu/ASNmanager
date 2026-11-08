@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.10.10
+version=3.10.11
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -12,7 +12,7 @@ case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
 export PATH
 
-SCRIPT_VERSION="3.10.10"
+SCRIPT_VERSION="3.10.11"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -5023,8 +5023,13 @@ cli_dnsmasq_conf() {
     # would want port 53 too and stop at once ("Address already in use") - no DNS, no DHCP, and the start script
     # restarts everything again every minute. While AdGuard Home itself has port 53, dnsmasq can only use 553.
     if ! grep -q '^port=' "$dc_c" && netstat -lnup 2>/dev/null | awk '{ n = split($4, q, ":"); if (q[n] == "53" && $NF ~ /AdGuardHome/) f = 1 } END { exit !f }'; then
+        # the same lines its start script writes: with a port other than 53 dnsmasq no longer gives itself out as
+        # DNS server by DHCP (option 6) - without the dhcp-option line the devices get no DNS server at all
+        dc_ip=$(nvram get lan_ipaddr)
+        grep -q '^dhcp-option=lan,6[,[:space:]]' "$dc_c" || [ -z "$dc_ip" ] || echo "dhcp-option=lan,6,$dc_ip" >> "$dc_c"
+        grep -q '^add-mac' "$dc_c" || echo "add-mac" >> "$dc_c"
         echo "port=553" >> "$dc_c"
-        logger -t ASNmanager "dnsmasq: AdGuard Home holds port 53 but the dnsmasq configuration had no port line (hand-off of its start script missing) - port=553 added, so dnsmasq can start"
+        logger -t ASNmanager "dnsmasq: AdGuard Home holds port 53 but the dnsmasq configuration had no port line (hand-off of its start script missing) - port=553 and DNS server $dc_ip for DHCP added, so dnsmasq can start and the devices get DNS"
     fi
     sed -n 's/^servers-file=//p' "$dc_c" | grep -vxF "$DNSF_SERVERS" | tail -n 1 > "$DNSF_BASEF"
     sm_on && return 0
