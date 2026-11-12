@@ -1,3 +1,7 @@
+## v3.10.13 (test version)
+
+- Own presets showed up twice when the same presets.txt was on the router and on the USB device (for example after a restore, which copies the presets to the router): a preset with the same category and name is now listed once, the one on the router first
+
 ## v3.10.12
 
 - Rules can be switched off without removing them (GitHub issue #8): "Switch off" in the status column of a rule, or several at once with "Switch off selected". A switched-off rule stays in the list (greyed out, with its target, devices and note) but is not applied; "Switch on" brings it back exactly as it was. Works for ASNs, IP ranges and domains; command line `off <ID|ASN|domain|IP range>...` and `on ...`; backups keep switched-off rules as switched off (section [OFF]; older versions ignore it)

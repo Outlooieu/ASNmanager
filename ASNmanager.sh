@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.10.12
+version=3.10.13
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -12,7 +12,7 @@ case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
 export PATH
 
-SCRIPT_VERSION="3.10.12"
+SCRIPT_VERSION="3.10.13"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -186,7 +186,7 @@ preset_all() {
       for pa_f in /jffs/addons/asnmanager/presets.txt /tmp/mnt/*/ASNmanager/presets.txt; do
           # own presets get a 5th field "own" (shown with a star)
           [ -f "$pa_f" ] && tr -d '\r' < "$pa_f" | grep -E '^[a-z]+\|[^|]+\|[^|]+\|(wide)?$' | sed "s#\$#|own|$pa_f#"
-      done; } | tr -d '\r' | awk '!s[$0]++' |
+      done; } | tr -d '\r' | awk -F'|' '{ k = ($5 == "own") ? "own|" $1 "|" $2 : $0 } !s[k]++' |      # the same own preset in two files (router and USB device): once, the router file first
     awk -F'|' 'BEGIN { n = split("stream tvde news gaming social work shop bank services smarthome updates cloud test", c, " "); for (i = 1; i <= n; i++) o[c[i]] = i }
         { printf "%02d\t%s\t%s\n", ($1 in o) ? o[$1] : 99, tolower($2), $0 }' | sort -t "$(printf '\t')" -k1,1 -k2,2 | cut -f3-
 }
