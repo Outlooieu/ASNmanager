@@ -1229,7 +1229,7 @@ cu_seed_lines() {
 #  another device, the router never sees their lookups. Two ways to fill the sets anyway (cron, every minute):
 #  - external AdGuard Home: its query log is read through its API, the answers for the domain entries go into
 #    the sets (the addresses the devices really got, every subdomain)
-#  - lookups on a schedule (like Domain VPN Routing): the router looks the domain entries up itself (and "www.")
+#  - lookups on a schedule: the router looks the domain entries up itself (and "www.")
 # =====================================================================
 DF_EXT="/jffs/addons/asnmanager/aghext.conf"          # line 1 address of its web interface, line 2 base64 of user:password (root only)
 DF_RES="/jffs/addons/asnmanager/domresolve"           # minutes between the lookups (missing = off)

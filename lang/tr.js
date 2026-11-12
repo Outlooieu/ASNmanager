@@ -740,7 +740,7 @@ window.ASNM_LANGPACK = {"code": "tr", "locale": "tr-TR", "name": "Türkçe", "t"
 "dfx_bad_url": "Web arayüzünün adresini gir, örn. http://192.168.1.5:3000",
 "dfx_c_off": "Harici AdGuard Home kaldırılsın mı? Yanıtları artık alan adı girişlerini doldurmaz.",
 "dfr_title": "Alan adı girişlerini düzenli sorgula",
-"dfr_desc": "Domain VPN Routing gibi: yönlendirici her alan adı girişini kendisi sorgular (başına \"www.\" eklenmiş haliyle de) ve yanıtları setlere ekler. Yalnızca bu adları kapsar, her alt alan adını değil; CDN kullanan hizmetler cihazlarına başka adresler verebilir - mümkünse harici AdGuard Home daha iyi yoldur.",
+"dfr_desc": "Yönlendirici her alan adı girişini kendisi sorgular (başına \"www.\" eklenmiş haliyle de) ve yanıtları setlere ekler. Yalnızca bu adları kapsar, her alt alan adını değil; CDN kullanan hizmetler cihazlarına başka adresler verebilir - mümkünse harici AdGuard Home daha iyi yoldur.",
 "dfr_last": "Son çalışma {t}: {d} alan adı, {n} adres.",
 "dfr_wait": "İlk çalışma bir dakika içinde.",
 "act_aghext": "Harici AdGuard Home",

@@ -740,7 +740,7 @@ window.ASNM_LANGPACK = {"code": "sv", "locale": "sv-SE", "name": "Svenska", "t":
 "dfx_bad_url": "Ange adressen till dess webbgränssnitt, t.ex. http://192.168.1.5:3000",
 "dfx_c_off": "Ta bort den externa AdGuard Home? Dess svar fyller då inte längre domänposterna.",
 "dfr_title": "Slå upp domänposterna regelbundet",
-"dfr_desc": "Som Domain VPN Routing: routern slår själv upp varje domänpost (även med \"www.\" framför) och lägger svaren i seten. Täcker bara dessa namn, inte varje underdomän, och tjänster med CDN kan ge dina enheter andra adresser - där det går är den externa AdGuard Home den bättre vägen.",
+"dfr_desc": "Routern slår själv upp varje domänpost (även med \"www.\" framför) och lägger svaren i seten. Täcker bara dessa namn, inte varje underdomän, och tjänster med CDN kan ge dina enheter andra adresser - där det går är den externa AdGuard Home den bättre vägen.",
 "dfr_last": "Senaste körning {t}: {d} domän(er), {n} adress(er).",
 "dfr_wait": "Första körningen inom en minut.",
 "act_aghext": "Extern AdGuard Home",

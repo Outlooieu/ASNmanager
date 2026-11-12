@@ -740,7 +740,7 @@ window.ASNM_LANGPACK = {"code": "sl", "locale": "sl-SI", "name": "Slovenščina"
 "dfx_bad_url": "Vnesite naslov njegovega spletnega vmesnika, npr. http://192.168.1.5:3000",
 "dfx_c_off": "Odstranim zunanji AdGuard Home? Njegovi odgovori ne bodo več polnili domenskih vnosov.",
 "dfr_title": "Redno poizveduj domenske vnose",
-"dfr_desc": "Kot pri Domain VPN Routing: usmerjevalnik sam poizve vsak domenski vnos (tudi z \"www.\" spredaj) in odgovore vstavi v nize. Pokrije samo ta imena, ne vsake poddomene, storitve s CDN pa lahko vašim napravam dajo druge naslove - kjer je mogoče, je zunanji AdGuard Home boljša pot.",
+"dfr_desc": "Usmerjevalnik sam poizve vsak domenski vnos (tudi z \"www.\" spredaj) in odgovore vstavi v nize. Pokrije samo ta imena, ne vsake poddomene, storitve s CDN pa lahko vašim napravam dajo druge naslove - kjer je mogoče, je zunanji AdGuard Home boljša pot.",
 "dfr_last": "Zadnji zagon {t}: {d} domen, {n} naslovov.",
 "dfr_wait": "Prvi zagon v eni minuti.",
 "act_aghext": "Zunanji AdGuard Home",

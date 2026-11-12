@@ -3,7 +3,7 @@
 - Rules can be switched off without removing them (GitHub issue #8): "Switch off" in the status column of a rule, or several at once with "Switch off selected". A switched-off rule stays in the list (greyed out, with its target, devices and note) but is not applied; "Switch on" brings it back exactly as it was. Works for ASNs, IP ranges and domains; command line `off <ID|ASN|domain|IP range>...` and `on ...`; backups keep switched-off rules as switched off (section [OFF]; older versions ignore it)
 - Domain entries with another DNS server (GitHub issue #7): when the devices ask an AdGuard Home or Pi-hole on another device, the router never sees their lookups and the domain entries stayed at 0 learned. New card in Settings > DNS with two ways to fill them anyway:
   - External AdGuard Home: with the address and login of its web interface, its query log is read every minute and its answers for the domain entries go into the sets - the addresses the devices really got, for every subdomain. The login stays on the router (root only, not in backups); command line `aghext <http://IP:port> <user> [password] | off | status`
-  - Regular lookups (like Domain VPN Routing): every 5 to 60 minutes the router looks the domain entries up itself (also with "www.") and puts the answers into the sets; command line `domresolve off | 5 | 10 | 15 | 30 | 60`, state `domfeed status`
+  - Regular lookups: every 5 to 60 minutes the router looks the domain entries up itself (also with "www.") and puts the answers into the sets; command line `domresolve off | 5 | 10 | 15 | 30 | 60`, state `domfeed status`
 
 ## v3.10.11
 

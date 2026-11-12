@@ -740,7 +740,7 @@ window.ASNM_LANGPACK = {"code": "fr", "locale": "fr-FR", "name": "Français", "t
 "dfx_bad_url": "Veuillez saisir l'adresse de son interface web, p. ex. http://192.168.1.5:3000",
 "dfx_c_off": "Retirer l'AdGuard Home externe ? Ses réponses ne rempliront plus les entrées de domaine.",
 "dfr_title": "Résoudre régulièrement les entrées de domaine",
-"dfr_desc": "Comme Domain VPN Routing : le routeur résout lui-même chaque entrée de domaine (aussi avec « www. » devant) et place les réponses dans les sets. Ne couvre que ces noms, pas chaque sous-domaine, et les services avec CDN peuvent donner d'autres adresses à vos appareils - si possible, l'AdGuard Home externe est la meilleure voie.",
+"dfr_desc": "Le routeur résout lui-même chaque entrée de domaine (aussi avec « www. » devant) et place les réponses dans les sets. Ne couvre que ces noms, pas chaque sous-domaine, et les services avec CDN peuvent donner d'autres adresses à vos appareils - si possible, l'AdGuard Home externe est la meilleure voie.",
 "dfr_last": "Dernière exécution {t} : {d} domaine(s), {n} adresse(s).",
 "dfr_wait": "Première exécution dans la minute.",
 "act_aghext": "AdGuard Home externe",

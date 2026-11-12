@@ -740,7 +740,7 @@ window.ASNM_LANGPACK = {"code": "hu", "locale": "hu-HU", "name": "Magyar", "t": 
 "dfx_bad_url": "Add meg a webes felülete címét, pl. http://192.168.1.5:3000",
 "dfx_c_off": "Eltávolítod a külső AdGuard Home-ot? A válaszai ezután nem töltik a domain-bejegyzéseket.",
 "dfr_title": "Domain-bejegyzések rendszeres lekérdezése",
-"dfr_desc": "Mint a Domain VPN Routingnál: a router maga kérdezi le minden domain-bejegyzést (a \"www.\" előtaggal is), és a válaszokat a setekbe teszi. Csak ezeket a neveket fedi le, nem minden aldomaint, és a CDN-t használó szolgáltatások más címeket adhatnak az eszközeidnek - ahol lehet, a külső AdGuard Home a jobb megoldás.",
+"dfr_desc": "A router maga kérdezi le minden domain-bejegyzést (a \"www.\" előtaggal is), és a válaszokat a setekbe teszi. Csak ezeket a neveket fedi le, nem minden aldomaint, és a CDN-t használó szolgáltatások más címeket adhatnak az eszközeidnek - ahol lehet, a külső AdGuard Home a jobb megoldás.",
 "dfr_last": "Utolsó futás {t}: {d} domain, {n} cím.",
 "dfr_wait": "Első futás egy percen belül.",
 "act_aghext": "Külső AdGuard Home",

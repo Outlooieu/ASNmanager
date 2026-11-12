@@ -740,7 +740,7 @@ window.ASNM_LANGPACK = {"code": "pl", "locale": "pl-PL", "name": "Polski", "t": 
 "dfx_bad_url": "Podaj adres jego interfejsu WWW, np. http://192.168.1.5:3000",
 "dfx_c_off": "Usunąć zewnętrzny AdGuard Home? Jego odpowiedzi nie będą już wypełniać wpisów domen.",
 "dfr_title": "Regularnie sprawdzaj wpisy domen",
-"dfr_desc": "Jak w Domain VPN Routing: router sam sprawdza każdy wpis domeny (także z \"www.\" z przodu) i wkłada odpowiedzi do setów. Obejmuje tylko te nazwy, nie każdą subdomenę, a usługi z CDN mogą dać Twoim urządzeniom inne adresy - gdy to możliwe, zewnętrzny AdGuard Home jest lepszą drogą.",
+"dfr_desc": "Router sam sprawdza każdy wpis domeny (także z \"www.\" z przodu) i wkłada odpowiedzi do setów. Obejmuje tylko te nazwy, nie każdą subdomenę, a usługi z CDN mogą dać Twoim urządzeniom inne adresy - gdy to możliwe, zewnętrzny AdGuard Home jest lepszą drogą.",
 "dfr_last": "Ostatnie uruchomienie {t}: {d} domen, {n} adresów.",
 "dfr_wait": "Pierwsze uruchomienie w ciągu minuty.",
 "act_aghext": "Zewnętrzny AdGuard Home",

@@ -740,7 +740,7 @@ window.ASNM_LANGPACK = {"code": "nl", "locale": "nl-NL", "name": "Nederlands", "
 "dfx_bad_url": "Voer het adres van de webinterface in, bijv. http://192.168.1.5:3000",
 "dfx_c_off": "Externe AdGuard Home verwijderen? De antwoorden vullen de domeinitems dan niet meer.",
 "dfr_title": "Domeinitems regelmatig opvragen",
-"dfr_desc": "Zoals Domain VPN Routing: de router vraagt elk domeinitem zelf op (ook met \"www.\" ervoor) en zet de antwoorden in de sets. Dekt alleen deze namen, niet elk subdomein, en diensten met een CDN kunnen je apparaten andere adressen geven - waar mogelijk is de externe AdGuard Home de betere weg.",
+"dfr_desc": "De router vraagt elk domeinitem zelf op (ook met \"www.\" ervoor) en zet de antwoorden in de sets. Dekt alleen deze namen, niet elk subdomein, en diensten met een CDN kunnen je apparaten andere adressen geven - waar mogelijk is de externe AdGuard Home de betere weg.",
 "dfr_last": "Laatste run {t}: {d} domein(en), {n} adres(sen).",
 "dfr_wait": "Eerste run binnen een minuut.",
 "act_aghext": "Externe AdGuard Home",

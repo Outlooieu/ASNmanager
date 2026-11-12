@@ -740,7 +740,7 @@ window.ASNM_LANGPACK = {"code": "ro", "locale": "ro-RO", "name": "Română", "t"
 "dfx_bad_url": "Introdu adresa interfeței sale web, ex. http://192.168.1.5:3000",
 "dfx_c_off": "Elimini AdGuard Home extern? Răspunsurile lui nu vor mai umple intrările de domeniu.",
 "dfr_title": "Interoghează regulat intrările de domeniu",
-"dfr_desc": "Ca la Domain VPN Routing: routerul interoghează singur fiecare intrare de domeniu (și cu \"www.\" în față) și pune răspunsurile în seturi. Acoperă doar aceste nume, nu fiecare subdomeniu, iar serviciile cu CDN pot da dispozitivelor tale alte adrese - unde se poate, AdGuard Home extern e calea mai bună.",
+"dfr_desc": "Routerul interoghează singur fiecare intrare de domeniu (și cu \"www.\" în față) și pune răspunsurile în seturi. Acoperă doar aceste nume, nu fiecare subdomeniu, iar serviciile cu CDN pot da dispozitivelor tale alte adrese - unde se poate, AdGuard Home extern e calea mai bună.",
 "dfr_last": "Ultima rulare {t}: {d} domeniu/domenii, {n} adresă/adrese.",
 "dfr_wait": "Prima rulare în cel mult un minut.",
 "act_aghext": "AdGuard Home extern",

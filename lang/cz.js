@@ -740,7 +740,7 @@ window.ASNM_LANGPACK = {"code": "cz", "locale": "cs-CZ", "name": "Čeština", "t
 "dfx_bad_url": "Zadejte adresu jeho webového rozhraní, např. http://192.168.1.5:3000",
 "dfx_c_off": "Odebrat externí AdGuard Home? Jeho odpovědi už nebudou plnit doménové položky.",
 "dfr_title": "Pravidelně dotazovat doménové položky",
-"dfr_desc": "Jako Domain VPN Routing: router sám zjistí každou doménovou položku (i s \"www.\" na začátku) a odpovědi vloží do setů. Pokrývá jen tato jména, ne každou subdoménu, a služby s CDN mohou vašim zařízením dát jiné adresy - kde to jde, je externí AdGuard Home lepší cesta.",
+"dfr_desc": "Router sám zjistí každou doménovou položku (i s \"www.\" na začátku) a odpovědi vloží do setů. Pokrývá jen tato jména, ne každou subdoménu, a služby s CDN mohou vašim zařízením dát jiné adresy - kde to jde, je externí AdGuard Home lepší cesta.",
 "dfr_last": "Poslední běh {t}: {d} domén, {n} adres.",
 "dfr_wait": "První běh do minuty.",
 "act_aghext": "Externí AdGuard Home",

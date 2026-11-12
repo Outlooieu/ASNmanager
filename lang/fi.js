@@ -740,7 +740,7 @@ window.ASNM_LANGPACK = {"code": "fi", "locale": "fi-FI", "name": "Suomi", "t": {
 "dfx_bad_url": "Anna sen verkkokäyttöliittymän osoite, esim. http://192.168.1.5:3000",
 "dfx_c_off": "Poistetaanko ulkoinen AdGuard Home? Sen vastaukset eivät enää täytä verkkotunnusmerkintöjä.",
 "dfr_title": "Hae verkkotunnusmerkinnät säännöllisesti",
-"dfr_desc": "Kuten Domain VPN Routing: reititin hakee itse jokaisen verkkotunnusmerkinnän (myös \"www.\"-alkuisena) ja lisää vastaukset joukkoihin. Kattaa vain nämä nimet, ei jokaista aliverkkotunnusta, ja CDN:ää käyttävät palvelut voivat antaa laitteillesi muita osoitteita - kun mahdollista, ulkoinen AdGuard Home on parempi tapa.",
+"dfr_desc": "Reititin hakee itse jokaisen verkkotunnusmerkinnän (myös \"www.\"-alkuisena) ja lisää vastaukset joukkoihin. Kattaa vain nämä nimet, ei jokaista aliverkkotunnusta, ja CDN:ää käyttävät palvelut voivat antaa laitteillesi muita osoitteita - kun mahdollista, ulkoinen AdGuard Home on parempi tapa.",
 "dfr_last": "Viimeisin ajo {t}: {d} verkkotunnus(ta), {n} osoite(tta).",
 "dfr_wait": "Ensimmäinen ajo minuutin kuluessa.",
 "act_aghext": "Ulkoinen AdGuard Home",
