@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.10.11 -->
+<!-- ASNmanager-WebUI v3.10.12 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -197,6 +197,11 @@
 @keyframes asnm-flash { 50% { background: rgba(220, 38, 38, .18); } }
 .asnm-grc .asnm-badge { margin-left: 6px; }
 .asnm-table tr.asnm-failed td { background: rgba(248,113,113,.07); }
+.asnm-table tr.asnm-offrow td { opacity: .55; }
+.asnm-table tr.asnm-offrow td:first-child, .asnm-table tr.asnm-offrow td.asnm-actions { opacity: 1; }
+.asnm-badge.asnm-offb { background: rgba(148,163,184,.18); color: #94a3b8; }
+.asnm-offlink { font-size: 11px; opacity: .75; }
+.asnm-offlink:hover { opacity: 1; }
 .asnm-table tr.asnm-editing td { background: rgba(59,130,246,.08); }
 .asnm-arrow { display: inline-block; width: 0; height: 0; margin: 0 10px 1px 2px; vertical-align: middle; transition: transform .15s;
               border-left: 5px solid var(--muted); border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
@@ -526,7 +531,7 @@ var ASNM_NS = 'asnmanager';
 // the settings of ALL add-ons: the firmware writes custom_settings.txt anew from what a page sends - so every command
 // sends them back along with its own (taken when the page loads, refreshed from the router after each job)
 var ASNM_CS = <% get_custom_settings(); %>;
-var ASNM_PAGE_VER = '3.10.11';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.10.12';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
@@ -689,6 +694,7 @@ var ASNM_I18N = {
     c_replace: 'Replace the current list ({n} entries) with {m} entries from the backup?',
     a_asns: 'Please enter ASNs, IP/CIDR ranges (/8 to /32) or domains, e.g. AS13335, 181.209.202.0/24, *.googlevideo.com', a_ip: 'Source IP must be an IPv4 address or empty.',
     a_nothing: 'Nothing selected.', a_interval: 'Interval must be between 1 and 30 days.', a_time: 'Time must be HH:MM (24h).',
+    btn_off: 'Switch off', btn_on: 'Switch on', btn_off_sel: 'Switch off selected', btn_on_sel: 'Switch on selected', st_off: 'off', off_tip: 'Switched off: stays in the list with its target, devices and note, but is not applied. "Switch on" brings it back.', ls_off_n: '{n} off', act_off: 'Switch rules off', act_on: 'Switch rules on', act_offimport: 'Switched-off rules', df_title: 'Domain entries with another DNS server', df_sub: 'When the devices do not ask the router for names (AdGuard Home or Pi-hole on another device ...)', df_desc: 'Domain entries learn their addresses from the lookups that go through the router. If your devices use a DNS server on another device, the router never sees them and the entries stay at 0 learned. Then one of these fills them:', dfx_title: 'External AdGuard Home', dfx_desc: 'Every minute ASN Manager reads the query log of the AdGuard Home on another device and puts its answers for your domain entries into the sets - exactly the addresses your devices got, for every subdomain. The very first connection to a new address can still take the normal way. The login is kept on the router only (readable by root only, not in backups).', dfx_url: 'Address, e.g. http://192.168.1.5:3000', dfx_none: 'Not set up.', dfx_add: 'Set up', dfx_ok: '{u} - read at {t}, {n} address(es) for domain entries in the last hour.', dfx_err: '{u} - reading failed at {t}: {e}', dfx_wait: '{u} - read within a minute.', dfx_bad_url: 'Please enter the address of its web interface, e.g. http://192.168.1.5:3000', dfx_c_off: 'Remove the external AdGuard Home? Its answers no longer fill the domain entries.', dfr_title: 'Look up the domain entries regularly', dfr_desc: 'Like Domain VPN Routing: the router looks every domain entry up itself (also with "www." in front) and puts the answers into the sets. Covers only these names, not every subdomain, and services with a CDN can give your devices other addresses - where possible, the external AdGuard Home is the better way.', dfr_last: 'Last run {t}: {d} domain(s), {n} address(es).', dfr_wait: 'First run within a minute.', act_aghext: 'External AdGuard Home',
     a_host: 'Please enter a valid domain or IPv4 address.', footer: 'ASN Manager for Asuswrt-Merlin'
   },
   de: {
@@ -849,6 +855,7 @@ var ASNM_I18N = {
     c_replace: 'Die aktuelle Liste ({n} Einträge) durch {m} Einträge aus der Sicherung ersetzen?',
     a_asns: 'Bitte ASNs, IP-/CIDR-Bereiche (/8 bis /32) oder Domains eingeben, z. B. AS13335, 181.209.202.0/24, *.googlevideo.com', a_ip: 'Die Quell-IP muss eine IPv4-Adresse sein oder leer bleiben.',
     a_nothing: 'Nichts ausgewählt.', a_interval: 'Das Intervall muss zwischen 1 und 30 Tagen liegen.', a_time: 'Die Uhrzeit muss im Format HH:MM (24h) sein.',
+    btn_off: 'Ausschalten', btn_on: 'Einschalten', btn_off_sel: 'Auswahl ausschalten', btn_on_sel: 'Auswahl einschalten', st_off: 'aus', off_tip: 'Ausgeschaltet: bleibt mit Ziel, Geräten und Notiz in der Liste, wird aber nicht angewendet. "Einschalten" holt sie zurück.', ls_off_n: '{n} aus', act_off: 'Regeln ausschalten', act_on: 'Regeln einschalten', act_offimport: 'Ausgeschaltete Regeln', df_title: 'Domain-Einträge mit anderem DNS-Server', df_sub: 'Wenn die Geräte nicht den Router nach Namen fragen (AdGuard Home oder Pi-hole auf einem anderen Gerät ...)', df_desc: 'Domain-Einträge lernen ihre Adressen aus den Abfragen, die über den Router laufen. Nutzen deine Geräte einen DNS-Server auf einem anderen Gerät, sieht der Router sie nie und die Einträge bleiben bei 0 gelernt. Dann füllt eines davon sie:', dfx_title: 'Externes AdGuard Home', dfx_desc: 'Jede Minute liest ASN Manager das Abfrage-Protokoll des AdGuard Home auf einem anderen Gerät und legt dessen Antworten für deine Domain-Einträge in die Sets - genau die Adressen, die deine Geräte bekommen haben, für jede Subdomain. Die allererste Verbindung zu einer neuen Adresse kann noch den normalen Weg nehmen. Der Login liegt nur auf dem Router (nur für root lesbar, nicht in Sicherungen).', dfx_url: 'Adresse, z. B. http://192.168.1.5:3000', dfx_none: 'Nicht eingerichtet.', dfx_add: 'Einrichten', dfx_ok: '{u} - gelesen um {t}, {n} Adresse(n) für Domain-Einträge in der letzten Stunde.', dfx_err: '{u} - Lesen fehlgeschlagen um {t}: {e}', dfx_wait: '{u} - wird innerhalb einer Minute gelesen.', dfx_bad_url: 'Bitte die Adresse der Weboberfläche eingeben, z. B. http://192.168.1.5:3000', dfx_c_off: 'Externes AdGuard Home entfernen? Seine Antworten füllen die Domain-Einträge dann nicht mehr.', dfr_title: 'Domain-Einträge regelmäßig abfragen', dfr_desc: 'Wie bei Domain VPN Routing: Der Router fragt jeden Domain-Eintrag selbst ab (auch mit "www." davor) und legt die Antworten in die Sets. Erfasst nur diese Namen, nicht jede Subdomain, und Dienste mit CDN können deinen Geräten andere Adressen geben - wo möglich ist das externe AdGuard Home der bessere Weg.', dfr_last: 'Letzter Lauf {t}: {d} Domain(s), {n} Adresse(n).', dfr_wait: 'Erster Lauf innerhalb einer Minute.', act_aghext: 'Externes AdGuard Home',
     a_host: 'Bitte eine gültige Domain oder IPv4-Adresse eingeben.', footer: 'ASN Manager für Asuswrt-Merlin'
   }
 };
@@ -1022,6 +1029,12 @@ function asnmLoadData(first) {
         if (ASNM.data.custom) for (var ci = 0; ci < ASNM.data.custom.length; ci++) {
             var cc = ASNM.data.custom[ci];
             ASNM.data.entries.push({ asn: cc.id, dest: cc.dest, src: cc.src, subnets: cc.kind === 'ip' ? 1 : -1, loaded: cc.loaded, failed: 0, 'new': cc['new'], kind: cc.kind, value: cc.value, learned: cc.learned, ips: cc.ips || [], note: cc.note || '' });
+        }
+        ASNM.data.offRows = [];
+        if (ASNM.data.off) for (var oi = 0; oi < ASNM.data.off.length; oi++) {
+            var oo = ASNM.data.off[oi];
+            ASNM.data.offRows.push(oo.id ? { asn: oo.id, dest: oo.dest, src: oo.src, subnets: -1, loaded: 0, failed: 0, 'new': 0, kind: oo.kind, value: oo.value, learned: 0, ips: [], note: oo.note || '', off: 1 }
+                                         : { asn: oo.asn, dest: oo.dest, src: oo.src, subnets: -1, loaded: 0, failed: 0, 'new': 0, name: oo.name || '', note: oo.note || '', off: 1 });
         }
         ASNM.data.devices.sort(function (a, b) {
             var x = a.ip.split('.'), y = b.ip.split('.');
@@ -1326,7 +1339,7 @@ var ASNM_SECS = [
 ];
 
 function asnmRenderList() {
-    var all = ASNM.data.entries.slice(0);
+    var all = ASNM.data.entries.concat(ASNM.data.offRows || []);
     all.sort(function (a, b) {
         var o = ASNM.order.indexOf(a.dest) - ASNM.order.indexOf(b.dest);
         return o !== 0 ? o : (asnmEntryNum(a.asn) - asnmEntryNum(b.asn));
@@ -1364,7 +1377,8 @@ function asnmListSection(sec, entries, rcMap) {
     // per-target totals for the group headers
     var groups = {};
     for (var g = 0; g < entries.length; g++) {
-        var ge = entries[g], gs = groups[ge.dest] || (groups[ge.dest] = { n: 0, s: 0, f: 0, l: 0 });
+        var ge = entries[g], gs = groups[ge.dest] || (groups[ge.dest] = { n: 0, s: 0, f: 0, l: 0, o: 0 });
+        if (ge.off) { gs.o++; continue; }
         gs.n++; if (ge.subnets > 0) gs.s += ge.subnets; if (ge.failed) gs.f++; gs.l += ge.learned || 0;
     }
 
@@ -1380,6 +1394,7 @@ function asnmListSection(sec, entries, rcMap) {
                     asnmEsc(asnmDestLabel(e.dest)) + (f && f.dev ? ' - ' + asnmEsc(f.dev) : '') + ' &nbsp; ' + st + asnmFoBadge(e.dest) +
                     '<span class="asnm-gsum">' + asnmEsc(t('ls_gsum_' + sec, { n: gi.n, s: gi.s, l: gi.l })) +
                     (gi.f ? '<span class="asnm-badge asnm-bad">' + asnmEsc(t('group_failed', { f: gi.f })) + '</span>' : '') +
+                    (gi.o ? '<span class="asnm-badge asnm-offb">' + asnmEsc(t('ls_off_n', { n: gi.o })) + '</span>' : '') +
                     '<span class="asnm-grc" data-grc="' + asnmEsc(gk) + '">' + asnmGroupRcHtml(gk, rcMap) + '</span></span></td></tr>';
             lastDest = e.dest;
         }
@@ -1396,6 +1411,14 @@ function asnmListSection(sec, entries, rcMap) {
             continue;
         }
 
+        if (e.off) {
+            html += '<tr class="asnm-offrow" title="' + asnmEsc(t('off_tip')) + '"><td><input type="checkbox" class="asnm-chk asnm-chk-' + sec + '" value="' + a + '"/></td>' +
+                    '<td>' + (sec === 'asn' ? asnmEntryCell(e) : asnmEsc(sec === 'dom' ? '*.' + e.value : e.value) + ' <span class="asnm-muted asnm-cid">' + a + '</span>') + asnmNoteHtml(e) + '</td><td>' + asnmSrcCell(e.src) + '</td>' +
+                    '<td class="num"><span class="asnm-muted">-</span></td><td><span class="asnm-badge asnm-offb">' + asnmEsc(t('st_off')) + '</span></td><td></td>' +
+                    '<td class="asnm-actions"><input type="button" class="button_gen asnm-small-btn asnm-btn asnm-primary" value="' + asnmEsc(t('btn_on')) + '" onclick="asnmOnOff(\'on\', [\'' + a + '\'])"/> ' +
+                    '<input type="button" class="button_gen asnm-small-btn asnm-btn" value="' + asnmEsc(t('btn_remove')) + '" onclick="asnmRemove([\'' + a + '\'])"/></td></tr>';
+            continue;
+        }
         var iface = asnmIface(e.dest), state, rowCls = '';
         if (e.failed) { state = '<span class="asnm-badge asnm-bad">' + t('st_failed') + '</span>'; rowCls = ' class="asnm-failed"'; }
         else if (e['new'] && !e.loaded) state = '<span class="asnm-badge asnm-warn">' + t('st_new') + '</span>';
@@ -1410,7 +1433,7 @@ function asnmListSection(sec, entries, rcMap) {
         html += '<tr' + rowCls + '><td><input type="checkbox" class="asnm-chk asnm-chk-' + sec + '" value="' + a + '"/></td>' +
                 '<td>' + (sec === 'asn' ? asnmEntryCell(e) : asnmEsc(sec === 'dom' ? '*.' + e.value : e.value) + ' <span class="asnm-muted asnm-cid">' + a + '</span>') + asnmNoteHtml(e) + '</td><td>' + asnmSrcCell(e.src) + '</td>' +
                 '<td class="num">' + num + '</td>' +
-                '<td>' + state + '</td>' +
+                '<td>' + state + '<div><span class="asnm-link asnm-offlink" title="' + asnmEsc(t('off_tip')) + '" onclick="asnmOnOff(\'off\', [\'' + a + '\'])">' + asnmEsc(t('btn_off')) + '</span></div></td>' +
                 '<td id="asnm_rc_' + a + '">' + asnmRcBadge(e, rcMap) + '</td>' +
                 '<td class="asnm-actions"><input type="button" class="button_gen asnm-small-btn asnm-btn" value="' + asnmEsc(t('btn_edit')) + '" onclick="asnmEdit(\'' + a + '\')"/> ' +
                 '<input type="button" class="button_gen asnm-small-btn asnm-btn" value="' + asnmEsc(t('btn_remove')) + '" onclick="asnmRemove([\'' + a + '\'])"/></td></tr>';
@@ -1547,7 +1570,8 @@ function asnmToggleGroup(key) {
 
 function asnmCollapseAll(on) {
     if (!ASNM.data) return;
-    for (var i = 0; i < ASNM.data.entries.length; i++) ASNM.collapsed[asnmGroupKey(ASNM.data.entries[i])] = on;
+    var all = ASNM.data.entries.concat(ASNM.data.offRows || []);
+    for (var i = 0; i < all.length; i++) ASNM.collapsed[asnmGroupKey(all[i])] = on;
     asnmSaveCollapsed();
     asnmRenderList();
 }
@@ -1837,7 +1861,9 @@ function asnmEntryLabel(e) { return e.kind === 'ip' ? 'IP ' + e.value : (e.kind 
 function asnmLabelById(id) {
     var en = (ASNM.data && ASNM.data.entries) || [];
     for (var i = 0; i < en.length; i++) if (en[i].asn === id) return asnmEntryLabel(en[i]);
-    return 'AS' + id;
+    var of = (ASNM.data && ASNM.data.offRows) || [];
+    for (var j = 0; j < of.length; j++) if (of[j].asn === id) return asnmEntryLabel(of[j]);
+    return /^C\d+$/.test(id) ? id : 'AS' + id;
 }
 // learned addresses of a domain entry (data.js carries the first 200)
 function asnmLrRow(e) {
@@ -1880,6 +1906,10 @@ function asnmTrRowLabel(r) {
             var e = ASNM.data.entries[i];
             if (e.asn === r.asn && e.kind) return asnmEntryCell(e);
         }
+    // a switched-off IP / domain entry
+    var of = (ASNM.data && ASNM.data.offRows) || [];
+    for (var j = 0; j < of.length; j++) if (of[j].asn === r.asn && of[j].kind)
+        return asnmEntryCell(of[j]) + ' <span class="asnm-badge asnm-offb">' + asnmEsc(t('st_off')) + '</span>';
     // a removed IP / domain entry: what it was (remembered on removal)
     var g = ASNM.data && ASNM.data.removed && ASNM.data.removed[r.asn];
     if (g) return asnmEntryCell({ kind: g[0], value: g[1] }) + ' <span class="asnm-muted asnm-cid">' + asnmEsc(r.asn) + '</span>';
@@ -1951,6 +1981,18 @@ function asnmRemove(list) {
     if (!list.length) { alert(t('a_nothing')); return; }
     if (!confirm(list.length === 1 ? t('c_remove_one', { asn: asnmLabelById(list[0]) }) : t('c_remove_n', { n: list.length }))) return;
     asnmSend('remove', [list.join(',')]);
+}
+
+// switch rules off / on: they stay in the list (GitHub issue #8)
+function asnmOnOff(act, list) {
+    if (ASNM.busy) return;
+    if (!list.length) { alert(t('a_nothing')); return; }
+    asnmSend(act, [list.join(',')]);
+}
+function asnmOnOffSelected(act) {
+    var c = document.getElementsByClassName('asnm-chk'), l = [];
+    for (var i = 0; i < c.length; i++) if (c[i].checked) l.push(c[i].value);
+    asnmOnOff(act, l);
 }
 
 function asnmRemoveSelected() {
@@ -2287,11 +2329,11 @@ function asnmExportDone(txt, note) {
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.parentNode.removeChild(a); }, 1000);
 }
-var ASNM_SET_OK = { MAIL_NOTIFY: /^(off|daily|weekly)$/, STATS: /^(enabled|disabled)$/, STATS_SAVING: /^(on|off)$/, STATS_MODE: /^(asn|iface)$/, RULES_MODE: /^(combined|single)$/, WEBUI_LOCATION: /^(vpn|addons)$/, SG_DOMAINS: /^(on|off)$/, DNS_FOLLOW: /^(on|off)$/, DNS_DEVICE: /^(on|off)$/, DNS_TLS: /^(on|off)$/, FO_VPND: /^(on|off)$/, FO_KS: /^(on|off)$/, EXCLUDE: /^(none|[0-9.\/,]+)$/, DEVLINES: /^(none|[0-9.\/]+=[A-Z0-9]+(,[0-9.\/]+=[A-Z0-9]+)*)$/, LANGUARD: /^(on|off)$/, VPNWATCH: /^(on|off)$/ };
+var ASNM_SET_OK = { MAIL_NOTIFY: /^(off|daily|weekly)$/, STATS: /^(enabled|disabled)$/, STATS_SAVING: /^(on|off)$/, STATS_MODE: /^(asn|iface)$/, RULES_MODE: /^(combined|single)$/, WEBUI_LOCATION: /^(vpn|addons)$/, SG_DOMAINS: /^(on|off)$/, DNS_FOLLOW: /^(on|off)$/, DNS_DEVICE: /^(on|off)$/, DNS_TLS: /^(on|off)$/, FO_VPND: /^(on|off)$/, FO_KS: /^(on|off)$/, EXCLUDE: /^(none|[0-9.\/,]+)$/, DEVLINES: /^(none|[0-9.\/]+=[A-Z0-9]+(,[0-9.\/]+=[A-Z0-9]+)*)$/, LANGUARD: /^(on|off)$/, VPNWATCH: /^(on|off)$/, DOM_RESOLVE: /^(off|5|10|15|30|60)$/ };
 
 function asnmParseBackup(txt) {
     var lines = txt.replace(/\r/g, '').split('\n'), section = null, hasSections = /^\[(ASN_LIST|CUSTOM)\]/m.test(txt);
-    var res = { notes: [], entries: [], custom: [], bad: 0, interval: null, time: null, hasAsn: false, failover: [], hasFo: false, settings: {}, dnssrv: [], presets: [], nset: 0, version: '' };
+    var res = { notes: [], entries: [], custom: [], off: [], bad: 0, interval: null, time: null, hasAsn: false, failover: [], hasFo: false, settings: {}, dnssrv: [], presets: [], nset: 0, version: '' };
     var tg = '(?:WAN1|WAN2|OVPN[1-5]|WGC[1-5])', reFo = new RegExp('^(WAN|' + tg + ')=(' + tg + '|BLOCK)(?:,(' + tg + '|BLOCK))?$');
     for (var i = 0; i < lines.length; i++) {
         var l = lines[i].trim();
@@ -2309,7 +2351,7 @@ function asnmParseBackup(txt) {
             continue;
         }
         if (section === '[SETTINGS]') {
-            var sm = /^([A-Z_]+)=([a-z]+)$/.exec(l);
+            var sm = /^([A-Z_]+)=([a-z0-9]+)$/.exec(l);
             if (sm && ASNM_SET_OK[sm[1]] && ASNM_SET_OK[sm[1]].test(sm[2])) { res.settings[sm[1]] = sm[2]; res.nset++; }
             var dm = /^DNS_SERVER_((?:OVPN|WGC)[1-5])=(\d{1,3}(?:\.\d{1,3}){3}(?:,\d{1,3}(?:\.\d{1,3}){3})?)$/.exec(l);
             if (dm) { res.dnssrv.push([dm[1], dm[2]]); res.nset++; }
@@ -2324,6 +2366,13 @@ function asnmParseBackup(txt) {
             if (nmx) res.notes.push(nmx[1] + '=' + encodeURIComponent(nmx[2].trim().slice(0, 60)));
             continue;
         }
+        if (section === '[OFF]') {
+            var om = /^A\|(\d{1,10}):(WAN|WAN1|WAN2|OVPN[1-5]|WGC[1-5]):?([0-9.,\s]*)$/.exec(l), oc = /^C\|(WAN|WAN1|WAN2|OVPN[1-5]|WGC[1-5]):([0-9.,\s]*):(ip|dom):([A-Za-z0-9.\/-]+)$/.exec(l);
+            if (om && asnmValidSrc(om[3])) res.off.push('A|' + om[1] + ':' + (om[2] === 'WAN' ? 'WAN1' : om[2]) + ':' + asnmNormSrc(om[3]));
+            else if (oc && asnmValidSrc(oc[2]) && asnmEntryKind(oc[4]) === oc[3]) res.off.push('C|' + (oc[1] === 'WAN' ? 'WAN1' : oc[1]) + ':' + asnmNormSrc(oc[2]) + ':' + oc[3] + ':' + oc[4]);
+            else res.bad++;
+            continue;
+        }
         if (section === '[CUSTOM]') {
             var cm = /^(WAN|WAN1|WAN2|OVPN[1-5]|WGC[1-5]):([0-9.,\s]*):(ip|dom):([A-Za-z0-9.\/-]+)$/.exec(l);
             if (cm && asnmValidSrc(cm[2]) && asnmEntryKind(cm[4]) === cm[3]) res.custom.push((cm[1] === 'WAN' ? 'WAN1' : cm[1]) + ':' + asnmNormSrc(cm[2]) + ':' + cm[3] + ':' + cm[4]);
@@ -2336,7 +2385,7 @@ function asnmParseBackup(txt) {
         else res.bad++;
     }
     if (!hasSections && res.entries.length) res.hasAsn = true;
-    if (res.custom.length) res.hasAsn = true;
+    if (res.custom.length || res.off.length) res.hasAsn = true;
     return res;
 }
 
@@ -2361,7 +2410,7 @@ function asnmImportFile(input) {
         };
         var h = '<div class="asnm-rs-title">' + asnmEsc(t('rs_title')) + '</div><div class="asnm-dev">' + asnmEsc(file.name + (r.version ? ' (v' + r.version + ')' : '')) +
                 (r.bad ? ' - ' + asnmEsc(t('import_bad', { n: r.bad }).replace(/^, /, '')) : '') + '</div><div class="asnm-rs-list">';
-        if (r.hasAsn) h += sel('asnm_rs_asn', t('rs_asn', { n: r.entries.length + r.custom.length }),
+        if (r.hasAsn) h += sel('asnm_rs_asn', t('rs_asn', { n: r.entries.length + r.custom.length + r.off.length }),
             '<div class="asnm-rs-sub"><label><input type="radio" name="asnm_rs_mode" value="replace" checked="checked"/>' + asnmEsc(t('rs_replace')) + '</label>' +
             '<label><input type="radio" name="asnm_rs_mode" value="merge"/>' + asnmEsc(t('rs_merge')) + '</label></div>');
         if (r.interval && r.time) h += sel('asnm_rs_sched', t('rs_sched', { i: r.interval, t: r.time }));
@@ -2414,6 +2463,16 @@ function asnmImportRun() {
         }
         if (cchunk.length) jobs.push(['cimport', [cfirst ? mode : 'merge', cchunk.join(';')]]);
         else if (mode === 'replace') jobs.push(['cimport', ['replace', '']]);
+        var ochunk = [], olen = 0, ofirst = true;                                          // switched-off rules, after the lists
+        for (i = 0; i < r.off.length; i++) {
+            if (olen + r.off[i].length + 1 > ASNM.chunkChars && ochunk.length) {
+                jobs.push(['offimport', [ofirst ? mode : 'merge', ochunk.join(';')]]); ofirst = false;
+                ochunk = []; olen = 0;
+            }
+            ochunk.push(r.off[i]); olen += r.off[i].length + 1;
+        }
+        if (ochunk.length) jobs.push(['offimport', [ofirst ? mode : 'merge', ochunk.join(';')]]);
+        else if (mode === 'replace') jobs.push(['offimport', ['replace', '']]);
         var nchunk = [], nlen = 0, nfirst = true;
         for (i = 0; i < r.notes.length; i++) {
             if (nlen + r.notes[i].length + 1 > ASNM.chunkChars && nchunk.length) {
@@ -2433,7 +2492,7 @@ function asnmImportRun() {
     }
     if (chk('asnm_rs_set')) {
         // all settings in one job: the router syncs DNS once at the end (one restart of dnsmasq / AdGuard Home instead of one per setting)
-        var order = ['STATS_SAVING', 'STATS_MODE', 'RULES_MODE', 'WEBUI_LOCATION', 'SG_DOMAINS', 'DNS_FOLLOW', 'DNS_DEVICE', 'DNS_TLS', 'MAIL_NOTIFY', 'FO_VPND', 'FO_KS', 'EXCLUDE', 'DEVLINES', 'LANGUARD', 'VPNWATCH', 'STATS'], kv = [];
+        var order = ['STATS_SAVING', 'STATS_MODE', 'RULES_MODE', 'WEBUI_LOCATION', 'SG_DOMAINS', 'DNS_FOLLOW', 'DNS_DEVICE', 'DNS_TLS', 'MAIL_NOTIFY', 'FO_VPND', 'FO_KS', 'EXCLUDE', 'DEVLINES', 'LANGUARD', 'VPNWATCH', 'DOM_RESOLVE', 'STATS'], kv = [];
         for (i = 0; i < order.length; i++) if (r.settings[order[i]]) kv.push(order[i] + '=' + r.settings[order[i]]);
         for (i = 0; i < r.dnssrv.length; i++) kv.push('DNS_SERVER_' + r.dnssrv[i][0] + '=' + r.dnssrv[i][1]);     // DNS of the VPN provider per line
         if (kv.length) jobs.push(['rsset', [kv.join(';')]]);
@@ -2638,6 +2697,7 @@ function asnmPerfMark() {
     asnmExRender();
     asnmDlRender();
     asnmDnsfRender();
+    asnmDfRender();
     asnmMailRender();
 }
 
@@ -2749,6 +2809,45 @@ function asnmAghRender(f) {
     document.getElementById('asnm_agh_toggle').textContent = open ? t('btn_cancel') : t(f.aghlogin ? 'agh_change' : 'agh_add');
     var b = document.getElementById('asnm_agh_savebtn'); if (b) b.value = t('oe_save');
     var o = document.getElementById('asnm_agh_off'); if (o) o.style.display = f.aghlogin ? '' : 'none';
+}
+// domain entries with another DNS server: external AdGuard Home / regular lookups (GitHub issue #7)
+function asnmDfRender() {
+    var d = (ASNM.data && ASNM.data.df) || {}, info = document.getElementById('asnm_dfx_info'), s;
+    if (!info) return;
+    var tm = function (ts) { return ts ? new Date(ts * 1000).toLocaleTimeString(asnmLocale(), { hour: '2-digit', minute: '2-digit' }) : '-'; };
+    if (!d.ext) s = '<span class="asnm-muted">' + asnmEsc(t('dfx_none')) + '</span>';
+    else if (d.st === 'err') s = '<span class="asnm-dw-no">' + asnmEsc(t('dfx_err', { u: d.ext, e: d.x, t: tm(d.ts) })) + '</span>';
+    else if (d.st === 'ok') s = '<span class="asnm-dw-ok">✓ ' + asnmEsc(t('dfx_ok', { u: d.ext, n: d.x || 0, t: tm(d.ts) })) + '</span>';
+    else s = asnmEsc(t('dfx_wait', { u: d.ext }));
+    info.innerHTML = s;
+    var open = !!ASNM.dfxOpen;
+    document.getElementById('asnm_dfx_form').style.display = open ? '' : 'none';
+    document.getElementById('asnm_dfx_toggle').textContent = open ? t('btn_cancel') : t(d.ext ? 'agh_change' : 'dfx_add');
+    var b = document.getElementById('asnm_dfx_savebtn'); if (b) b.value = t('oe_save');
+    var o = document.getElementById('asnm_dfx_off'); if (o) o.style.display = d.ext ? '' : 'none';
+    var u = document.getElementById('asnm_dfx_url'); if (u && open && !u.value && d.ext) u.value = d.ext;
+    var sel = document.getElementById('asnm_dfr_sel');
+    if (sel && document.activeElement !== sel) sel.value = String(d.res || 0);
+    var ri = document.getElementById('asnm_dfr_info');
+    if (ri) ri.textContent = d.res ? (d.rts ? t('dfr_last', { t: tm(d.rts), d: d.rd || 0, n: d.rn || 0 }) : t('dfr_wait')) : '';
+}
+function asnmDfxToggle() { ASNM.dfxOpen = !ASNM.dfxOpen; asnmDfRender(); }
+function asnmDfxSave() {
+    var u = document.getElementById('asnm_dfx_url'), n = document.getElementById('asnm_dfx_user'), p = document.getElementById('asnm_dfx_pass');
+    if (ASNM.busy) return;
+    var url = u.value.trim().replace(/\/+$/, '');
+    if (!/^https?:\/\/[A-Za-z0-9._:\[\]-]+(\/[A-Za-z0-9._~\/-]*)?$/.test(url)) { alert(t('dfx_bad_url')); return; }
+    if (!n.value || !p.value) { alert(t('agh_need')); return; }
+    var b = btoa(unescape(encodeURIComponent(n.value + ':' + p.value)));
+    p.value = '';
+    ASNM.dfxOpen = false;
+    asnmSend('aghext', [url, b]);
+}
+function asnmDfxOff() { if (!ASNM.busy && confirm(t('dfx_c_off'))) asnmSend('aghext', ['off']); }
+function asnmDfrSet(v) {
+    var cur = String((ASNM.data && ASNM.data.df && ASNM.data.df.res) || 0);
+    if (ASNM.busy || v === cur) { asnmDfRender(); return; }
+    asnmSend('setting', ['DOM_RESOLVE', v === '0' ? 'off' : v]);
 }
 function asnmAghToggle() { ASNM.aghOpen = !ASNM.aghOpen; asnmAghRender((ASNM.data && ASNM.data.dnsf) || {}); }
 function asnmAghSave() {
@@ -4106,6 +4205,8 @@ function initial() {
     <div class="asnm-table-wrap"><div id="asnm_list" class="asnm-muted"><div style="padding:14px;">...</div></div></div>
     <div class="asnm-row" style="margin-top:14px;">
       <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_remove_sel" onclick="asnmRemoveSelected();"/>
+      <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_off_sel" onclick="asnmOnOffSelected('off');"/>
+      <input type="button" class="button_gen asnm-btn" data-i18n-value="btn_on_sel" onclick="asnmOnOffSelected('on');"/>
       <span class="asnm-spacer"></span>
       <input type="button" class="button_gen asnm-btn asnm-ghost asnm-danger-text" data-i18n-value="btn_remove_all" onclick="asnmClearAll();"/>
     </div>
@@ -4313,6 +4414,29 @@ function initial() {
     </div>
     <div id="asnm_dw_now"></div>
     <details class="asnm-dw-more"><summary data-i18n="dw_more"></summary><ul id="asnm_dw_more_list"></ul></details>
+  </div>
+  <div class="asnm-card" id="asnm_df_card">
+    <div class="asnm-card-head"><svg class="asnm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg><div class="asnm-card-titles"><h3 data-i18n="df_title"></h3><div class="asnm-card-sub" data-i18n="df_sub"></div></div></div>
+    <div class="asnm-help" data-i18n="df_desc"></div>
+    <div class="asnm-dw-sub" style="margin-top:10px;">
+      <div><span class="asnm-label asnm-dw-sublabel" data-i18n="dfx_title"></span><span id="asnm_dfx_info"></span>
+        <span class="asnm-link" id="asnm_dfx_toggle" style="margin-left:8px;" onclick="asnmDfxToggle();"></span></div>
+      <div id="asnm_dfx_form" style="display:none;margin-top:6px;">
+        <span class="asnm-help" data-i18n="dfx_desc"></span>
+        <div class="asnm-dw-ed" style="margin-top:8px;flex-wrap:wrap;gap:8px;">
+          <input type="text" id="asnm_dfx_url" maxlength="120" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-ph="dfx_url" style="width:230px;"/>
+          <input type="text" id="asnm_dfx_user" maxlength="64" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-ph="agh_user"/>
+          <input type="password" id="asnm_dfx_pass" maxlength="128" autocomplete="new-password" data-i18n-ph="agh_pass" onkeydown="if (event.key === 'Enter') { event.preventDefault(); asnmDfxSave(); }"/>
+          <input type="button" class="button_gen asnm-btn asnm-primary asnm-small-btn" id="asnm_dfx_savebtn" onclick="asnmDfxSave();"/>
+          <span class="asnm-link" id="asnm_dfx_off" style="display:none;" data-i18n="agh_remove" onclick="asnmDfxOff();"></span>
+        </div></div>
+    </div>
+    <div class="asnm-dw-sub">
+      <div><span class="asnm-label asnm-dw-sublabel" data-i18n="dfr_title"></span><span class="asnm-help" data-i18n="dfr_desc"></span></div>
+      <div class="asnm-dw-ed" style="margin-top:8px;"><select id="asnm_dfr_sel" class="input_option" style="max-width:200px;" onchange="asnmDfrSet(this.value);">
+        <option value="0" data-i18n="dnsf_off"></option><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="30">30 min</option><option value="60">60 min</option></select>
+        <span class="asnm-help" id="asnm_dfr_info" style="margin-left:10px;"></span></div>
+    </div>
   </div>
   </div>
   <div class="asnm-subpanel" id="asnm_ssub_general" style="display:none;">

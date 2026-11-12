@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.10.11
+version=3.10.12
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -12,7 +12,7 @@ case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
 export PATH
 
-SCRIPT_VERSION="3.10.11"
+SCRIPT_VERSION="3.10.12"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -516,7 +516,7 @@ cu_kind() {
 cu_has() { grep -q "^$1:" "$CUSTOM_FILE" 2>/dev/null; }
 # ids are never given out twice (the traffic statistics keep their numbers under the id): high-water mark in .seq
 cu_next_id() {
-    cnx=$(sed -n 's/^C\([0-9][0-9]*\):.*/\1/p' "$CUSTOM_FILE" 2>/dev/null | sort -n | tail -n 1)
+    cnx=$({ sed -n 's/^C\([0-9][0-9]*\):.*/\1/p' "$CUSTOM_FILE"; sed -n 's/^C|C\([0-9][0-9]*\):.*/\1/p' "$OFF_FILE"; } 2>/dev/null | sort -n | tail -n 1)
     cnq=$(cat "$CUSTOM_FILE.seq" 2>/dev/null); case "$cnq" in ''|*[!0-9]*) cnq=0 ;; esac
     [ "${cnx:-0}" -gt "$cnq" ] && cnq=${cnx:-0}
     cnq=$((cnq + 1)); echo "$cnq" > "$CUSTOM_FILE.seq"
@@ -526,6 +526,8 @@ cu_next_id() {
 cu_save() {
     [ -f "$CUSTOM_FILE" ] || : > "$CUSTOM_FILE"
     awk -F: -v k="$1" -v v="$4" '!($4 == k && $5 == v)' "$CUSTOM_FILE" > "$CUSTOM_FILE.new" && mv -f "$CUSTOM_FILE.new" "$CUSTOM_FILE"
+    # added again while a switched-off copy is kept: the new one counts
+    [ -s "$OFF_FILE" ] && awk -F: -v k="$1" -v v="$4" '!($1 ~ /^C\|/ && $4 == k && $5 == v)' "$OFF_FILE" > "$OFF_FILE.new" && mv -f "$OFF_FILE.new" "$OFF_FILE"
     cus_id=$(cu_next_id)
     echo "${cus_id}:$2:$3:$1:$4" >> "$CUSTOM_FILE"
     echo "$cus_id"
@@ -1196,8 +1198,13 @@ cu_apply_dom_run() {
 # A device asked for the name before the entry existed: its answer is cached on the device (and in AdGuard Home),
 # so dnsmasq sees no new lookup for a while and the entry learns nothing. The suggestions by domain already know
 # which addresses were looked up under which name (last 2 days): those go into the sets right away.
-cu_seed_known() {         # file "id <TAB> group set <TAB> domain"
-    [ -s "$1" ] && [ -s "$TS_RT/sg_dns.txt" ] || return 0
+cu_seed_known() {         # file "id <TAB> group set <TAB> domain" [names: "address <TAB> name[,name...]", default the suggestions]
+    cu_seed_lines "$1" "${2:-$TS_RT/sg_dns.txt}" | ipset -q restore -exist
+    return 0
+}
+# the ipset lines for cu_seed_known: "add <set> <address>" (each address once per entry)
+cu_seed_lines() {
+    [ -s "$1" ] && [ -s "$2" ] || return 0
     # every name is checked against the domains by its suffixes (a.b.example.com, b.example.com, example.com, com),
     # the matches go into the sets with one ipset call
     awk -F'\t' 'FILENAME == ARGV[1] { n++; id[n] = $1; gs[n] = $2; if ($3 in ix) ix[$3] = ix[$3] " " n; else ix[$3] = n; next }
@@ -1213,8 +1220,189 @@ cu_seed_known() {         # file "id <TAB> group set <TAB> domain"
                     p = index(x, "."); if (p == 0) break; x = substr(x, p + 1)
                 }
             }
-        }' "$1" "$TS_RT/sg_dns.txt" 2>/dev/null | sort -u | ipset -q restore -exist
+        }' "$1" "$2" 2>/dev/null | sort -u
+}
+
+# =====================================================================
+#  Domain entries with another DNS server (GitHub issue #7)
+#  The domain sets are filled by dnsmasq (or AdGuard Home on the router) - when the devices ask a DNS server on
+#  another device, the router never sees their lookups. Two ways to fill the sets anyway (cron, every minute):
+#  - external AdGuard Home: its query log is read through its API, the answers for the domain entries go into
+#    the sets (the addresses the devices really got, every subdomain)
+#  - lookups on a schedule (like Domain VPN Routing): the router looks the domain entries up itself (and "www.")
+# =====================================================================
+DF_EXT="/jffs/addons/asnmanager/aghext.conf"          # line 1 address of its web interface, line 2 base64 of user:password (root only)
+DF_RES="/jffs/addons/asnmanager/domresolve"           # minutes between the lookups (missing = off)
+DF_RT="/tmp/asnmanager-df"               # RAM: ext.st, res.st, res.last, lock
+DF_HOOK="ASNmanager-DomFeed"
+DF_LIMIT=${DF_LIMIT:-500}                # query log lines per minute
+df_ext_on() { [ -s "$DF_EXT" ]; }
+df_ext_url() { sed -n 1p "$DF_EXT" 2>/dev/null; }
+df_res_min() { drm_v=$(cat "$DF_RES" 2>/dev/null); case "$drm_v" in 5|10|15|30|60) echo "$drm_v" ;; *) echo 0 ;; esac; }
+df_cron_sync() {
+    ensure_script "$SERVICES_START" 2>/dev/null
+    if df_ext_on || [ "$(df_res_min)" -gt 0 ]; then
+        cru a ASN_DomFeed "* * * * * $SCRIPT_PATH domfeed run" 2>/dev/null
+        grep -q "# ${DF_HOOK}\$" "$SERVICES_START" 2>/dev/null || echo "$SCRIPT_PATH domfeed cron >/dev/null 2>&1 # ${DF_HOOK}" >> "$SERVICES_START"
+    else
+        cru d ASN_DomFeed 2>/dev/null
+        [ -f "$SERVICES_START" ] && sed -i "/# ${DF_HOOK}\$/d" "$SERVICES_START"
+        rm -rf "$DF_RT"
+    fi
     return 0
+}
+# df_api <path> <output file> [conf file]: GET on the external AdGuard Home, the HTTP code in DF_HTTP
+df_api() {
+    da_c=${3:-$DF_EXT}
+    da_u=$(sed -n 1p "$da_c" 2>/dev/null); da_b=$(sed -n 2p "$da_c" 2>/dev/null)
+    [ -n "$da_u" ] && [ -n "$da_b" ] || { DF_HTTP=nologin; return 2; }
+    DF_HTTP=$(printf 'header = "Authorization: Basic %s"\n' "$da_b" | curl -sk --connect-timeout 5 -m 25 -K - -o "$2" -w '%{http_code}' "$da_u$1" 2>/dev/null)
+    case "$DF_HTTP" in 2??) return 0 ;; esac
+    return 1
+}
+df_api_why() {
+    case "$DF_HTTP" in
+        401|403) echo "AdGuard Home refused the login (user name or password wrong)" ;;
+        000|"")  echo "no answer from $(df_ext_url 2>/dev/null)" ;;
+        nologin) echo "no login saved" ;;
+        *)       echo "AdGuard Home answered HTTP $DF_HTTP" ;;
+    esac
+}
+# aghext <address> <user> <password> | <address> <base64 of user:password> | off | status
+aghext_set() {
+    case "$1" in
+        off|"") rm -f "$DF_EXT" "$DF_RT/ext.st"; df_cron_sync; echo "External AdGuard Home removed."; return 0 ;;
+        status) df_status; return 0 ;;
+    esac
+    ae_u=$(printf '%s' "$1" | sed 's#/*$##')
+    echo "$ae_u" | grep -qE '^https?://[A-Za-z0-9._:-]+(\[[0-9A-Fa-f:]+\](:[0-9]+)?)?(/[A-Za-z0-9._~/-]*)?$' || { echo "Not saved: the address must look like http://192.168.1.5:3000"; return 1; }
+    if [ $# -ge 3 ]; then ae_b=$(printf '%s:%s' "$2" "$3" | { base64 2>/dev/null || openssl base64 -A 2>/dev/null; } | tr -d '\n')
+    else ae_b=$2; fi
+    case "$ae_b" in ''|*[!A-Za-z0-9+/=]*) echo "Not saved: user name and password missing or invalid."; return 1 ;; esac
+    mkdir -p "$ADDON_DIR" "$DF_RT"
+    ( umask 077; printf '%s\n%s\n' "$ae_u" "$ae_b" > "$DF_EXT.new" ); chmod 600 "$DF_EXT.new"
+    if ! df_api /control/status "$DF_RT/status.json" "$DF_EXT.new"; then
+        rm -f "$DF_EXT.new" "$DF_RT/status.json"
+        echo "Not saved: $(DF_EXT=/dev/null; df_api_why | sed "s#no answer from #no answer from $ae_u#")."
+        return 1
+    fi
+    rm -f "$DF_RT/status.json"
+    mv -f "$DF_EXT.new" "$DF_EXT"
+    df_cron_sync
+    echo "External AdGuard Home saved ($ae_u) - its query log is read every minute."
+    df_lock && { df_ext_fetch; df_unlock; }
+    df_status | sed -n 1p
+    return 0
+}
+# domresolve off | 5 | 10 | 15 | 30 | 60
+df_res_set() {
+    case "$1" in
+        off|0) rm -f "$DF_RES" "$DF_RT/res.st" "$DF_RT/res.last"; df_cron_sync; echo "Regular lookups of the domain entries: off."; return 0 ;;
+        5|10|15|30|60) mkdir -p "$ADDON_DIR"; echo "$1" > "$DF_RES"; rm -f "$DF_RT/res.last"; df_cron_sync
+                       echo "Regular lookups of the domain entries: every $1 minutes (the first within a minute)."; return 0 ;;
+        *) echo "Usage: domresolve off | 5 | 10 | 15 | 30 | 60   (minutes; now: $(df_res_min | sed 's/^0$/off/'))"; return 1 ;;
+    esac
+}
+df_lock() {
+    mkdir -p "$DF_RT"
+    if ! mkdir "$DF_RT/lock" 2>/dev/null; then
+        dl_t=$(date -r "$DF_RT/lock" +%s 2>/dev/null); case "$dl_t" in ''|*[!0-9]*) dl_t=0 ;; esac
+        [ $(( $(date +%s) - dl_t )) -lt 600 ] && return 1          # the last run is still at work
+        rm -rf "$DF_RT/lock"; mkdir "$DF_RT/lock" 2>/dev/null || return 1
+    fi
+    return 0
+}
+df_unlock() { rm -rf "$DF_RT/lock"; }
+# "address <TAB> name" lines of a file into the sets of the matching domain entries; prints the number of addresses
+df_seed() {
+    [ -s "$CU_IDMAP" ] || { echo 0; return 0; }
+    cu_seed_lines "$CU_IDMAP" "$1" > "$DF_RT/seed.txt"
+    ipset -q restore -exist < "$DF_RT/seed.txt"
+    grep -c '^add ASNC_' "$DF_RT/seed.txt"
+    rm -f "$DF_RT/seed.txt"
+}
+# the newest lines of the query log of the external AdGuard Home (answers with IPv4 addresses)
+df_ext_fetch() {
+    df_ext_on || return 0
+    if [ ! -s "$CU_IDMAP" ]; then echo "ok|$(date +%s)|0" > "$DF_RT/ext.st"; return 0; fi
+    if ! df_api "/control/querylog?limit=$DF_LIMIT" "$DF_RT/ql.json"; then
+        echo "err|$(date +%s)|$(df_api_why)" > "$DF_RT/ext.st"; rm -f "$DF_RT/ql.json"; return 1
+    fi
+    # one record per line: every record has one "time" (its keys come in alphabetical order: answer ... question ... time)
+    awk '{ gsub(/"time":"/, "\n"); print }' "$DF_RT/ql.json" | awk '
+        {
+            if (!match($0, /"question":\{[^}]*\}/)) next
+            qs = substr($0, RSTART, RLENGTH); if (qs !~ /"type":"A"/) next
+            if (!match(qs, /"name":"[^"]*"/)) next
+            q = tolower(substr(qs, RSTART + 8, RLENGTH - 9)); sub(/\.$/, "", q)
+            if (q !~ /^[a-z0-9_.-]+\.[a-z0-9-]+$/) next
+            if (!match($0, /"answer":\[[^]]*\]/)) next
+            a = substr($0, RSTART, RLENGTH)
+            while (match(a, /\{[^}]*\}/)) {
+                o = substr(a, RSTART, RLENGTH); a = substr(a, RSTART + RLENGTH)
+                if (o ~ /"type":"A"/ && match(o, /"value":"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+"/)) print substr(o, RSTART + 9, RLENGTH - 10) "\t" q
+            }
+        }' | sort -u > "$DF_RT/ql.txt"
+    rm -f "$DF_RT/ql.json"
+    de_n=$(df_seed "$DF_RT/ql.txt")
+    # the addresses found per run add up for the page (the count of the last hour)
+    de_now=$(date +%s)
+    { awk -F'|' -v t="$de_now" '$1 >= t - 3600' "$DF_RT/ext.hist" 2>/dev/null; echo "$de_now|${de_n:-0}"; } > "$DF_RT/ext.hist.new" && mv -f "$DF_RT/ext.hist.new" "$DF_RT/ext.hist"
+    echo "ok|$de_now|$(awk -F'|' '{ s += $2 } END { print s + 0 }' "$DF_RT/ext.hist")" > "$DF_RT/ext.st"
+    rm -f "$DF_RT/ql.txt"
+    return 0
+}
+# the router looks the domain entries up itself (each domain and "www." in front)
+df_resolve() {
+    [ -s "$CU_IDMAP" ] || { echo "$(date +%s)|0|0" > "$DF_RT/res.st"; return 0; }
+    : > "$DF_RT/res.txt"; dr_d=0
+    for dr_n in $(cut -f3 "$CU_IDMAP" | sort -u | head -n 400); do
+        dr_d=$((dr_d + 1))
+        for dr_q in "$dr_n" "www.$dr_n"; do
+            nslookup "$dr_q" 127.0.0.1 2>/dev/null | awk -v n="$dr_q" '/^Name:/ { f = 1; next } f && /^Address/ { for (i = 2; i <= NF; i++) if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) print $i "\t" n }'
+        done >> "$DF_RT/res.txt"
+    done
+    dr_c=$(df_seed "$DF_RT/res.txt")
+    echo "$(date +%s)|$dr_d|${dr_c:-0}" > "$DF_RT/res.st"
+    rm -f "$DF_RT/res.txt"
+}
+# cron, every minute
+df_run() {
+    df_ext_on || [ "$(df_res_min)" -gt 0 ] || { df_cron_sync; return 0; }
+    sm_on && return 0                     # safemode: no rules, nothing to fill
+    df_lock || return 0
+    df_ext_on && df_ext_fetch
+    drn_m=$(df_res_min)
+    if [ "$drn_m" -gt 0 ]; then
+        drn_l=$(cat "$DF_RT/res.last" 2>/dev/null); case "$drn_l" in ''|*[!0-9]*) drn_l=0 ;; esac
+        drn_now=$(date +%s)
+        if [ $((drn_now - drn_l)) -ge $((drn_m * 60 - 20)) ]; then echo "$drn_now" > "$DF_RT/res.last"; df_resolve; fi
+    fi
+    df_unlock
+    return 0
+}
+df_status() {
+    if df_ext_on; then
+        IFS='|' read -r dst_s dst_t dst_x < "$DF_RT/ext.st" 2>/dev/null
+        case "$dst_s" in
+            ok)  echo "External AdGuard Home $(df_ext_url): read $(date -d "@$dst_t" '+%H:%M' 2>/dev/null), $dst_x address(es) for domain entries in the last hour" ;;
+            err) echo "External AdGuard Home $(df_ext_url): last read failed at $(date -d "@$dst_t" '+%H:%M' 2>/dev/null) - $dst_x" ;;
+            *)   echo "External AdGuard Home $(df_ext_url): not read yet" ;;
+        esac
+    else echo "External AdGuard Home: not set up"; fi
+    if [ "$(df_res_min)" -gt 0 ]; then
+        IFS='|' read -r drs_t drs_d drs_n < "$DF_RT/res.st" 2>/dev/null
+        if [ -n "$drs_t" ]; then echo "Lookups every $(df_res_min) min: last $(date -d "@$drs_t" '+%H:%M' 2>/dev/null), $drs_d domain(s), $drs_n address(es)"
+        else echo "Lookups every $(df_res_min) min: not run yet"; fi
+    else echo "Regular lookups of the domain entries: off"; fi
+}
+# for data.js: "df":{...}
+df_json() {
+    dj_s=""; dj_t=0; dj_x=""; dj_rt=0; dj_rd=0; dj_rn=0
+    df_ext_on && [ -s "$DF_RT/ext.st" ] && IFS='|' read -r dj_s dj_t dj_x < "$DF_RT/ext.st"
+    [ -s "$DF_RT/res.st" ] && IFS='|' read -r dj_rt dj_rd dj_rn < "$DF_RT/res.st"
+    printf '"df":{"ext":"%s","st":"%s","ts":%s,"x":"%s","res":%s,"rts":%s,"rd":%s,"rn":%s},' \
+        "$(df_ext_url | tr -d '"\\')" "$dj_s" "${dj_t:-0}" "$(printf '%s' "$dj_x" | tr -d '"\\' | cut -c1-200)" "$(df_res_min)" "${dj_rt:-0}" "${dj_rd:-0}" "${dj_rn:-0}"
 }
 
 # A domain entry that was removed or moved to another target leaves its learned addresses in the set of its old
@@ -1510,11 +1698,11 @@ names_fill() {
 note_key() {          # ASN | C<n> | ip:<range> | dom:<domain>  ->  key (empty = unknown entry)
     case "$1" in
         ''|*[!0-9]*) ;;
-        *) grep -q "^$1:" "$ASN_FILE" 2>/dev/null && echo "$1"; return 0 ;;
+        *) { grep -q "^$1:" "$ASN_FILE" || grep -q "^A|$1:" "$OFF_FILE"; } 2>/dev/null && echo "$1"; return 0 ;;
     esac
     case "$1" in
-        C[0-9]*|c[0-9]*) awk -F: -v id="C${1#?}" '$1 == id { print $4 ":" $5; exit }' "$CUSTOM_FILE" 2>/dev/null ;;
-        ip:*|dom:*) awk -F: -v k="${1%%:*}" -v v="${1#*:}" '$4 == k && $5 == v { print k ":" v; exit }' "$CUSTOM_FILE" 2>/dev/null ;;
+        C[0-9]*|c[0-9]*) awk -F: -v id="C${1#?}" '$1 == id || $1 == "C|" id { print $4 ":" $5; exit }' "$CUSTOM_FILE" "$OFF_FILE" 2>/dev/null ;;
+        ip:*|dom:*) awk -F: -v k="${1%%:*}" -v v="${1#*:}" '$4 == k && $5 == v { print k ":" v; exit }' "$CUSTOM_FILE" "$OFF_FILE" 2>/dev/null ;;
     esac
 }
 note_clean() { tr -d '\000-\037\177"\\|<>' | sed 's/^ *//; s/ *$//' | cut -c1-120; }
@@ -1542,7 +1730,8 @@ cli_note() {
 # notes of entries that are no longer in the lists go
 notes_prune() {
     [ -s "$NOTES_FILE" ] || return 0
-    { cut -d: -f1 "$ASN_FILE" 2>/dev/null; awk -F: '$1 ~ /^C[0-9]+$/ { print $4 ":" $5 }' "$CUSTOM_FILE" 2>/dev/null; } | sort -u > /tmp/asnmanager-notes.keys
+    { cut -d: -f1 "$ASN_FILE" 2>/dev/null; awk -F: '$1 ~ /^C[0-9]+$/ { print $4 ":" $5 }' "$CUSTOM_FILE" 2>/dev/null
+      sed -n 's/^A|\([0-9][0-9]*\):.*/\1/p' "$OFF_FILE" 2>/dev/null; awk -F: '$1 ~ /^C\|C[0-9]+$/ { print $4 ":" $5 }' "$OFF_FILE" 2>/dev/null; } | sort -u > /tmp/asnmanager-notes.keys
     awk -F'\t' 'FILENAME == ARGV[1] { k[$1] = 1; next } ($1 in k)' /tmp/asnmanager-notes.keys "$NOTES_FILE" > "$NOTES_FILE.new" && mv -f "$NOTES_FILE.new" "$NOTES_FILE"
     rm -f /tmp/asnmanager-notes.keys
 }
@@ -1727,6 +1916,8 @@ backup_text() {
     [ -s "$ASN_FILE" ] && cat "$ASN_FILE"
     echo "[CUSTOM]"
     [ -s "$CUSTOM_FILE" ] && awk -F: '{ print $2 ":" $3 ":" $4 ":" $5 }' "$CUSTOM_FILE"
+    echo "[OFF]"
+    [ -s "$OFF_FILE" ] && awk -F'|' '$1 == "A" { print "A|" $2 } $1 == "C" { n = index($2, ":"); print "C|" substr($2, n + 1) }' "$OFF_FILE"
     echo "[NOTES]"
     [ -s "$NOTES_FILE" ] && cat "$NOTES_FILE"
     load_schedule
@@ -1752,6 +1943,7 @@ backup_text() {
     echo "DEVLINES=$(dl_list | awk '{ printf "%s%s=%s", (NR > 1 ? "," : ""), $1, $2 }' | sed 's/^$/none/')"
     echo "LANGUARD=$(lg_on && echo on || echo off)"
     echo "VPNWATCH=$(vw_on && echo on || echo off)"
+    echo "DOM_RESOLVE=$(df_res_min | sed 's/^0$/off/')"
     # DNS of the VPN provider per line ("DNS fitting the line")
     [ -s "$DNSF_CONF" ] && awk -F= '$1 ~ /^(OVPN|WGC)[1-5]$/ && $2 != "" { v = $2; gsub(/ +/, ",", v); print "DNS_SERVER_" $1 "=" v }' "$DNSF_CONF"
     # own presets - from the router and from a USB device (restored to the router)
@@ -1787,6 +1979,7 @@ rs_scan() {
         awk -v d="$RS_DIR" '
             /^\[ASN_LIST\]/ { f = d "/asn.txt"; next }
             /^\[CUSTOM\]/ { f = d "/custom.txt"; next }
+            /^\[OFF\]/ { f = d "/off.txt"; next }
             /^\[NOTES\]/ { f = d "/notes.txt"; next }
             /^\[SCHEDULE\]/ { f = d "/sched.txt"; next }
             /^\[FAILOVER\]/ { f = d "/fo.txt"; next }
@@ -1829,6 +2022,7 @@ rs_setting() {
         DNS_FOLLOW:on|DNS_FOLLOW:off)  dnsf_set "$2" ;;
         DNS_DEVICE:on|DNS_DEVICE:off)  dnsd_set "$2" ;;
         DNS_CACHE:*)                   dnsd_cache_set "$2" ;;
+        DOM_RESOLVE:*)                 df_res_set "$2"; return $? ;;
         DNS_TLS:on|DNS_TLS:off)        dnsf_tls_set "$2" ;;
         MAIL_NOTIFY:off|MAIL_NOTIFY:daily|MAIL_NOTIFY:weekly)  mail_set "$2" ;;
         FO_VPND:on|FO_VPND:off)        fo_vpnd_set "$2" ;;
@@ -1878,6 +2072,9 @@ rs_apply() {
         elif [ "$ra_mode" = "replace" ]; then
             [ -f "$CUSTOM_FILE" ] && : > "$CUSTOM_FILE"
         fi
+        # switched-off rules (after the lists: a rule that is on in the backup stays on)
+        if [ -s "$RS_DIR/off.txt" ]; then cli_offimport "$ra_mode" "$(tr '\n' ';' < "$RS_DIR/off.txt" | sed 's/;$//')"
+        elif [ "$ra_mode" = "replace" ]; then rm -f "$OFF_FILE"; fi
         if [ -s "$RS_DIR/notes.txt" ]; then
             mkdir -p "$ADDON_DIR" 2>/dev/null
             if [ "$ra_mode" = "replace" ]; then cp -f "$RS_DIR/notes.txt" "$NOTES_FILE"
@@ -2062,6 +2259,7 @@ uninstall_menu() {
 
             # Remove cronjob, cache and associated files
             cru d ASN_Worker 2>/dev/null
+            rm -f "$DF_EXT" "$DF_RES"; df_cron_sync >/dev/null 2>&1
             sed -i '/cru [ad] ASN_Worker/d' "/jffs/scripts/services-start" 2>/dev/null
             sed -i '/asn-bypass-worker.sh/d' "/jffs/scripts/services-start" 2>/dev/null
             for f in /jffs/scripts/services-start /jffs/scripts/service-event /jffs/scripts/services-stop; do
@@ -3305,13 +3503,14 @@ dg_mask() {
 
 # ---------- CLI actions ----------
 cli_list() {
-    [ -s "$ASN_FILE" ] || [ -s "$CUSTOM_FILE" ] || { echo "ASN list is empty."; return 0; }
+    [ -s "$ASN_FILE" ] || [ -s "$CUSTOM_FILE" ] || [ -s "$OFF_FILE" ] || { echo "ASN list is empty."; return 0; }
     while IFS=':' read -r asn dest src_ip; do
         [ -z "$asn" ] && continue
         cl_nm=$(name_of "$asn"); cl_nt=$(note_of "$asn")
         printf "AS%-10s -> %-6s %s%s%s\n" "$asn" "$dest" "${cl_nm:+$cl_nm  }" "${src_ip:+[Src: $src_ip]}" "${cl_nt:+  # $cl_nt}"
     done < "$ASN_FILE"
     [ -s "$CUSTOM_FILE" ] && cu_list
+    off_list
     return 0
 }
 
@@ -3337,6 +3536,7 @@ cli_add() {
             asn*)
                 asn=${k#asn }
                 sed -i "/^${asn}:/d" "$ASN_FILE"
+                [ -s "$OFF_FILE" ] && sed -i "/^A|${asn}:/d" "$OFF_FILE"
                 echo "${asn}:${dest}:${src}" >> "$ASN_FILE"
                 n=$((n + 1)); added="$added $asn"; nkeys="$nkeys $asn" ;;
             *)
@@ -3374,6 +3574,7 @@ cli_edit() {
     case "$1" in
         C[0-9]*|c[0-9]*)
             ced_id="C${1#?}"
+            off_has "C|$ced_id" && { echo "${ced_id} is switched off - switch it on first (on ${ced_id})."; return 1; }
             cu_has "$ced_id" || { echo "${ced_id} is not in the list."; return 1; }
             ced_d=$(norm_dest "$2") || { echo "Invalid target '$2'"; return 1; }
             ced_s=$(norm_src "$3"); is_valid_src "$ced_s" || { echo "Invalid source IP '$3'"; return 1; }
@@ -3383,6 +3584,7 @@ cli_edit() {
             return 0 ;;
     esac
     asn=$(norm_asn "$1") || { echo "Invalid ASN '$1'"; return 1; }
+    off_has "A|$asn" && { echo "AS${asn} is switched off - switch it on first (on AS${asn})."; return 1; }
     grep -q "^${asn}:" "$ASN_FILE" || { echo "AS${asn} is not in the list."; return 1; }
     norm_dest "$2" >/dev/null || { echo "Invalid target '$2'"; return 1; }
     if ! is_valid_src "$(norm_src "$3")"; then echo "Invalid source IP '$3'"; return 1; fi
@@ -3413,6 +3615,7 @@ cli_import() {
         src=$(norm_src "$src")
         if ! is_valid_src "$src"; then bad=$((bad + 1)); continue; fi
         sed -i "/^${asn}:/d" "$ASN_FILE"
+        [ -s "$OFF_FILE" ] && sed -i "/^A|${asn}:/d" "$OFF_FILE"
         echo "${asn}:${dest}:${src}" >> "$ASN_FILE"
         n=$((n + 1)); added="$added $asn"
     done
@@ -3426,12 +3629,148 @@ cli_import() {
 # the traffic statistics keep the numbers of a removed IP / domain entry under its id (C9 ...): remember what it was,
 # so the table can still show "*.akamaized.net (removed)" instead of only "C9"
 CU_GONE="/jffs/addons/asnmanager/removed_entries.txt"
-cu_gone_note() {
+cu_gone_note() {             # ID [file]  (the file of the switched-off entries: "C|ID:...")
     [ -n "$1" ] || return 0
-    cgn=$(awk -F: -v id="$1" '$1 == id { print $1 "\t" $4 "\t" $5; exit }' "$CUSTOM_FILE" 2>/dev/null)
+    cgn=$(awk -F: -v id="$1" '$1 == id || $1 == "C|" id { print id "\t" $4 "\t" $5; exit }' "${2:-$CUSTOM_FILE}" 2>/dev/null)
     [ -n "$cgn" ] || return 0
     mkdir -p "$(dirname "$CU_GONE")"
     { awk -F'\t' -v id="$1" '$1 != id' "$CU_GONE" 2>/dev/null; echo "$cgn"; } | tail -n 500 > "$CU_GONE.new" && mv -f "$CU_GONE.new" "$CU_GONE"
+}
+
+# =====================================================================
+#  Switched-off rules: kept in the list, but not applied (GitHub issue #8)
+#  /jffs/scripts/asnm_off.txt, the lines as they were in their list:  "A|<asn>:<target>:<sources>" (ASN list)
+#  and "C|C<n>:<target>:<sources>:ip|dom:<value>" (custom entries). Out of the lists, every apply / check / export
+#  sees only the rules that are on; id, target, devices and note stay and come back when it is switched on.
+# =====================================================================
+OFF_FILE="/jffs/scripts/asnm_off.txt"
+off_has() { grep -q "^$1:" "$OFF_FILE" 2>/dev/null; }
+# the ids / ASNs of one input: C12, AS15169, 15169, a domain or IP range of a custom entry
+off_ids() {          # $1 = custom file to look the values up in ("" = only ids and ASNs), then the tokens
+    oi_f=$1; shift
+    set -f
+    for oi_r in $(echo "$*" | tr ',;' '  '); do
+        case "$oi_r" in C[0-9]*|c[0-9]*) echo "C${oi_r#?}"; continue ;; esac
+        oi_k=$(cu_kind "$oi_r") || { echo "?$oi_r"; continue; }
+        case "$oi_k" in
+            asn*) echo "A${oi_k#asn }" ;;
+            *) oi_id=$(awk -F: -v k="${oi_k%% *}" -v v="${oi_k#* }" '$4 == k && $5 == v { sub(/^C\|/, "", $1); print $1; exit }' "$oi_f" 2>/dev/null)
+               if [ -n "$oi_id" ]; then echo "$oi_id"; else echo "?$oi_r"; fi ;;
+        esac
+    done
+    set +f
+}
+# off <ENTRY>...: take rules out of the lists (they stay in the off file)
+cli_off() {
+    [ $# -gt 0 ] || { echo "Usage: off <ASN|C1|domain|IP range>...   (switch rules off without deleting them)"; return 1; }
+    of_n=0; of_skip=""
+    mkdir -p "$(dirname "$OFF_FILE")"; touch "$OFF_FILE"
+    for of_i in $(off_ids "$CUSTOM_FILE" "$@"); do
+        case "$of_i" in
+            A*) of_a=${of_i#A}; of_l=$(grep "^${of_a}:" "$ASN_FILE" 2>/dev/null | head -n 1)
+                if [ -n "$of_l" ]; then
+                    sed -i "/^A|${of_a}:/d" "$OFF_FILE"; echo "A|$of_l" >> "$OFF_FILE"; sed -i "/^${of_a}:/d" "$ASN_FILE"; of_n=$((of_n + 1))
+                else of_skip="$of_skip AS$of_a"; fi ;;
+            C*) of_l=$(grep "^${of_i}:" "$CUSTOM_FILE" 2>/dev/null | head -n 1)
+                if [ -n "$of_l" ]; then
+                    sed -i "/^C|${of_i}:/d" "$OFF_FILE"; echo "C|$of_l" >> "$OFF_FILE"; sed -i "/^${of_i}:/d" "$CUSTOM_FILE"; of_n=$((of_n + 1))
+                else of_skip="$of_skip $of_i"; fi ;;
+            *)  of_skip="$of_skip ${of_i#?}" ;;
+        esac
+    done
+    [ $of_n -gt 0 ] && mark_pending
+    [ -n "$of_skip" ] && echo "Not on (or not in the list):$of_skip"
+    echo "Switched off $of_n rule(s) - they stay in the list. Apply rules to activate."
+    [ $of_n -gt 0 ]
+}
+# on <ENTRY>...: put switched-off rules back into their lists
+cli_on() {
+    [ $# -gt 0 ] || { echo "Usage: on <ASN|C1|domain|IP range>...   (switch rules on again)"; return 1; }
+    on_n=0; on_skip=""; on_ids=""
+    for on_i in $(off_ids "$OFF_FILE" "$@"); do
+        case "$on_i" in
+            A*) on_a=${on_i#A}; on_l=$(sed -n "s/^A|\(${on_a}:.*\)/\1/p" "$OFF_FILE" 2>/dev/null | head -n 1)
+                [ -n "$on_l" ] || { on_skip="$on_skip AS$on_a"; continue; }
+                # added again in the meantime: the rule in the list wins
+                grep -q "^${on_a}:" "$ASN_FILE" 2>/dev/null || echo "$on_l" >> "$ASN_FILE"
+                sed -i "/^A|${on_a}:/d" "$OFF_FILE"; on_n=$((on_n + 1)); on_ids="$on_ids $on_a" ;;
+            C*) on_l=$(sed -n "s/^C|\(${on_i}:.*\)/\1/p" "$OFF_FILE" 2>/dev/null | head -n 1)
+                [ -n "$on_l" ] || { on_skip="$on_skip $on_i"; continue; }
+                on_kv=$(echo "$on_l" | cut -d: -f4-)
+                [ -f "$CUSTOM_FILE" ] || : > "$CUSTOM_FILE"
+                awk -F: -v kv="$on_kv" '($4 ":" $5) == kv { f = 1 } END { exit !f }' "$CUSTOM_FILE" || echo "$on_l" >> "$CUSTOM_FILE"
+                sed -i "/^C|${on_i}:/d" "$OFF_FILE"; on_n=$((on_n + 1)); on_ids="$on_ids $on_i" ;;
+            *)  on_skip="$on_skip ${on_i#?}" ;;
+        esac
+    done
+    sort -u "$ASN_FILE" -o "$ASN_FILE" 2>/dev/null
+    [ -s "$OFF_FILE" ] || rm -f "$OFF_FILE"
+    [ $on_n -gt 0 ] && mark_pending $on_ids
+    [ -n "$on_skip" ] && echo "Not switched off (or not in the list):$on_skip"
+    echo "Switched on $on_n rule(s). Apply rules to activate."
+    [ $on_n -gt 0 ]
+}
+off_list() {
+    [ -s "$OFF_FILE" ] || return 0
+    echo "--- switched off (kept, not applied - \"on <ID>\" switches them on) ---"
+    while IFS='|' read -r ol_k ol_l; do
+        case "$ol_k" in
+            A) ol_a=${ol_l%%:*}; ol_r=${ol_l#*:}; ol_d=${ol_r%%:*}; ol_s=${ol_r#*:}; [ "$ol_s" = "$ol_r" ] && ol_s=""
+               printf "AS%-10s -> %-6s %s%s  (off)\n" "$ol_a" "$ol_d" "$(name_of "$ol_a")" "${ol_s:+  [Src: $ol_s]}" ;;
+            C) echo "$ol_l" | { IFS=: read -r ol_id ol_d ol_s ol_kk ol_v
+               [ "$ol_kk" = "dom" ] && ol_v="*.$ol_v"
+               printf "%-5s %-6s -> %-6s %s  (off)\n" "$ol_id" "$ol_kk" "$ol_d" "$ol_v${ol_s:+  [Src: $ol_s]}"; } ;;
+        esac
+    done < "$OFF_FILE"
+}
+# for data.js: "off":[...] - ASN rules {"asn":..} and custom entries {"id":..,"kind":..}
+off_json() {
+    printf '"off":['
+    [ -s "$OFF_FILE" ] && awk -F'|' -v nmf="$NAMES_FILE" -v ntf="$NOTES_FILE" '
+        BEGIN { while ((getline l < nmf) > 0) { split(l, a, "\t"); nm[a[1]] = a[2] }
+                while ((getline l < ntf) > 0) { split(l, a, "\t"); nt[a[1]] = a[2] } }
+        function js(s) { gsub(/["\\]/, "", s); return s }
+        $1 == "A" { split($2, f, ":"); if (f[1] !~ /^[0-9]+$/ || f[2] !~ /^(WAN|WAN1|WAN2|OVPN[1-5]|WGC[1-5])$/) next
+                    s = f[3]; gsub(/[^0-9.,]/, "", s)
+                    printf "%s{\"asn\":\"%s\",\"dest\":\"%s\",\"src\":\"%s\",\"name\":\"%s\",\"note\":\"%s\"}", (n++ ? "," : ""), f[1], f[2], s, js(nm[f[1]]), js(nt[f[1]]) }
+        $1 == "C" { split($2, f, ":"); if (f[1] !~ /^C[0-9]+$/ || f[2] !~ /^(WAN|WAN1|WAN2|OVPN[1-5]|WGC[1-5])$/ || f[4] !~ /^(ip|dom)$/) next
+                    s = f[3]; gsub(/[^0-9.,]/, "", s); v = f[5]; gsub(/[^A-Za-z0-9.\/-]/, "", v)
+                    printf "%s{\"id\":\"%s\",\"dest\":\"%s\",\"src\":\"%s\",\"kind\":\"%s\",\"value\":\"%s\",\"note\":\"%s\"}", (n++ ? "," : ""), f[1], f[2], s, f[4], v, js(nt[f[4] ":" f[5]]) }' "$OFF_FILE"
+    printf '],'
+}
+# offimport <replace|merge> <A|ASN:TARGET:SRC or C|TARGET:SRC:KIND:VALUE>[;...]   (restore of a backup)
+cli_offimport() {
+    oim_mode=$1; [ $# -gt 0 ] && shift
+    case "$oim_mode" in replace|merge) ;; *) echo "Mode must be replace or merge"; return 1 ;; esac
+    mkdir -p "$(dirname "$OFF_FILE")"
+    [ "$oim_mode" = "replace" ] && : > "$OFF_FILE"
+    oim_n=0
+    set -f
+    for oim_e in $(echo "$*" | tr ';' ' '); do
+        oim_v=${oim_e#?|}
+        case "$oim_e" in
+            A\|*) oim_a=$(norm_asn "${oim_v%%:*}") || continue; oim_r=${oim_v#*:}
+                  oim_d=$(norm_dest "${oim_r%%:*}") || continue; oim_s=""; case "$oim_r" in *:*) oim_s=$(norm_src "${oim_r#*:}") ;; esac
+                  is_valid_src "$oim_s" || continue
+                  grep -q "^${oim_a}:" "$ASN_FILE" 2>/dev/null && continue          # on in the list: stays on
+                  sed -i "/^A|${oim_a}:/d" "$OFF_FILE"; echo "A|${oim_a}:${oim_d}:${oim_s}" >> "$OFF_FILE" ;;
+            C\|*) oim_d=$(norm_dest "$(echo "$oim_v" | cut -d: -f1)") || continue
+                  oim_s=$(norm_src "$(echo "$oim_v" | cut -d: -f2)"); is_valid_src "$oim_s" || continue
+                  oim_k=$(echo "$oim_v" | cut -d: -f3); oim_x=$(echo "$oim_v" | cut -d: -f4)
+                  case "$oim_k" in
+                      ip)  cu_is_cidr "$oim_x" || continue; case "$oim_x" in */*) ;; *) oim_x="$oim_x/32" ;; esac ;;
+                      dom) oim_x=$(cu_norm_domain "$oim_x") || continue ;;
+                      *)   continue ;;
+                  esac
+                  awk -F: -v k="$oim_k" -v v="$oim_x" '($4 == k && $5 == v) { f = 1 } END { exit !f }' "$CUSTOM_FILE" "$OFF_FILE" 2>/dev/null && continue
+                  echo "C|$(cu_next_id):${oim_d}:${oim_s}:${oim_k}:${oim_x}" >> "$OFF_FILE" ;;
+            *)    continue ;;
+        esac
+        oim_n=$((oim_n + 1))
+    done
+    set +f
+    [ -s "$OFF_FILE" ] || rm -f "$OFF_FILE"
+    echo "Imported $oim_n switched-off rule(s) (${oim_mode})."
 }
 cli_remove() {
     n=0; cn=0
@@ -3441,18 +3780,22 @@ cli_remove() {
             C[0-9]*|c[0-9]*)
                 cid="C${raw#?}"
                 cu_has "$cid" && { cu_gone_note "$cid"; sed -i "/^${cid}:/d" "$CUSTOM_FILE"; cn=$((cn + 1)); }
+                off_has "C|$cid" && { cu_gone_note "$cid" "$OFF_FILE"; sed -i "/^C|${cid}:/d" "$OFF_FILE"; cn=$((cn + 1)); }
                 continue ;;
         esac
         k=$(cu_kind "$raw") || continue
         case "$k" in
-            asn*) a=${k#asn }; grep -q "^${a}:" "$ASN_FILE" && n=$((n + 1)); sed -i "/^${a}:/d" "$ASN_FILE" ;;
+            asn*) a=${k#asn }; grep -q "^${a}:" "$ASN_FILE" && n=$((n + 1)); sed -i "/^${a}:/d" "$ASN_FILE"
+                  off_has "A|$a" && { sed -i "/^A|${a}:/d" "$OFF_FILE"; n=$((n + 1)); } ;;
             *)
                 kk=${k%% *}; vv=${k#* }
                 if awk -F: -v k="$kk" -v v="$vv" '$4 == k && $5 == v { f = 1 } END { exit !f }' "$CUSTOM_FILE" 2>/dev/null; then
                     cn=$((cn + 1))
                     cu_gone_note "$(awk -F: -v k="$kk" -v v="$vv" '$4 == k && $5 == v { print $1; exit }' "$CUSTOM_FILE")"
                     awk -F: -v k="$kk" -v v="$vv" '!($4 == k && $5 == v)' "$CUSTOM_FILE" > "$CUSTOM_FILE.new" && mv -f "$CUSTOM_FILE.new" "$CUSTOM_FILE"
-                fi ;;
+                fi
+                cr_o=$(awk -F: -v k="$kk" -v v="$vv" '$1 ~ /^C\|/ && $4 == k && $5 == v { print substr($1, 3); exit }' "$OFF_FILE" 2>/dev/null)
+                [ -n "$cr_o" ] && { cu_gone_note "$cr_o" "$OFF_FILE"; sed -i "/^C|${cr_o}:/d" "$OFF_FILE"; cn=$((cn + 1)); } ;;
         esac
     done
     set +f
@@ -3465,7 +3808,7 @@ cli_remove() {
 cli_clear() {
     > "$ASN_FILE"
     [ -f "$CUSTOM_FILE" ] && : > "$CUSTOM_FILE"
-    rm -f "$NOTES_FILE"
+    rm -f "$NOTES_FILE" "$OFF_FILE"
     mark_pending
     echo "All ASNs cleared. Apply rules to remove active routing."
 }
@@ -3710,6 +4053,8 @@ web_export() {
             }' "$STATS_FILE" "$sets_tmp" "$fail_tmp" "$pend_tmp" "$nm_tmp" "$nt_tmp" "$ASN_FILE"
         printf '],'
         cu_json "$pend_tmp"
+        off_json
+        df_json
 
         printf '"ifaces":['
         first=1
@@ -3937,6 +4282,9 @@ web_job() {
         preset)
             if [ -n "$a3" ]; then cli_preset "$a1" "$a2" --src "$a3"; else cli_preset "$a1" "$a2"; fi > "$OUT" 2>&1 ;;
         remove)   cli_remove "$a1" > "$OUT" 2>&1 ;;
+        off)      cli_off "$a1" > "$OUT" 2>&1 ;;
+        on)       cli_on "$a1" > "$OUT" 2>&1 ;;
+        offimport) cli_offimport "$a1" "$a2" > "$OUT" 2>&1 ;;
         clear)    cli_clear > "$OUT" 2>&1 ;;
         apply)    cli_apply smart > "$OUT" 2>&1 ;;
         reload)   cli_apply force > "$OUT" 2>&1 ;;
@@ -3970,6 +4318,7 @@ web_job() {
         mailtest) mail_test > "$OUT" 2>&1 ;;
         smoff)    cli_safemode off > "$OUT" 2>&1 ;;
         aghlogin) rm -f "$AGH_AUTH.refused"; agh_login "$a1" > "$OUT" 2>&1 ;;
+        aghext)   aghext_set "$a1" "$a2" > "$OUT" 2>&1 ;;
         failover) fbs=""; [ -n "$a2" ] && fbs="$a2"; [ -n "$a3" ] && fbs="${fbs:+$fbs,}$a3"
                   fo_set "$a1" "$fbs" > "$OUT" 2>&1 ;;
         *)        echo "Unknown action '$act'" > "$OUT"; false ;;
@@ -7967,6 +8316,7 @@ webui_mount() {
     web_export
     cru a ASN_Check "*/5 * * * * $SCRIPT_PATH check run" 2>/dev/null   # routing check (RAM only, renewed on every mount)
     fo_cron_sync >/dev/null 2>&1
+    df_cron_sync >/dev/null 2>&1
     rc_check >/dev/null 2>&1
     echo "WebUI mounted as $am_webui_page"
 }
@@ -8430,6 +8780,11 @@ ASN Manager v${SCRIPT_VERSION} - usage: ASNmanager.sh [command]
   presets                            list service presets
   remove <ENTRY>...                  remove ASN(s) / entries (ASN, C1 ... id from "list", IP/CIDR or domain)
   clear                              remove all ASNs
+  off <ENTRY>...                     switch rules off without deleting them (ASN, C1 ..., IP/CIDR or domain)
+  on <ENTRY>...                      switch rules on again
+  aghext <http://IP:port> <user> [password] | off | status   external AdGuard Home: its answers fill the domain entries
+  domresolve off | 5 | 10 | 15 | 30 | 60   the router looks the domain entries up itself every N minutes
+  domfeed [status]                   state of the two above
   apply [full]                       apply rules: from the saved subnets, only new ASNs are downloaded
                                      (only the IP / domain entries if the ASN list is unchanged); full = download all
   reload                             same as "apply full"
@@ -8497,6 +8852,16 @@ cli_main() {
         preset)   cli_preset "$@" ;;
         presets)  print_presets ;;
         remove|del) cli_remove "$@" ;;
+        off|disable) cli_off "$@" ;;
+        aghext)   aghext_set "$@" ;;
+        domresolve) df_res_set "$1" ;;
+        domfeed)
+            case "$1" in
+                run)    df_run ;;
+                cron)   df_cron_sync ;;
+                *)      df_status ;;
+            esac ;;
+        on|enable)   cli_on "$@" ;;
         clear)    cli_clear ;;
         apply)    cli_apply "${1:-smart}" ;;
         reload)   cli_apply force ;;

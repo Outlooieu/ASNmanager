@@ -248,6 +248,14 @@ What to know about domains:
 - **Learned addresses**: click "N learned" in the list to see them (the first 200), or `ASNmanager.sh custom learned [C1]` for all. dnsmasq only stores the addresses, not which subdomain they belong to. The number on the page refreshes every 30 seconds.
 - The routing check shows them too (a domain says "none learned" until a device has looked the name up); backups and the restore dialog include them as part of the list; "Remove all" removes them too.
 
+**Devices that use another DNS server** (AdGuard Home or Pi-hole on another device): the router never sees their lookups, so the domain entries stay at 0 learned. Settings > DNS > "Domain entries with another DNS server" has two ways to fill them anyway:
+- **External AdGuard Home**: with the address and login of its web interface, ASN Manager reads its query log every minute and puts its answers for the domain entries into the sets - exactly the addresses the devices got, for every subdomain (the very first connection to a new address can still take the normal way). The login stays on the router (root only, not in backups). Command line: `aghext http://192.168.1.5:3000 <user> [password] | off | status`.
+- **Regular lookups** (like Domain VPN Routing): every 5 to 60 minutes the router looks every domain entry up itself (also with `www.` in front) and puts the answers into the sets. It covers only these names, not every subdomain, and services with a CDN can give the devices other addresses - the external AdGuard Home is the better way where possible. Command line: `domresolve off | 5 | 10 | 15 | 30 | 60`, state: `domfeed status`.
+
+## Switching rules off
+
+A rule can be **switched off** instead of removed ("Switch off" in its row, or several at once with the boxes and "Switch off selected"): it stays in the list - greyed out, with its target, devices, note and traffic numbers - but is not applied, as if it were removed. "Switch on" brings it back exactly as it was (Apply afterwards, as with every change). Backups keep switched-off rules as switched off. Command line: `ASNmanager.sh off C12 AS15169` and `ASNmanager.sh on C12 AS15169` (IDs, ASNs, or the domain / IP range of a custom entry).
+
 ## Performance (CPU load)
 
 The CPU load of the router is mostly decided by what happens to **every forwarded packet**. ASN Manager has two settings for that (Settings tab, card "Performance"; both also in backups):
@@ -359,6 +367,8 @@ ASNmanager.sh custom learned
 ASNmanager.sh preset 4 OVPN1
 ASNmanager.sh edit 13335 WAN2
 ASNmanager.sh remove 13335
+ASNmanager.sh off 13335
+ASNmanager.sh on 13335
 ASNmanager.sh apply
 ASNmanager.sh apply full
 ASNmanager.sh retry
