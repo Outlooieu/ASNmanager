@@ -1,4 +1,4 @@
-## v3.10.13 (test version)
+## v3.10.13
 
 - Own presets showed up twice when the same presets.txt was on the router and on the USB device (for example after a restore, which copies the presets to the router): a preset with the same category and name is now listed once, the one on the router first
 
