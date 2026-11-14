@@ -9,11 +9,11 @@ ASN Manager is a script designed for Asuswrt-Merlin routers, allowing you to eas
  /_\ / __| \| | |  \/  | /_\ | \| | /_\ / __| __|| _ \
 / _ \__ \ .' | | |\/| |/ _ \| .' |/ _ \ (_ | _| |   /
 /_/ \_\___/_|\_| |_|  |_/_/ \_\_|\_/_/ \_\___|___||_|_\
-              === ASN MANAGER v3.9.20 ===
+              === ASN MANAGER v3.10.13 ===
 ================================================================
  ASNs
  [1]  Show ASN list & routing targets
- [2]  Add ASN(s), IP/CIDR ranges or domains
+ [2]  Add ASN(s) - target interface & source devices
  [3]  Find ASN for domain / IP (find, add & delete)
  [4]  Add service presets (AWS, Netflix, Gaming, Streaming ...)
  [5]  Edit ASN (target / source devices)
@@ -43,7 +43,7 @@ Select an option [1-20, e]:
 
 Key Features:
 
-Multi-Interface Routing: Assign specific ASNs - and single IPs, CIDR ranges or domains - directly to WAN1, WAN2, OpenVPN clients (tun11–15), or WireGuard clients (wgc1–5), for all devices or only for chosen ones.
+Multi-Interface Routing: Assign specific ASNs - and single IPs, CIDR ranges or domains - directly to WAN1, WAN2, OpenVPN clients (tun11–15), or WireGuard clients (wgc1–5), for all devices or only for chosen ones. A whole device can get its own line ("device lines"), and any rule can be switched off without removing it.
 
 Automated IP Subnet Fetching: Automatically queries and aggregates IPv4 prefixes from multiple reliable sources (Amazon IP ranges, IPverse, RIPE Stat, HackerTarget, and BGPView).
 
@@ -52,6 +52,12 @@ Low CPU load: all ASNs of a target share one ipset and one marking rule, so the 
 Auto-Refresh Scheduling: Built-in configuration to automatically re-fetch and update IP subnets via cron jobs and persistent startup scripts (services-start).
 
 Interactive Diagnostics: Includes built-in tools to test IP/domain routing, view active ipset counts, check interface public IPs/countries, and run traceroutes through specific target interfaces.
+
+Failover & protection: fallback chains per target (with a kill switch), tunnel protection, a LAN guard that keeps the router reachable and a self-test that takes the rules out again if they ever break the router.
+
+DNS that fits the line: domain entries and devices are looked up through the DNS of their line, works with AdGuard Home, Unbound, dnscrypt-proxy and Pi-hole.
+
+Traffic statistics and suggestions: see how much each ASN, interface and device uses, and add what the traffic without a rule goes to with one click.
 
 Backup & Restore: Easily export and import your configuration locally to /jffs or to an external USB storage drive.
 
@@ -135,7 +141,7 @@ Layout: the **overview** (status tiles, routing check, "Apply rules", notices) i
 - **Traffic** - statistics, live throughput and suggestions (the card opens by itself in this tab)
 - **Targets & failover** - interfaces with external IP, speed test and the failover chains
 - **Diagnostics** - **Explain** a domain or IP (DNS answer, every entry that contains each address, which rule wins - also for one device -, the interface it leaves through), **Check device** (its rules, its normal way through the VPN Director, its current connections with name, traffic, rule and interface), **Check DNS chain** (port 53 -> dnsmasq -> its servers, with a learning test of a domain entry), route test, traceroute, ipset status, public IPs, and the **diagnostic bundle**: one text file with everything needed to analyse a problem (public addresses, VPN servers and tunnel addresses, MAC addresses, IPv6 and keys masked; notes and VPN Director descriptions left out; the domains of your entries become domain-01.de ... unless you tick "Domains in clear text") - download it and attach it to an issue on GitHub
-- **Settings** - display (unit for data rates), performance (marking rules, statistics detail), auto-refresh schedule, backup & restore
+- **Settings** - four groups: **Routing** (device lines, excluded devices), **DNS** (DNS fitting the line, AdGuard Home, domain entries with another DNS server), **General** (display, performance, auto-refresh schedule, e-mail on new versions) and **Backup & restore**
 
 The tabs show small counters (number of ASNs, statistics on, active failovers). The page always starts on the ASNs tab.
 
@@ -187,6 +193,7 @@ The table "How it runs now" shows per line the DNS server, where it comes from, 
 
 - **The same provider DNS on several lines**: many VPN providers give every server the same DNS address (e.g. 10.2.0.1). Enter it for each line - every line gets a stand-in address (198.18.53.x) that is marked with its line and rewritten to the real one, so each line asks the server at the end of its own tunnel.
 - **AdGuard Home login** (optional, under "Every device"): with the login of its web interface, "DNS per device" changes the clients through AdGuard Home itself - no restart, DNS keeps running. Kept on the router only (root only, not in backups); command line `agh login <user> | logout | status`.
+- **Cache of the device clients** (optional, off by default): a client of AdGuard Home with its own upstreams - every device on a VPN line - does not use the global cache of AdGuard Home, so these devices had no cache there at all. Settings > DNS > "Cache of the device clients" (off, 1, 2, 4, 8 MB; 1 MB holds roughly 2,000 to 5,000 answers) gives each of them its own. AdGuard Home builds the cache only when it starts, so it is restarted once when the size changes (DNS stops for a few seconds; the page asks first). Command line: `ASNmanager.sh dnsdevice cache off | <MB>`.
 - **Devices & DNS** (Diagnostics > router checks, `ASNmanager.sh devices`): every active device with its normal line, its open connections per line and its DNS - including the real resolver behind it (what leak tests show), with name and place.
 
 | Setup | Sites of ASN Manager | Every device | Encrypt over WAN |
@@ -299,6 +306,29 @@ In the card "Target interfaces", section **Failover**, every target that has ASN
 
 The source of a rule can be empty (all devices), one IP or a **comma separated list** of IPs, for example `192.168.1.50,192.168.1.60` (up to 32). It works everywhere: "Add ASNs, IPs or domains", the service presets and editing a row (a device picker with checkboxes, like in the suggestions: tick as many devices as you like, "All devices" clears the choice; you can also type the IPs), the suggestions (tick several devices), backup / restore and the command line (`ASNmanager.sh add WGC1 2906 --src 192.168.1.50,192.168.1.60`). The router creates one marking rule per device; the traffic statistics count each device separately. Each ASN is still on the list only once - adding it again replaces the earlier rule, so to add a device later, edit the row or add the ASN again with the full device list.
 
+## Device lines
+
+A **device line** sends everything a device does over one line - for example a PC over WAN2 or the TV over a VPN. Your entries still come first: with an entry `google.de -> WAN1` the device reaches google.de over WAN1 and everything else over its device line. The device line takes precedence over the VPN Director rule of the device, and with "DNS per device" (AdGuard Home) its lookups follow it. If the line fails, its failover chain or kill switch applies; without either, the device takes its normal way (VPN Director / WAN).
+
+- WebUI: Settings > Routing > "Device lines" - tick one or several devices, choose a line, remove with one click. The device list is grouped (LAN / Wi-Fi, guest network, WireGuard server peers). Command line: `devline list | set <IP|network> <line> | del <IP|network> | none`
+- A device line can also be a whole network (`192.168.2.0/24`); the most exact address wins (a single device before a network that contains it).
+- When the line of a device changes, its open connections to the internet are closed, so it opens them again on the new line at once. The connections to the router itself (SSH, this page) stay.
+- Device lines are set at boot as the first step (before the WAN is up), so a device on a VPN line never reaches the internet over WAN while the rules are built. They are part of the backup and are out while safemode is on.
+- `ASNmanager.sh devices` marks a device line with `*`; `device <IP>`, `explain <name> <device IP>` and "Check device" show the line and the way the device really takes.
+
+## Excluded devices
+
+Devices or networks ASN Manager leaves alone - for example the guest network (`192.168.2.0/24`). None of its entries applies to them (also not those for single devices); they take their normal way (VPN Director / WAN). WebUI: Settings > Routing > "Excluded devices" (tick several at once, or type a network). Command line: `exclude list | set <IP|network>[,...] | none`.
+
+## LAN guard and VPN watcher
+
+- **LAN guard** (on by default, `languard on | off | status`): the router always reaches its own networks (LAN, guest networks, VPN server) through the main routing table - one routing rule per network, before the VPN Director and its kill switch. A VPN client that is down can no longer lock the router out of its own LAN when the router itself is in the VPN Director.
+- **VPN watcher** (on by default, `vpnwatch on | off | status`): with dual WAN in load balance the firmware stops the WireGuard clients when a WAN goes down or comes back, and does not start them again. After such a WAN event (`/jffs/scripts/wan-event`) ASN Manager waits 45 seconds, starts the clients that are switched on but not running and then checks its routes.
+
+## Safemode (self-test)
+
+After a boot, an Apply or a change of the DNS / failover settings, a self-test watches the router for two minutes - counted from the moment it is fully up (WAN connected, time set, dnsmasq / AdGuard Home running, rules built). If the router itself still reaches the internet over WAN but DNS answers no longer come, dnsmasq is gone or the LAN is routed wrongly, ASN Manager takes all of its own rules out again (the lists and settings stay) and checks once more: if it is still broken the cause is not ASN Manager and its rules are put back. An outage of the internet line itself never counts; there is at most one rollback per boot. Apply, `safemode off` or the next reboot bring the rules back. Command line: `safemode status | on | off | test`.
+
 ## Suggestions from the traffic without a rule
 
 At the bottom of the "Traffic per ASN" card (while counting is enabled) a list shows the ASNs that receive the most traffic **without** a rule - for example "AS2906 Netflix Streaming Services, 9.8 GB, used by TV box, phone". Pick a target interface and the **devices** - "All devices" or any number of devices (the ones that use this ASN are listed first) - and click **Add**; the ASN is put on the list (then apply the rules).
@@ -377,6 +407,15 @@ ASNmanager.sh test netflix.com
 ASNmanager.sh explain zdf.de 192.168.1.20
 ASNmanager.sh device 192.168.1.20
 ASNmanager.sh dnschain
+ASNmanager.sh devline set 192.168.1.50 WGC1
+ASNmanager.sh exclude set 192.168.2.0/24
+ASNmanager.sh languard status
+ASNmanager.sh vpnwatch status
+ASNmanager.sh safemode status
+ASNmanager.sh dnsdevice cache 2
+ASNmanager.sh aghext http://192.168.1.10:3000 <user> [password]
+ASNmanager.sh domresolve 15
+ASNmanager.sh domfeed status
 ASNmanager.sh diag
 ASNmanager.sh schedule 1 04:30
 ASNmanager.sh stats enable
