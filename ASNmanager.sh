@@ -2419,7 +2419,8 @@ check_menu_update() {
     rm -f "$TMP_CHECK" 2>/dev/null
     FETCH_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/ASNmanager.sh"
 
-    if curl -s -S -k --connect-timeout 1 -m 10 "$FETCH_URL?t=$(date +%s)" -o "$TMP_CHECK" && [ -s "$TMP_CHECK" ]; then
+    # only the first 2 KB: the version is in line 15 (the whole script is over 500 KB - it was loaded at every menu redraw)
+    if curl -s -S -k --connect-timeout 1 -m 10 -r 0-2047 "$FETCH_URL?t=$(date +%s)" -o "$TMP_CHECK" && [ -s "$TMP_CHECK" ]; then
         sed -i 's/\r$//' "$TMP_CHECK" 2>/dev/null
         REMOTE_VERSION=$(grep -m 1 "^SCRIPT_VERSION=" "$TMP_CHECK" | cut -d'"' -f2 | tr -d '\r')
         if [ -n "$REMOTE_VERSION" ] && is_remote_newer "$SCRIPT_VERSION" "$REMOTE_VERSION"; then
@@ -8398,10 +8399,26 @@ webui_auto() {
         sleep 1
     elif [ "$(webui_page_version)" != "$SCRIPT_VERSION" ]; then
         webui_install >/dev/null 2>&1
+    elif webui_mounted_ok; then
+        # the tab is in place (same page, menu entry present): only the cron jobs, no new page data and no routing check -
+        # a full mount took up to 20 s before the menu appeared (the cron jobs and the page refresh the data themselves)
+        cru l 2>/dev/null | grep -q '#ASN_Check#' || cru a ASN_Check "*/5 * * * * $SCRIPT_PATH check run" 2>/dev/null
+        fo_cron_sync >/dev/null 2>&1
+        df_cron_sync >/dev/null 2>&1
     else
-        # re-mount so menu placement changes (e.g. new default location) take effect
+        # not (or not correctly) mounted, e.g. after a reboot or a change of the menu location: mount it
         webui_mount >/dev/null 2>&1
     fi
+}
+
+# the WebUI tab is mounted with the current page: same file in /www/user and its entry in the menu
+webui_mounted_ok() {
+    wmo_p=$(cat "$ADDON_DIR/webui_page" 2>/dev/null)
+    case "$wmo_p" in user[0-9]*.asp) ;; *) return 1 ;; esac
+    [ -f "/www/user/$wmo_p" ] && [ -s "$WEBUI_SRC" ] || return 1
+    [ "$(md5sum < "$WEBUI_SRC")" = "$(md5sum < "/www/user/$wmo_p")" ] || return 1
+    grep -q "{url: \"$wmo_p\", tabName: \"$WEBUI_TAB\"}" /tmp/menuTree.js 2>/dev/null || return 1
+    mount | grep -q ' /www/require/modules/menuTree.js ' || return 1
 }
 
 webui_disable() {
