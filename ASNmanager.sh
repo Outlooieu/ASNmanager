@@ -4668,17 +4668,20 @@ ts_remove_rules() {
     for c in $chains; do iptables -t mangle -X "$c" 2>/dev/null; done
 }
 
+# what the counting rules depend on, one labelled line each ("stats diag" shows what changed at the last rebuild)
+ts_signature_parts() {
+    echo "list: $(date -r "$ASN_FILE" +%s 2>/dev/null) $(date -r "$CUSTOM_FILE" +%s 2>/dev/null)"
+    ipset list -n 2>/dev/null | grep -E '^ASNC?_' | sort | sed 's/^/set: /'
+    ts_client_ips | sort | sed 's/^/client: /'
+    for d in $VALID_DESTS; do dev=$(get_ifname "$d"); [ -n "$dev" ] && [ -d "/sys/class/net/$dev" ] && echo "iface: $d=$dev"; done
+    echo "routes: $(ip route show 2>/dev/null | md5sum | cut -d' ' -f1)"
+    echo "jumps: $(iptables -t mangle -S FORWARD 2>/dev/null | grep -c 'ASC_[UD]_')"
+    echo "mode: $(ts_mode)"
+}
 ts_signature() {
-    {
-        date -r "$ASN_FILE" +%s 2>/dev/null
-        date -r "$CUSTOM_FILE" +%s 2>/dev/null
-        ipset list -n 2>/dev/null | grep -E '^ASNC?_' | sort
-        ts_client_ips | sort
-        for d in $VALID_DESTS; do dev=$(get_ifname "$d"); [ -n "$dev" ] && [ -d "/sys/class/net/$dev" ] && echo "$d=$dev"; done
-        ip route show 2>/dev/null | md5sum
-        iptables -t mangle -S FORWARD 2>/dev/null | grep -c 'ASC_[UD]_'
-        ts_mode
-    } | md5sum | cut -d' ' -f1
+    mkdir -p "$TS_RT" 2>/dev/null
+    ts_signature_parts > "$TS_RT/sig.parts.new" 2>/dev/null
+    md5sum < "$TS_RT/sig.parts.new" | cut -d' ' -f1
 }
 
 # ---------- persistence ----------
@@ -6542,6 +6545,11 @@ ts_loop() {
         LP_STEP=signature; sig=$(ts_signature)
         if [ "$sig" != "$(cat "$TS_RT/sig" 2>/dev/null)" ]; then
             LP_STEP=sync; ts_lock; ts_sync >/dev/null 2>&1 && echo "$sig" > "$TS_RT/sig"; ts_unlock
+            # the page shows these counters: read them after the rebuild (before, a rebuild left the numbers of the round before -
+            # and when the counting rules were rebuilt in every round, the page kept showing old numbers, e.g. 0 B for a new entry)
+            LP_STEP=live; ts_live > "$TS_RT/last_live.txt"
+            { tail -n 59 "$TS_RT/syncs" 2>/dev/null; date +%s; } > "$TS_RT/syncs.new" && mv -f "$TS_RT/syncs.new" "$TS_RT/syncs"
+            [ -f "$TS_RT/sig.parts" ] && mv -f "$TS_RT/sig.parts" "$TS_RT/sig.parts.old"; cp -f "$TS_RT/sig.parts.new" "$TS_RT/sig.parts" 2>/dev/null
         else
             LP_STEP=live; ts_live > "$TS_RT/last_live.txt"
         fi
@@ -6680,6 +6688,13 @@ ts_diag() {
     if [ -n "$td_ts" ]; then echo "[INFO] stats.js:         written $((td_now - td_ts)) s ago (the page reads this file)"
     else echo "[WARN] stats.js:         missing - the page has nothing to show (try: stats enable / refresh)"; fi
     if ts_worker_running; then echo "[INFO] rule rebuild:     running right now (counting waits for it)"; else echo "[OK]   rule rebuild:     not running"; fi
+    td_sy=$(awk -v n="$(date +%s)" '$1 >= n - 600 { c++ } END { print c + 0 }' "$TS_RT/syncs" 2>/dev/null)
+    if [ "${td_sy:-0}" -ge 20 ]; then echo "[WARN] rule rebuilds:    ${td_sy} in the last 10 minutes - something they depend on keeps changing (devices, routes, sets)"
+    else echo "[INFO] rule rebuilds:    ${td_sy:-0} in the last 10 minutes"; fi
+    if [ -f "$TS_RT/sig.parts.old" ] && [ -f "$TS_RT/sig.parts" ]; then
+        td_ch=$(diff "$TS_RT/sig.parts.old" "$TS_RT/sig.parts" 2>/dev/null | grep -E '^[-+][a-z]+: ' | head -n 6 | tr '\n' ';' | sed 's/;$//')
+        [ -n "$td_ch" ] && echo "[INFO] last rebuild because: $td_ch"
+    fi
     echo "[INFO] counting rules:   $(iptables -t mangle -S 2>/dev/null | grep -c '^-A ASC_') (chains in FORWARD: $(iptables -t mangle -S FORWARD 2>/dev/null | grep -c 'ASC_[UD]_'))"
     if grep -q "asnmanager" /jffs/scripts/service-event 2>/dev/null; then echo "[OK]   service-event:    hook present"; else echo "[FAIL] service-event:    hook for the WebUI buttons is missing (try: webui install)"; fi
     td_old=0; td_all=0

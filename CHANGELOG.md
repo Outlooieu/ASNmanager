@@ -1,5 +1,6 @@
 ## v3.10.14
 
+- Traffic statistics: an entry could show 0 B on the page although its counting rules counted (reported by AvalonOC on an RT-BE88U). When the counting rules were rebuilt, the page got the counter values of the round before; when they were rebuilt in every round, it kept showing old numbers - for an entry added in between, 0 B. The counters are now read again right after a rebuild. `stats diag` shows how often the counting rules were rebuilt in the last 10 minutes and what changed at the last rebuild (devices, sets, routes ...), to find out why they are rebuilt so often
 - WebUI, Traffic: the table was wider than the card when rows were expanded (long device or interface names in the first column), and its right side - packets and share - was cut off. The first column now wraps, and if a table is still too wide (small screens) it can be scrolled sideways instead of being cut off - for every table of the page
 
 ## v3.10.13
