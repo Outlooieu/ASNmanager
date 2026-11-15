@@ -1,3 +1,7 @@
+## v3.10.14
+
+- WebUI, Traffic: the table was wider than the card when rows were expanded (long device or interface names in the first column), and its right side - packets and share - was cut off. The first column now wraps, and if a table is still too wide (small screens) it can be scrolled sideways instead of being cut off - for every table of the page
+
 ## v3.10.13
 
 - Own presets showed up twice when the same presets.txt was on the router and on the USB device (for example after a restore, which copies the presets to the router): a preset with the same category and name is now listed once, the one on the router first
