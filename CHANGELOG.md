@@ -1,3 +1,9 @@
+## v3.10.14
+
+- The menu (also as option 6 in amtm) opened only after about 20 seconds: at every start it mounted the WebUI tab again, wrote all page data and ran the routing check. Now it only checks that the tab is in place and mounts it only when it is missing or out of date; the page data and the routing check come from their own jobs as before. The update notice in the menu loads only the first 2 KB of the script from GitHub instead of all of it (over 500 KB at every redraw of the menu)
+- Traffic statistics: an entry could show 0 B on the page although its counting rules counted (reported by AvalonOC on an RT-BE88U). When the counting rules were rebuilt, the page got the counter values of the round before; when they were rebuilt in every round, it kept showing old numbers - for an entry added in between, 0 B. The counters are now read again right after a rebuild. `stats diag` shows how often the counting rules were rebuilt in the last 10 minutes and what changed at the last rebuild (devices, sets, routes ...), to find out why they are rebuilt so often
+- WebUI, Traffic: the table was wider than the card when rows were expanded (long device or interface names in the first column), and its right side - packets and share - was cut off. The first column now wraps, and if a table is still too wide (small screens) it can be scrolled sideways instead of being cut off - for every table of the page
+
 ## v3.10.13
 
 - Own presets showed up twice when the same presets.txt was on the router and on the USB device (for example after a restore, which copies the presets to the router): a preset with the same category and name is now listed once, the one on the router first

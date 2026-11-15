@@ -1,5 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<!-- ASNmanager-WebUI v3.10.13 -->
+<!-- ASNmanager-WebUI v3.10.14 -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
@@ -208,7 +208,7 @@
 .asnm-arrow.asnm-open { transform: rotate(90deg); }
 .asnm-gsum { float: right; font-weight: 500; color: var(--muted); font-size: 12px; }
 .asnm-gsum .asnm-badge { margin-left: 6px; }
-.asnm-table-wrap { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.asnm-table-wrap { border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; overflow-y: hidden; }
 #asnm_list { padding: 0; }
 .asnm-lsec + .asnm-lsec { margin-top: 0; padding-top: 0; border-top: 0; }
 .asnm-lsec-head { display: flex; align-items: center; gap: 9px; margin: 0 0 4px; padding: 8px 12px; background: var(--card2); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; }
@@ -257,7 +257,8 @@
 #asnm_tr_card.asnm-tr-open .asnm-tr-head { margin-bottom: 14px; }
 .asnm-tr-btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .asnm-tr-row { cursor: pointer; }
-.asnm-tr-row td:first-child { white-space: nowrap; }
+.asnm-tr-row td:first-child { white-space: normal; }
+.asnm-tr-row td.num { white-space: nowrap; }
 .asnm-tr-other td { background: var(--card2); }
 .asnm-tr-sub td { background: var(--row-hover); font-size: 12px; padding-top: 6px; padding-bottom: 6px; }
 .asnm-tr-sub td:first-child { padding-left: 34px; }
@@ -531,7 +532,7 @@ var ASNM_NS = 'asnmanager';
 // the settings of ALL add-ons: the firmware writes custom_settings.txt anew from what a page sends - so every command
 // sends them back along with its own (taken when the page loads, refreshed from the router after each job)
 var ASNM_CS = <% get_custom_settings(); %>;
-var ASNM_PAGE_VER = '3.10.13';     // the version of this page (same as the marker at the top)
+var ASNM_PAGE_VER = '3.10.14';     // the version of this page (same as the marker at the top)
 var ASNM_FORCE_LANG = '';
 
 /* ============================ i18n ============================ */
