@@ -9074,7 +9074,7 @@ ts_ensure_loop
 
 while true; do
     show_menu
-    read -r opt
+    read -r opt || { echo; exit 0; }      # no input any more (Ctrl+D, closed pipe): end instead of redrawing the menu forever
     act=$(menu_action "$opt")
     case $act in
         list)
