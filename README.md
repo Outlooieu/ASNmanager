@@ -35,7 +35,9 @@ ASN Manager is a script for Asuswrt-Merlin routers that sends the traffic of spe
 
 ## Installation
 
-Run the following command in your router's terminal via SSH:
+**With amtm** (recommended): ASN Manager is part of [amtm](https://diversion.ch/amtm.html), the Asuswrt-Merlin Terminal Menu, since amtm v7.2. Open `amtm` via SSH and choose option **6**. Afterwards option 6 opens ASN Manager, and amtm's update function (`u`) keeps it up to date.
+
+**Manually:** run the following command in your router's terminal via SSH:
 ```
 curl -k -s -o /jffs/scripts/ASNmanager.sh https://raw.githubusercontent.com/Outlooieu/ASNmanager/main/ASNmanager.sh && chmod 755 /jffs/scripts/ASNmanager.sh && /jffs/scripts/ASNmanager.sh install
 ```
@@ -218,7 +220,7 @@ The packs were translated with care but not by native speakers - corrections are
 - **"Another ASN Manager job is still running"**: only one WebUI job runs at a time. The page now shows a job that was started earlier (another tab, another device, before a reload) and follows it until it is finished. A lock left behind by a job that no longer runs is cleared automatically. On the command line, `ASNmanager.sh job` shows the running job, `ASNmanager.sh job clear` removes a stuck lock.
 - **Traffic statistics do not count?** If the counting is not running (for example after a killed job), the traffic card says so and offers **Repair**; the same on the command line: `ASNmanager.sh stats repair`. It keeps the numbers, cleans all temporary files in RAM and sets the counting up again. Opening the page also restarts a stopped counting process by itself. If the buttons answer "No answer from the statistics module", `ASNmanager.sh stats diag` shows in one go where it hangs (counting loop, lock, hook, how long an export takes, how long each ASN Manager process has been running). Runs of the periodic jobs (routing check, failover, helpers of the counting loop) that hang for more than 15 minutes are stopped by the next routing check; `ASNmanager.sh rescue` does it at once. Every name lookup (`nslookup`) and every download has a time limit, the routing check never runs twice at the same time and is stopped after 4 minutes, and the WAN values from `nvram` are read once per run (every `nvram get` is a process of its own and can be slow on a busy router).
 - **Rescue:** if ASN Manager seems stuck, `ASNmanager.sh rescue` stops running jobs (rule rebuilds, failover and check runs - not the statistics), removes all locks and restarts failover and statistics. Apply the rules again afterwards if a rebuild was stopped.
-- **amtm:** `ASNmanager.sh amtmupdate check` returns exit code 0 (amtm may update the script), `ASNmanager.sh amtmupdate` updates without questions (same safe update as the WebUI: syntax check, backup, rollback) and returns 0 on success, 1 on failure. The script file contains the line `version=x.y.z` (no quotes) that amtm reads.
+- **amtm** (option 6, since amtm v7.2): `u` in amtm updates ASN Manager together with the other scripts. Behind it: `ASNmanager.sh amtmupdate check` returns exit code 0 (amtm may update the script), `ASNmanager.sh amtmupdate` updates without questions (same safe update as the WebUI: syntax check, backup, rollback) and returns 0 on success, 1 on failure. The script file contains the line `version=x.y.z` (no quotes) that amtm reads.
 
 ## IPs, ranges and domains
 
