@@ -1,3 +1,7 @@
+## v3.10.15
+
+- WebUI tab showed another add-on (e.g. the MerlinAU dashboard) after a reboot: when two add-ons mount their page at the same moment, both can take the same free page (userN.asp), and the one that writes last wins. The routing check every 5 minutes now notices when the page of the "ASN Manager" tab is missing or belongs to someone else and mounts it again on a free page (system log: "WebUI tab: its page was missing or taken by another add-on")
+
 ## v3.10.14
 
 - The menu (also as option 6 in amtm) opened only after about 20 seconds: at every start it mounted the WebUI tab again, wrote all page data and ran the routing check. Now it only checks that the tab is in place and mounts it only when it is missing or out of date; the page data and the routing check come from their own jobs as before. The update notice in the menu loads only the first 2 KB of the script from GitHub instead of all of it (over 500 KB at every redraw of the menu)

@@ -1,5 +1,5 @@
 #!/bin/sh
-version=3.10.14
+version=3.10.15
 # ASN Manager for Asuswrt-Merlin
 
 # Interactive menu only: CLI / WebUI calls (with arguments) must never grab the TTY
@@ -12,7 +12,7 @@ case ":$PATH:" in *:/usr/sbin:*) ;; *) PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 case ":$PATH:" in *:/opt/sbin:*) ;; *) PATH="$PATH:/opt/sbin:/opt/bin" ;; esac
 export PATH
 
-SCRIPT_VERSION="3.10.14"
+SCRIPT_VERSION="3.10.15"
 SCRIPT_PATH="/jffs/scripts/ASNmanager.sh"
 ASN_FILE="/jffs/scripts/asn_list.txt"
 WORKER_SCRIPT="/jffs/scripts/asn-bypass-worker.sh"
@@ -8987,6 +8987,11 @@ cli_main() {
         check)
             case "$1" in
                 run) proc_reap; ts_ensure_loop >/dev/null 2>&1; sm_hook_sync; agh_ipset_guard
+                     # WebUI tab lost its page (another add-on took the same userN.asp at boot, e.g. MerlinAU): mount it again
+                     if webui_enabled && [ -s "$WEBUI_SRC" ] && [ -f "$ADDON_DIR/webui_page" ] && ! webui_mounted_ok; then
+                         logger -t ASNmanager "WebUI tab: its page was missing or taken by another add-on - mounted again"
+                         webui_mount >/dev/null 2>&1
+                     fi
                      # the lookup log lines of dnsmasq (suggestions by domain): put back when safemode or a reboot after
                      # safemode left them out (dnsmasq is restarted only when they changed)
                      sm_on || sgd_write >/dev/null 2>&1; cu_learned_save >/dev/null 2>&1; dns_export >/dev/null 2>&1; sgd_trim; rc_run_once
