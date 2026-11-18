@@ -8239,7 +8239,8 @@ menu_sed() {
 }
 
 menu_remount() {
-    umount /www/require/modules/menuTree.js 2>/dev/null
+    # all add-ons share /tmp/menuTree.js; mounts stacked by several add-ons are all taken off, then it is mounted once
+    mr_i=0; while [ $mr_i -lt 5 ] && umount /www/require/modules/menuTree.js 2>/dev/null; do mr_i=$((mr_i + 1)); done
     mount -o bind /tmp/menuTree.js /www/require/modules/menuTree.js
 }
 
