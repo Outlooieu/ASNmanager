@@ -8238,6 +8238,12 @@ menu_sed() {
     rm -f /tmp/menuTree.js.asnm
 }
 
+# pages that the menu shows under our tab name although they are not ASN Manager pages
+menu_foreign_tabs() {
+    sed -n "s/.*{url: \"\(user[0-9]*\.asp\)\", tabName: \"$WEBUI_TAB\"}.*/\1/p" /tmp/menuTree.js 2>/dev/null | sort -u |
+    while read -r mf_u; do grep -q "$WEBUI_MARK" "/www/user/$mf_u" 2>/dev/null || echo "$mf_u"; done
+}
+
 menu_remount() {
     # all add-ons share /tmp/menuTree.js; mounts stacked by several add-ons are all taken off, then it is mounted once
     mr_i=0; while [ $mr_i -lt 5 ] && umount /www/require/modules/menuTree.js 2>/dev/null; do mr_i=$((mr_i + 1)); done
@@ -8313,6 +8319,8 @@ webui_mount() {
     [ -f /tmp/menuTree.js ] || cp /www/require/modules/menuTree.js /tmp/
     # remove our previous entries by page URL (the tab name can be shared with another install)
     [ -n "$old" ] && menu_sed "/{url: \"$old\", tabName: \"$WEBUI_TAB\"}/d"
+    # entries with our tab name whose page is not ours (any more): e.g. left over after another add-on took that page
+    for wm_u in $(menu_foreign_tabs); do menu_sed "/{url: \"$wm_u\", tabName: \"$WEBUI_TAB\"}/d"; done
     menu_sed "/{url: \"$am_webui_page\", tabName:/d"
     entry="{url: \"$am_webui_page\", tabName: \"$WEBUI_TAB\"},"
     if [ "$(webui_location)" = "vpn" ]; then
@@ -8426,6 +8434,7 @@ webui_mounted_ok() {
     [ -f "/www/user/$wmo_p" ] && [ -s "$WEBUI_SRC" ] || return 1
     [ "$(md5sum < "$WEBUI_SRC")" = "$(md5sum < "/www/user/$wmo_p")" ] || return 1
     grep -q "{url: \"$wmo_p\", tabName: \"$WEBUI_TAB\"}" /tmp/menuTree.js 2>/dev/null || return 1
+    [ -z "$(menu_foreign_tabs)" ] || return 1
     mount | grep -q ' /www/require/modules/menuTree.js ' || return 1
 }
 
