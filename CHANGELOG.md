@@ -1,6 +1,7 @@
 ## v3.10.15
 
 - WebUI tab showed another add-on (e.g. the MerlinAU dashboard) after a reboot: when two add-ons mount their page at the same moment, both can take the same free page (userN.asp), and the one that writes last wins. The routing check every 5 minutes now notices when the page of the "ASN Manager" tab is missing or belongs to someone else and mounts it again on a free page (system log: "WebUI tab: its page was missing or taken by another add-on")
+- WebUI tab could not be moved or mounted again when another add-on had bind-mounted something onto /tmp/menuTree.js: the menu changes failed with "sed: can't move ... Device or resource busy" and the tab kept pointing to the wrong page. The menu file is now changed by writing its content through instead of replacing the file
 
 ## v3.10.14
 

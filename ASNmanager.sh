@@ -8231,6 +8231,13 @@ service_event() {
 webui_lock()   { exec 9>/tmp/addonwebui.lock; command -v flock >/dev/null 2>&1 && flock -x 9; }
 webui_unlock() { command -v flock >/dev/null 2>&1 && flock -u 9; exec 9>&-; }
 
+# change /tmp/menuTree.js in place: "sed -i" writes a new file and renames it, which fails ("Device or resource busy")
+# when the file itself is a mount point (another add-on bind-mounted something onto it) - write the content through instead
+menu_sed() {
+    sed "$1" /tmp/menuTree.js > /tmp/menuTree.js.asnm 2>/dev/null && cat /tmp/menuTree.js.asnm > /tmp/menuTree.js
+    rm -f /tmp/menuTree.js.asnm
+}
+
 menu_remount() {
     umount /www/require/modules/menuTree.js 2>/dev/null
     mount -o bind /tmp/menuTree.js /www/require/modules/menuTree.js
@@ -8304,15 +8311,15 @@ webui_mount() {
 
     [ -f /tmp/menuTree.js ] || cp /www/require/modules/menuTree.js /tmp/
     # remove our previous entries by page URL (the tab name can be shared with another install)
-    [ -n "$old" ] && sed -i "/{url: \"$old\", tabName: \"$WEBUI_TAB\"}/d" /tmp/menuTree.js
-    sed -i "/{url: \"$am_webui_page\", tabName:/d" /tmp/menuTree.js
+    [ -n "$old" ] && menu_sed "/{url: \"$old\", tabName: \"$WEBUI_TAB\"}/d"
+    menu_sed "/{url: \"$am_webui_page\", tabName:/d"
     entry="{url: \"$am_webui_page\", tabName: \"$WEBUI_TAB\"},"
     if [ "$(webui_location)" = "vpn" ]; then
         # VPN menu: insert as last tab (after Instant Guard), i.e. before the menu's "__INHERIT__" end marker
         vpn_ln=$(grep -n 'menu_VPN"' /tmp/menuTree.js | head -n 1 | cut -d':' -f1)
         if [ -n "$vpn_ln" ]; then
             end_ln=$(awk -v s="$vpn_ln" 'NR > s && /tabName: *"__INHERIT__"/ { print NR; exit }' /tmp/menuTree.js)
-            [ -n "$end_ln" ] && sed -i "${end_ln}i $entry" /tmp/menuTree.js
+            [ -n "$end_ln" ] && menu_sed "${end_ln}i $entry"
         fi
     fi
     help_ln=$(grep -n "shared-jy/redirect.htm" /tmp/menuTree.js | head -n 1 | cut -d':' -f1)
@@ -8320,10 +8327,10 @@ webui_mount() {
         :
     elif [ -n "$help_ln" ]; then
         # Shared "Addons" menu (vnStat-on-Merlin, scMerlin, ...) already exists -> add our tab there
-        sed -i "${help_ln}i $entry" /tmp/menuTree.js
+        menu_sed "${help_ln}i $entry"
     else
         # Fallback: official Merlin example location (Tools menu)
-        sed -i "/url: \"Tools_OtherSettings.asp\", tabName:/a $entry" /tmp/menuTree.js
+        menu_sed "/url: \"Tools_OtherSettings.asp\", tabName:/a $entry"
     fi
     menu_remount
     webui_unlock
@@ -8341,7 +8348,7 @@ webui_unmount() {
     page=$(cat "$ADDON_DIR/webui_page" 2>/dev/null)
     webui_lock
     if [ -f /tmp/menuTree.js ]; then
-        case "$page" in user[0-9]*.asp) sed -i "/{url: \"$page\", tabName: \"$WEBUI_TAB\"}/d" /tmp/menuTree.js ;; esac
+        case "$page" in user[0-9]*.asp) menu_sed "/{url: \"$page\", tabName: \"$WEBUI_TAB\"}/d" ;; esac
         menu_remount
     fi
     case "$page" in
