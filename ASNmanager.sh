@@ -5354,6 +5354,8 @@ dnsf_vnat() {
     dv_ok=1
     for dv_tb in nat mangle; do iptables -t $dv_tb -C OUTPUT -j ASNM_DNSV 2>/dev/null || dv_ok=0; done
     if [ -s "$1" ]; then
+        # the copy for the early step at boot - also when nothing else changed (written only when it differs)
+        [ "$1" = "$DNSF_VMAP_BOOT" ] || cmp -s "$1" "$DNSF_VMAP_BOOT" 2>/dev/null || { mkdir -p "$ADDON_DIR"; cp "$1" "$DNSF_VMAP_BOOT"; }
         cmp -s "$1" "$DNSF_VMAP" && [ $dv_ok -eq 1 ] && return 0
         for dv_tb in nat mangle; do
             iptables -t $dv_tb -N ASNM_DNSV 2>/dev/null; iptables -t $dv_tb -F ASNM_DNSV
@@ -5365,7 +5367,6 @@ dnsf_vnat() {
             for dv_p in udp tcp; do iptables -t nat -A ASNM_DNSV -d "$dv_v/32" -p $dv_p --dport 53 -j DNAT --to-destination "$dv_r"; done
         done < "$1"
         cp "$1" "$DNSF_VMAP"
-        [ "$1" = "$DNSF_VMAP_BOOT" ] || cmp -s "$1" "$DNSF_VMAP_BOOT" 2>/dev/null || { mkdir -p "$ADDON_DIR"; cp "$1" "$DNSF_VMAP_BOOT"; }
         logger -t ASNmanager "DNS follows the route: $(wc -l < "$1") stand-in DNS address(es) for servers on several VPN lines"
     else
         [ -s "$DNSF_VMAP" ] || iptables -t nat -L ASNM_DNSV -n >/dev/null 2>&1 || return 0
