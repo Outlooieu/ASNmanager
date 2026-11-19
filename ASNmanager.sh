@@ -5146,6 +5146,11 @@ DNSF_PRIO=10500                                  # before the VPN Director (11xx
 DNSF_VPRIO=9860
 DNSF_VNET=198.18.53
 DNSF_VMAP=/tmp/asnmanager-dnsf.vmap
+# copies for the early step at boot (flash, written only when they change): the DNS rules and stand-in addresses are
+# set before AdGuard Home / dnsmasq pass on the first lookups - otherwise every device on a VPN line had no DNS for
+# about 30 s after a reboot (20 s timeouts to the stand-in addresses until dnsf_sync ran)
+DNSF_RULES_BOOT="$ADDON_DIR/dnsf.rules.boot"
+DNSF_VMAP_BOOT="$ADDON_DIR/dnsf.vmap.boot"
 DNSF_MAX=${DNSF_MAX:-2000}                       # at most this many learned names
 DNSF_BEGIN="# ASNmanager dnsfollow begin"
 DNSF_END="# ASNmanager dnsfollow end"
@@ -5317,6 +5322,31 @@ dnsf_set() {
     return 0
 }
 
+# sets the DNS routing rules of a rules file (lines: "<ip> <table|unreachable>" or "m:<mark> <ip> <table|unreachable>")
+dnsf_rules_apply() {
+    for dra_p in $DNSF_PRIO $((DNSF_PRIO + 1)) $DNSF_VPRIO $((DNSF_VPRIO + 1)); do
+        while ip rule show 2>/dev/null | grep -q "^${dra_p}:"; do ip rule del prio "$dra_p" 2>/dev/null || break; done
+    done
+    while read -r dra_a dra_b dra_c; do
+        case "$dra_a" in
+            m:*) if [ "$dra_c" = "unreachable" ]; then ip rule add iif lo fwmark "${dra_a#m:}/$MARK_MASK" to "$dra_b/32" unreachable prio $((DNSF_VPRIO + 1)) 2>/dev/null
+                 else ip rule add iif lo fwmark "${dra_a#m:}/$MARK_MASK" to "$dra_b/32" lookup "$dra_c" prio "$DNSF_VPRIO" 2>/dev/null; fi ;;
+            *)   if [ "$dra_b" = "unreachable" ]; then ip rule add iif lo to "$dra_a/32" unreachable prio $((DNSF_PRIO + 1)) 2>/dev/null
+                 else ip rule add iif lo to "$dra_a/32" lookup "$dra_b" prio "$DNSF_PRIO" 2>/dev/null; fi ;;
+        esac
+    done < "$1"
+    cp "$1" "$DNSF_RULES"
+    ip route flush cache 2>/dev/null
+}
+
+# early step at boot: the DNS rules and stand-in addresses of the last run, before dnsmasq / AdGuard Home answer
+dnsf_early() {
+    { dnsf_on || dnsd_on; } || return 0
+    [ -s "$DNSF_RULES_BOOT" ] && dnsf_rules_apply "$DNSF_RULES_BOOT"
+    [ -s "$DNSF_VMAP_BOOT" ] && dnsf_vnat "$DNSF_VMAP_BOOT"
+    return 0
+}
+
 # removes everything: rules, servers file, our dnsmasq block
 # stand-in DNS addresses (see DNSF_VPRIO): mark (mangle OUTPUT) and rewrite to the real address (nat OUTPUT), only for
 # the router itself; rebuilt when the list changed or a firewall restart removed the chains
@@ -5335,6 +5365,7 @@ dnsf_vnat() {
             for dv_p in udp tcp; do iptables -t nat -A ASNM_DNSV -d "$dv_v/32" -p $dv_p --dport 53 -j DNAT --to-destination "$dv_r"; done
         done < "$1"
         cp "$1" "$DNSF_VMAP"
+        [ "$1" = "$DNSF_VMAP_BOOT" ] || cmp -s "$1" "$DNSF_VMAP_BOOT" 2>/dev/null || { mkdir -p "$ADDON_DIR"; cp "$1" "$DNSF_VMAP_BOOT"; }
         logger -t ASNmanager "DNS follows the route: $(wc -l < "$1") stand-in DNS address(es) for servers on several VPN lines"
     else
         [ -s "$DNSF_VMAP" ] || iptables -t nat -L ASNM_DNSV -n >/dev/null 2>&1 || return 0
@@ -5342,7 +5373,7 @@ dnsf_vnat() {
             while iptables -t $dv_tb -D OUTPUT -j ASNM_DNSV 2>/dev/null; do :; done
             iptables -t $dv_tb -F ASNM_DNSV 2>/dev/null; iptables -t $dv_tb -X ASNM_DNSV 2>/dev/null
         done
-        rm -f "$DNSF_VMAP"
+        rm -f "$DNSF_VMAP" "$DNSF_VMAP_BOOT"
     fi
     return 0
 }
@@ -5351,7 +5382,7 @@ dnsf_clear() {
     for dc_p in $DNSF_PRIO $((DNSF_PRIO + 1)) $DNSF_VPRIO $((DNSF_VPRIO + 1)); do
         while ip rule show 2>/dev/null | grep -q "^${dc_p}:"; do ip rule del prio "$dc_p" 2>/dev/null || break; done
     done
-    rm -f "$DNSF_RULES" "$DNSF_STATE"
+    rm -f "$DNSF_RULES" "$DNSF_STATE" "$DNSF_RULES_BOOT" "$DNSF_VMAP_BOOT"
     [ -s "$DNSF_UBSTATE" ] && { : > /tmp/asnmanager-ub.none; dnsf_ub_sync /tmp/asnmanager-ub.none; rm -f /tmp/asnmanager-ub.none "$DNSF_UBSTATE"; }
     [ -f "$DNSF_SERVERS" ] && { rm -f "$DNSF_SERVERS" "$DNSF_OWN"; dnsf_conf_write; }
 }
@@ -5617,20 +5648,9 @@ dnsf_sync_run() {
     done < "$ds_tmp/vmap"
     ds_nrules=$(ip rule show 2>/dev/null | grep -c "^${DNSF_PRIO}:\|^$((DNSF_PRIO + 1)):\|^${DNSF_VPRIO}:\|^$((DNSF_VPRIO + 1)):")
     if ! cmp -s "$ds_tmp/rules" "$DNSF_RULES" || [ "$ds_nrules" -ne "$(wc -l < "$ds_tmp/rules")" ]; then
-        for ds_p in $DNSF_PRIO $((DNSF_PRIO + 1)) $DNSF_VPRIO $((DNSF_VPRIO + 1)); do
-            while ip rule show 2>/dev/null | grep -q "^${ds_p}:"; do ip rule del prio "$ds_p" 2>/dev/null || break; done
-        done
-        while read -r ds_a ds_b ds_c; do
-            case "$ds_a" in
-                m:*) if [ "$ds_c" = "unreachable" ]; then ip rule add iif lo fwmark "${ds_a#m:}/$MARK_MASK" to "$ds_b/32" unreachable prio $((DNSF_VPRIO + 1)) 2>/dev/null
-                     else ip rule add iif lo fwmark "${ds_a#m:}/$MARK_MASK" to "$ds_b/32" lookup "$ds_c" prio "$DNSF_VPRIO" 2>/dev/null; fi ;;
-                *)   if [ "$ds_b" = "unreachable" ]; then ip rule add iif lo to "$ds_a/32" unreachable prio $((DNSF_PRIO + 1)) 2>/dev/null
-                     else ip rule add iif lo to "$ds_a/32" lookup "$ds_b" prio "$DNSF_PRIO" 2>/dev/null; fi ;;
-            esac
-        done < "$ds_tmp/rules"
-        cp "$ds_tmp/rules" "$DNSF_RULES"
-        ip route flush cache 2>/dev/null
+        dnsf_rules_apply "$ds_tmp/rules"
     fi
+    cmp -s "$ds_tmp/rules" "$DNSF_RULES_BOOT" 2>/dev/null || { mkdir -p "$ADDON_DIR"; cp "$ds_tmp/rules" "$DNSF_RULES_BOOT"; }
     dnsf_vnat "$ds_tmp/vmap"
     # 8) servers file: written (flash) only when it changed; dnsmasq reads it again on SIGHUP
     dnsf_on || : > "$ds_tmp/servers"
@@ -8543,9 +8563,10 @@ cli_early() {
     DL_NODNS=1; dl_sync; DL_NODNS=""
     ks_sync
     lg_sync
+    dnsf_early
     ( "$SCRIPT_PATH" routes wait ) </dev/null >/dev/null 2>&1 &
     eb_n=$(dl_rules_now | grep -c .)
-    logger -t ASNmanager "Boot: early step - $eb_n device line rule(s), kill switch $(ks_on && echo on || echo off), excluded $(ex_list | grep -c .)"
+    logger -t ASNmanager "Boot: early step - $eb_n device line rule(s), kill switch $(ks_on && echo on || echo off), excluded $(ex_list | grep -c .), DNS rules $(ip rule show 2>/dev/null | grep -c "^${DNSF_PRIO}:\|^$((DNSF_PRIO + 1)):\|^${DNSF_VPRIO}:\|^$((DNSF_VPRIO + 1)):"), stand-in DNS $(wc -l < "$DNSF_VMAP" 2>/dev/null || echo 0)"
     return 0
 }
 sm_hook_sync() {
